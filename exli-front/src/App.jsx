@@ -1,35 +1,43 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+  PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend
 } from 'recharts';
 import {
-  LayoutGrid, Upload, Users, PieChart as PieIcon, Settings, Plus,
-  Trash2, Save, ArrowRight, CheckCircle, Activity, Shield, LogOut,
-  FileText, DollarSign, Calendar
+  LayoutGrid, Upload, Users, PieChart as PieIcon, Settings,
+  ArrowRight, CheckCircle, Activity, Shield, DollarSign, Calendar
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import {
-  getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, signOut
+  getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged
 } from 'firebase/auth';
 import {
-  getFirestore, collection, doc, setDoc, addDoc, onSnapshot, query, orderBy, deleteDoc, serverTimestamp
+  getFirestore, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp
 } from 'firebase/firestore';
 
-// --- Firebase Initialization (Adhering to Mandatory Rules) ---
+// --- CONFIGURATION ---
+
+// 1. PASTE YOUR CLOUD RUN URL HERE (No trailing slash)
+// Example: "https://exli-processor-fw87sfs-uc.a.run.app"
+const CLOUD_RUN_URL = import.meta.env.VITE_CLOUD_RUN_URL;
+
+
 const firebaseConfig = {
-  apiKey: "PASTE_YOUR_API_KEY_HERE",
-  authDomain: "PASTE_YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "PASTE_YOUR_PROJECT_ID",
-  storageBucket: "PASTE_YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "PASTE_YOUR_SENDER_ID",
-  appId: "PASTE_YOUR_APP_ID"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
+
+// --- INITIALIZATION ---
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+const appId = "exli-local-v1";
 
-// --- Shared/Utility Components ---
+// --- SHARED COMPONENTS ---
 
 const Card = ({ children, className = "" }) => (
   <div className={`bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden ${className}`}>
@@ -41,8 +49,6 @@ const Button = ({ children, onClick, variant = "primary", className = "", disabl
   const variants = {
     primary: "bg-emerald-600 text-white hover:bg-emerald-700",
     secondary: "bg-slate-100 text-slate-700 hover:bg-slate-200",
-    outline: "border-2 border-slate-200 text-slate-600 hover:border-emerald-500 hover:text-emerald-600",
-    danger: "bg-red-50 text-red-600 hover:bg-red-100"
   };
   return (
     <button
@@ -55,30 +61,101 @@ const Button = ({ children, onClick, variant = "primary", className = "", disabl
   );
 };
 
-// --- Feature Nodes ---
+// --- FEATURE NODES ---
 
-// 1. The Importer Node
+// 1. The Smart Import Node (Connected to Cloud Run)
 const ImportNode = ({ userId, onComplete }) => {
   const [step, setStep] = useState(1);
-  const [rawData, setRawData] = useState("");
-  const [parsedRows, setParsedRows] = useState([]);
-  const [columnMapping, setColumnMapping] = useState({ date: 0, description: 1, amount: 2, category: 3 });
-  const [isSaving, setIsSaving] = useState(false);
+  const [file, setFile] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  // Simulating a CSV parse
-  const handleParse = () => {
-    if (!rawData) return;
-    const rows = rawData.split('\n').map(row => row.split(',').map(cell => cell.trim())).filter(row => row.length > 1);
-    setParsedRows(rows);
-    setStep(2);
+  // Data from Server
+  const [headers, setHeaders] = useState([]);      // List of column names ["Date", "Amount", ...]
+  const [parsedRows, setParsedRows] = useState([]); // List of lists [[...], [...]]
+
+  // Mapping: Stores the INDEX of the column (0, 1, 2...)
+  const [columnMapping, setColumnMapping] = useState({
+    date: '', description: '', amount: '', category: '', currency: ''
+  });
+
+  const handleFileChange = (e) => {
+    if (e.target.files[0]) {
+      setFile(e.target.files[0]);
+      setError(null);
+    }
+  };
+
+  const handleUploadAndAnalyze = async () => {
+    if (!file) return;
+    setIsLoading(true);
+    setError(null);
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      // 1. Send file to Python Backend
+      const response = await fetch(`${CLOUD_RUN_URL}/analyze-file`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Server Error: ${response.statusText} - ${errText}`);
+      }
+
+      const data = await response.json();
+
+      // 2. Update state with server response
+      setHeaders(data.columns);
+      setParsedRows(data.preview_data);
+
+      // 3. Apply the "Smart Mapping" suggestions from Python
+      // The server returns names like { date: "Transaction Date" }
+      // We convert that to indices for the UI logic
+      const suggestions = {};
+
+      // Helper to find index of a column name
+      const findIndex = (name) => data.columns.indexOf(name);
+
+      if (data.suggested_mapping) {
+        if (data.suggested_mapping.date) suggestions.date = findIndex(data.suggested_mapping.date);
+        if (data.suggested_mapping.description) suggestions.description = findIndex(data.suggested_mapping.description);
+        if (data.suggested_mapping.amount) suggestions.amount = findIndex(data.suggested_mapping.amount);
+        if (data.suggested_mapping.category) suggestions.category = findIndex(data.suggested_mapping.category);
+        if (data.suggested_mapping.currency) suggestions.currency = findIndex(data.suggested_mapping.currency);
+      }
+
+      // Remove any -1 (not found) values
+      Object.keys(suggestions).forEach(key => {
+        if (suggestions[key] === -1) delete suggestions[key];
+      });
+
+      setColumnMapping(prev => ({ ...prev, ...suggestions }));
+      setStep(2);
+
+    } catch (err) {
+      console.error(err);
+      setError("Failed to analyze file. Check if Cloud Run URL is correct and server is running.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSave = async () => {
-    setIsSaving(true);
+    setIsLoading(true);
     try {
       const expensesRef = collection(db, 'artifacts', appId, 'users', userId, 'expenses');
-      const batchPromises = parsedRows.slice(1).map(async (row) => { // Skip header
-        const amount = parseFloat(row[columnMapping.amount]?.replace(/[^0-9.-]+/g, ""));
+
+      // parsedRows contains raw data. We map it using the indices selected by the user.
+      const batchPromises = parsedRows.map(async (row) => {
+        // Get raw amount
+        const rawAmount = row[columnMapping.amount];
+        // Clean string to number (remove currency symbols, commas)
+        const amount = parseFloat(String(rawAmount).replace(/[^0-9.-]+/g, ""));
+
         if (isNaN(amount)) return null;
 
         return addDoc(expensesRef, {
@@ -86,7 +163,8 @@ const ImportNode = ({ userId, onComplete }) => {
           description: row[columnMapping.description] || "Unknown",
           amount: amount,
           category: row[columnMapping.category] || "Uncategorized",
-          source: "import",
+          currency: row[columnMapping.currency] || "ILS",
+          source: "import_cloud_v1",
           createdAt: serverTimestamp()
         });
       });
@@ -95,8 +173,9 @@ const ImportNode = ({ userId, onComplete }) => {
       setStep(3);
     } catch (error) {
       console.error("Error saving batch:", error);
+      setError("Failed to save data to Firebase.");
     } finally {
-      setIsSaving(false);
+      setIsLoading(false);
     }
   };
 
@@ -105,9 +184,9 @@ const ImportNode = ({ userId, onComplete }) => {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Upload className="w-6 h-6 text-emerald-600" /> Data Importer
+            <Upload className="w-6 h-6 text-emerald-600" /> Smart Importer
           </h2>
-          <p className="text-slate-500 mt-1">Import raw data from your bank or Excel.</p>
+          <p className="text-slate-500 mt-1">Upload your bank statement (Excel or CSV).</p>
         </div>
         <div className="flex gap-2">
           {[1, 2, 3].map(s => (
@@ -117,19 +196,40 @@ const ImportNode = ({ userId, onComplete }) => {
       </div>
 
       {step === 1 && (
-        <div className="space-y-4">
-          <div className="bg-blue-50 p-4 rounded-lg text-blue-800 text-sm flex gap-3">
-            <FileText className="w-5 h-5 shrink-0" />
-            <p>Paste your CSV data below. For this demo, ensure columns are comma-separated. <br />Example: <code>2023-11-01, Grocery Store, 45.50, Food</code></p>
+        <div className="space-y-6">
+          <div className="border-2 border-dashed border-slate-300 rounded-2xl p-12 text-center hover:bg-slate-50 transition-colors relative">
+            <input
+              type="file"
+              accept=".csv, .xls, .xlsx"
+              onChange={handleFileChange}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            />
+            <div className="pointer-events-none">
+              <Upload className={`w-12 h-12 mx-auto mb-4 ${file ? 'text-emerald-600' : 'text-slate-400'}`} />
+              {file ? (
+                <div>
+                  <div className="font-bold text-lg text-slate-800">{file.name}</div>
+                  <div className="text-sm text-slate-500">{(file.size / 1024).toFixed(2)} KB</div>
+                </div>
+              ) : (
+                <div>
+                  <div className="font-bold text-lg text-slate-600">Click or Drag file here</div>
+                  <div className="text-sm text-slate-400">Supports CSV, Excel (XLS/XLSX)</div>
+                </div>
+              )}
+            </div>
           </div>
-          <textarea
-            className="w-full h-64 p-4 border border-slate-200 rounded-xl font-mono text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-            placeholder="Paste data here..."
-            value={rawData}
-            onChange={(e) => setRawData(e.target.value)}
-          />
+
+          {error && (
+            <div className="p-4 bg-red-50 text-red-700 rounded-xl text-sm flex items-center gap-2">
+              <Activity className="w-4 h-4" /> {error}
+            </div>
+          )}
+
           <div className="flex justify-end">
-            <Button onClick={handleParse} disabled={!rawData}>Next: Map Columns <ArrowRight className="w-4 h-4" /></Button>
+            <Button onClick={handleUploadAndAnalyze} disabled={!file || isLoading}>
+              {isLoading ? 'Analyzing on Cloud...' : 'Upload & Analyze'} <ArrowRight className="w-4 h-4" />
+            </Button>
           </div>
         </div>
       )}
@@ -137,18 +237,22 @@ const ImportNode = ({ userId, onComplete }) => {
       {step === 2 && (
         <div className="space-y-6">
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-            <h3 className="font-semibold mb-4 text-slate-700">Map your columns</h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {['Date', 'Description', 'Amount', 'Category'].map((field) => (
+            <h3 className="font-semibold mb-4 text-slate-700 flex justify-between">
+              <span>Confirm Column Mapping</span>
+              <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded">AI Suggestions Applied</span>
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+              {['Date', 'Description', 'Amount', 'Category', 'Currency'].map((field) => (
                 <div key={field}>
                   <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{field}</label>
                   <select
-                    className="w-full p-2 bg-white border border-slate-300 rounded-lg"
+                    className="w-full p-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
                     onChange={(e) => setColumnMapping(prev => ({ ...prev, [field.toLowerCase()]: parseInt(e.target.value) }))}
-                    value={columnMapping[field.toLowerCase()]}
+                    value={columnMapping[field.toLowerCase()] ?? ""}
                   >
-                    {parsedRows[0]?.map((_, idx) => (
-                      <option key={idx} value={idx}>Column {idx + 1} ({parsedRows[0][idx]})</option>
+                    <option value="">Select Column...</option>
+                    {headers.map((header, idx) => (
+                      <option key={idx} value={idx}>{header}</option>
                     ))}
                   </select>
                 </div>
@@ -156,34 +260,34 @@ const ImportNode = ({ userId, onComplete }) => {
             </div>
           </div>
 
-          <div className="border rounded-xl overflow-hidden">
+          <div className="border rounded-xl overflow-hidden overflow-x-auto">
             <table className="w-full text-sm text-left">
               <thead className="bg-slate-100 text-slate-600 font-medium">
                 <tr>
-                  <th className="p-3">Date</th>
-                  <th className="p-3">Description</th>
-                  <th className="p-3">Amount</th>
-                  <th className="p-3">Category</th>
+                  {headers.map((h, i) => <th key={i} className="p-3 whitespace-nowrap">{h}</th>)}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {parsedRows.slice(1, 6).map((row, i) => (
-                  <tr key={i} className="bg-white">
-                    <td className="p-3 text-slate-500">{row[columnMapping.date]}</td>
-                    <td className="p-3 font-medium text-slate-700">{row[columnMapping.description]}</td>
-                    <td className="p-3 text-emerald-600 font-mono">{row[columnMapping.amount]}</td>
-                    <td className="p-3"><span className="bg-slate-100 px-2 py-1 rounded text-xs">{row[columnMapping.category] || 'Uncategorized'}</span></td>
+                {parsedRows.map((row, i) => (
+                  <tr key={i} className="bg-white hover:bg-slate-50">
+                    {row.map((cell, j) => (
+                      <td key={j} className={`p-3 whitespace-nowrap ${j === columnMapping.amount ? 'font-mono text-emerald-600 font-bold' :
+                        j === columnMapping.date ? 'text-blue-600' : 'text-slate-500'
+                        }`}>
+                        {cell}
+                      </td>
+                    ))}
                   </tr>
                 ))}
               </tbody>
             </table>
-            <div className="p-2 bg-slate-50 text-center text-xs text-slate-400">Showing first 5 rows preview</div>
+            <div className="p-2 bg-slate-50 text-center text-xs text-slate-400">Showing first 5 rows from file</div>
           </div>
 
           <div className="flex justify-between">
             <Button variant="secondary" onClick={() => setStep(1)}>Back</Button>
-            <Button onClick={handleSave} disabled={isSaving}>
-              {isSaving ? 'Processing...' : `Import ${parsedRows.length - 1} Transactions`}
+            <Button onClick={handleSave} disabled={isLoading}>
+              {isLoading ? 'Saving...' : 'Import Transactions'}
             </Button>
           </div>
         </div>
@@ -205,7 +309,6 @@ const ImportNode = ({ userId, onComplete }) => {
 
 // 2. The Analytics Node
 const AnalyticsNode = ({ data }) => {
-  // Aggregate data by category
   const categoryData = useMemo(() => {
     const agg = {};
     data.forEach(item => {
@@ -252,139 +355,54 @@ const AnalyticsNode = ({ data }) => {
             <div className="h-64 flex items-center justify-center text-slate-400">No data available</div>
           )}
         </Card>
-
-        <Card className="p-6">
-          <h3 className="font-semibold text-slate-700 mb-4">Monthly Trends</h3>
-          <div className="h-64 w-full flex items-center justify-center bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-400 text-sm">
-            Trend charts available after 2 months of data
-          </div>
-        </Card>
-      </div>
-
-      <div className="mt-8">
-        <h3 className="font-semibold text-slate-700 mb-4">Recent Transactions</h3>
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          {data.length > 0 ? (
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left text-slate-500">
-                <tr>
-                  <th className="p-4 font-medium">Date</th>
-                  <th className="p-4 font-medium">Description</th>
-                  <th className="p-4 font-medium">Category</th>
-                  <th className="p-4 font-medium text-right">Amount</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {data.slice(0, 5).map((item) => (
-                  <tr key={item.id}>
-                    <td className="p-4 text-slate-500">{new Date(item.date).toLocaleDateString()}</td>
-                    <td className="p-4 font-medium text-slate-700">{item.description}</td>
-                    <td className="p-4"><span className="px-2 py-1 rounded bg-slate-100 text-xs">{item.category}</span></td>
-                    <td className="p-4 text-right font-mono text-slate-700">${parseFloat(item.amount).toFixed(2)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <div className="p-8 text-center text-slate-500">No transactions found. Try importing data.</div>
-          )}
-        </div>
       </div>
     </div>
   );
 };
 
-// 3. Social/Benchmark Node
+// 3. Social Node Placeholder
 const SocialNode = () => (
   <div className="p-6 animate-fade-in">
     <h2 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2">
       <Users className="w-6 h-6 text-purple-600" /> Community Benchmarks
     </h2>
-
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-      <Card className="p-6 bg-gradient-to-br from-purple-50 to-white">
-        <div className="text-sm text-purple-600 font-bold uppercase tracking-wider mb-2">Dining Out</div>
-        <div className="text-3xl font-bold text-slate-800 mb-1">$450</div>
-        <div className="text-xs text-slate-500">Avg. for users like you</div>
-        <div className="mt-4 flex items-center text-xs text-green-600 font-medium bg-green-50 w-fit px-2 py-1 rounded">
-          You are 12% below avg
-        </div>
-      </Card>
-
-      <Card className="p-6 bg-gradient-to-br from-blue-50 to-white">
-        <div className="text-sm text-blue-600 font-bold uppercase tracking-wider mb-2">Groceries</div>
-        <div className="text-3xl font-bold text-slate-800 mb-1">$320</div>
-        <div className="text-xs text-slate-500">Avg. for users like you</div>
-        <div className="mt-4 flex items-center text-xs text-red-600 font-medium bg-red-50 w-fit px-2 py-1 rounded">
-          You are 5% above avg
-        </div>
-      </Card>
-
-      <Card className="p-6 bg-gradient-to-br from-amber-50 to-white">
-        <div className="text-sm text-amber-600 font-bold uppercase tracking-wider mb-2">Savings Rate</div>
-        <div className="text-3xl font-bold text-slate-800 mb-1">18%</div>
-        <div className="text-xs text-slate-500">Community Goal</div>
-        <div className="mt-4 flex items-center text-xs text-slate-500 font-medium bg-slate-100 w-fit px-2 py-1 rounded">
-          Keep going!
-        </div>
-      </Card>
-    </div>
-
-    <div className="bg-blue-50 border border-blue-100 p-6 rounded-xl flex items-start gap-4">
-      <Shield className="w-6 h-6 text-blue-600 shrink-0 mt-1" />
-      <div>
-        <h4 className="font-bold text-blue-800 mb-1">Privacy First</h4>
-        <p className="text-sm text-blue-700">
-          Exli compares your spending categories anonymously. We never share your transaction details, specific locations, or raw amounts associated with your identity. Only aggregate percentages are used for community nodes.
-        </p>
-      </div>
+    <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed">
+      Feature coming soon!
     </div>
   </div>
 );
 
-// --- Main App Component ---
+// --- MAIN APP ---
 
 export default function App() {
   const [user, setUser] = useState(null);
   const [expenses, setExpenses] = useState([]);
-  const [activeNode, setActiveNode] = useState('dashboard'); // dashboard, import, analytics, social
+  const [activeNode, setActiveNode] = useState('dashboard');
   const [loading, setLoading] = useState(true);
 
-  // Auth Listener
+  // Auth
   useEffect(() => {
     const initAuth = async () => {
-      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-        await signInWithCustomToken(auth, __initial_auth_token);
-      } else {
-        await signInAnonymously(auth);
-      }
+      await signInAnonymously(auth);
     };
     initAuth();
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
+    return onAuthStateChanged(auth, (u) => {
       setUser(u);
       setLoading(false);
     });
-    return () => unsubscribe();
   }, []);
 
-  // Data Fetching
+  // Data
   useEffect(() => {
     if (!user) return;
-
     const expensesRef = collection(db, 'artifacts', appId, 'users', user.uid, 'expenses');
     const q = query(expensesRef, orderBy('date', 'desc'));
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setExpenses(data);
-    }, (error) => {
-      console.error("Error fetching expenses:", error);
-    });
-
-    return () => unsubscribe();
+    return onSnapshot(q, (snapshot) => {
+      setExpenses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => console.error("Data fetch error:", error));
   }, [user]);
 
-  // Calculation for Dashboard Summary
   const totalSpent = useMemo(() => expenses.reduce((acc, curr) => acc + Number(curr.amount), 0), [expenses]);
 
   if (loading) return <div className="h-screen w-full flex items-center justify-center bg-slate-50 text-emerald-600 font-bold animate-pulse">Loading Exli...</div>;
@@ -407,7 +425,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
-
       {/* Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -422,7 +439,7 @@ export default function App() {
             {user && (
               <div className="hidden md:flex items-center gap-2 text-sm text-slate-500 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-200">
                 <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                User: {user.uid.slice(0, 6)}...
+                {user.uid.slice(0, 6)}...
               </div>
             )}
           </div>
@@ -432,15 +449,8 @@ export default function App() {
       {/* Main Content */}
       <main className="max-w-6xl mx-auto px-4 py-8">
 
-        {/* DASHBOARD VIEW (Grid of Nodes) */}
         {activeNode === 'dashboard' && (
           <div className="animate-fade-in">
-            <div className="mb-10 text-center max-w-2xl mx-auto">
-              <h1 className="text-3xl font-extrabold text-slate-800 mb-3">Welcome to your financial command center.</h1>
-              <p className="text-slate-500 text-lg">Configure your nodes to manage expenses, sync with partners, and analyze your growth.</p>
-            </div>
-
-            {/* High Level Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
               <Card className="p-6 flex items-center gap-4 border-l-4 border-l-emerald-500">
                 <div className="p-3 rounded-full bg-emerald-50 text-emerald-600"><DollarSign /></div>
@@ -456,43 +466,35 @@ export default function App() {
                   <div className="text-2xl font-bold text-slate-800">{expenses.length}</div>
                 </div>
               </Card>
-              <Card className="p-6 flex items-center gap-4 border-l-4 border-l-purple-500 opacity-60 cursor-not-allowed">
-                <div className="p-3 rounded-full bg-purple-50 text-purple-600"><Users /></div>
-                <div>
-                  <div className="text-sm text-slate-500 font-medium">Partner Mode</div>
-                  <div className="text-sm font-bold text-slate-800">Connect Account</div>
-                </div>
-              </Card>
             </div>
 
-            {/* Nodes Grid */}
             <h2 className="text-xl font-bold text-slate-700 mb-4">Your Active Nodes</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <NodeCard
                 id="import"
-                title="Data Importer"
-                description="Parse CSVs from banks or Excel files. Map columns intelligently."
+                title="Smart Importer"
+                description="Upload Excel/CSV. AI auto-detects columns."
                 icon={Upload}
                 color="text-emerald-600"
               />
               <NodeCard
                 id="analytics"
                 title="Visual Analytics"
-                description="Deep dive into your spending habits with interactive graphs."
+                description="Charts and breakdowns of your spending."
                 icon={PieIcon}
                 color="text-blue-600"
               />
               <NodeCard
                 id="social"
                 title="Community"
-                description="Compare your benchmarks anonymously with the Exli network."
+                description="Benchmarks (Coming Soon)."
                 icon={Users}
                 color="text-purple-600"
               />
               <NodeCard
                 id="settings"
                 title="Node Settings"
-                description="Customize which modules are active in your dashboard."
+                description="Configure modules."
                 icon={Settings}
                 color="text-slate-600"
               />
@@ -500,10 +502,8 @@ export default function App() {
           </div>
         )}
 
-        {/* ACTIVE NODE VIEWS */}
         {activeNode !== 'dashboard' && (
           <div className="bg-white min-h-[600px] rounded-3xl shadow-xl border border-slate-200 overflow-hidden flex flex-col">
-            {/* Node Toolbar */}
             <div className="bg-slate-50 border-b border-slate-200 p-4 flex items-center justify-between">
               <button
                 onClick={() => setActiveNode('dashboard')}
@@ -511,25 +511,12 @@ export default function App() {
               >
                 <ArrowRight className="w-4 h-4 rotate-180" /> Back to Dashboard
               </button>
-              <div className="flex gap-2">
-                <div className="w-3 h-3 rounded-full bg-red-400/20"></div>
-                <div className="w-3 h-3 rounded-full bg-amber-400/20"></div>
-                <div className="w-3 h-3 rounded-full bg-emerald-400/20"></div>
-              </div>
             </div>
-
-            {/* Node Content */}
             <div className="flex-1 overflow-y-auto">
               {activeNode === 'import' && <ImportNode userId={user?.uid} onComplete={() => setActiveNode('analytics')} />}
               {activeNode === 'analytics' && <AnalyticsNode data={expenses} />}
               {activeNode === 'social' && <SocialNode />}
-              {activeNode === 'settings' && (
-                <div className="p-12 text-center text-slate-400">
-                  <Settings className="w-16 h-16 mx-auto mb-4 opacity-20" />
-                  <h3 className="text-lg font-medium text-slate-600">Node Configuration</h3>
-                  <p>This feature allows you to enable/disable specific modules to keep your experience clean.</p>
-                </div>
-              )}
+              {activeNode === 'settings' && <div className="p-12 text-center text-slate-400">Settings Coming Soon</div>}
             </div>
           </div>
         )}
