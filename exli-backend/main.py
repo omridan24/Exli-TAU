@@ -11,11 +11,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Configure logging to STDOUT explicitly for Cloud Run
+# Configure logging
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-print("--- EXLI BACKEND v6.4 (SMART ROW DETECTION) ---", flush=True)
+print("--- EXLI BACKEND v7.1 (TOKEN OPTIMIZED) ---", flush=True)
 
 app = Flask(__name__)
 CORS(app)
@@ -28,39 +28,37 @@ else:
     clean_key = GEMINI_API_KEY.replace("(", "").replace(")", "").strip()
     genai.configure(api_key=clean_key)
 
-def get_file_structure_from_ai(text_sample):
-    # STRICTLY use Gemini 2.5 Flash as requested
+def get_file_structure_from_ai(text_head, text_tail):
     model_name = 'gemini-2.5-flash'
     print(f"Analyzing structure with {model_name}...", flush=True)
 
-    # --- DEBUG: LOG INPUT ---
-    print(f"--- [DEBUG] AI INPUT SAMPLE (First 500 chars) ---\n{text_sample[:500]}\n---------------------------------------------------", flush=True)
-
-    # PROMPT: Updated to ask for header_row_index
+    # --- OPTIMIZATION: REDUCED CONTEXT ---
+    # We rely on the fact that headers are almost always in the top 15 lines
+    # and totals are in the bottom 5.
+    
     prompt = f"""
     You are a financial data parsing assistant.
     
-    RAW DATA SAMPLE (First 20-30 lines of file):
+    FILE START (First 15 lines):
     '''
-    {text_sample}
+    {text_head}
+    '''
+    
+    FILE END (Last 5 lines):
+    '''
+    {text_tail}
     '''
     
     TASK:
-    1. Identify the 0-based ROW INDEX where the actual column headers are located. 
-       - If the file has garbage text at the top, count how many lines to skip.
-       - Example: If line 1 is "Bank Export" and line 2 is "Date,Amount", then index is 1.
-       - If headers are on the very first line, index is 0.
-    2. Identify the DELIMITER character (e.g. "," or ";" or "|").
-    3. Map the headers found in that specific row to these standard concepts:
-       - "date" (Look for: Date, Transaction Date, תאריך)
-       - "amount" (Look for: Total Cost, Amount, Debit, Price, סכום, חיוב)
-       - "currency" (Look for: Currency, Coin, מטבע)
-       - "category" (Look for: Category, Type, Kind, קטגוריה)
-       - "description" (Look for: Description, Details, Payee, Name, תיאור, בית עסק)
+    1. Identify HEADER ROW INDEX (0-based).
+    2. Identify FOOTER SKIP COUNT (lines to ignore at bottom).
+    3. Identify DELIMITER character.
+    4. Map headers to: "date", "amount", "currency", "category", "description".
     
     OUTPUT FORMAT (JSON ONLY):
     {{
-      "header_row_index": <integer>,
+      "header_row_index": <int>,
+      "footer_skip_count": <int>,
       "delimiter": "<char>",
       "mapping": {{
         "date": "<Header Name>",
@@ -75,10 +73,6 @@ def get_file_structure_from_ai(text_sample):
     try:
         model = genai.GenerativeModel(model_name)
         response = model.generate_content(prompt)
-        
-        # --- DEBUG: LOG RAW RESPONSE ---
-        print(f"--- [DEBUG] AI RAW RESPONSE ---\n{response.text}\n-------------------------------", flush=True)
-
         clean_text = response.text.replace("```json", "").replace("```", "").strip()
         return json.loads(clean_text)
     except Exception as e:
@@ -87,7 +81,7 @@ def get_file_structure_from_ai(text_sample):
 
 @app.route('/', methods=['GET'])
 def health_check():
-    return "Exli Backend v6.4 (Smart Row Detection) is Online", 200
+    return "Exli Backend v7.1 (Optimized) is Online", 200
 
 @app.route('/test-ai', methods=['GET'])
 def test_ai():
@@ -115,66 +109,74 @@ def analyze_file():
         delimiter = None
         mapping = {}
         header_index = 0
+        footer_count = 0
 
-        # --- PATH A: EXCEL FILE (.xlsx, .xls) ---
+        # --- PATH A: EXCEL FILE ---
         if file.filename.endswith(('.xls', '.xlsx')):
-            print("Detected Excel File. Loading raw to find headers...", flush=True)
-            # Load raw (header=None) so we can see the garbage rows at top if any
+            print("Detected Excel File.", flush=True)
             df_raw = pd.read_excel(io.BytesIO(raw_bytes), header=None)
             
-            # Convert first 20 rows to CSV string so AI can see the layout
-            text_sample = df_raw.head(20).to_csv(index=False, header=False)
+            # OPTIMIZATION: Only send top 20 and bottom 5 rows
+            text_head = df_raw.head(20).to_csv(index=False, header=False)
+            text_tail = df_raw.tail(5).to_csv(index=False, header=False)
             
-            ai_config = get_file_structure_from_ai(text_sample)
+            ai_config = get_file_structure_from_ai(text_head, text_tail)
+            
             if ai_config:
                 mapping = ai_config.get('mapping', {})
                 header_index = ai_config.get('header_row_index', 0)
+                footer_count = ai_config.get('footer_skip_count', 0)
                 delimiter = "Excel (n/a)"
-                print(f"AI Decision -> Header Index: {header_index}", flush=True)
                 
-                # Reload Excel using the correct header row
-                # Note: Pandas read_excel header=N means row N is header, data starts at N+1
                 df = pd.read_excel(io.BytesIO(raw_bytes), header=header_index)
+                if footer_count > 0:
+                    df = df.iloc[:-footer_count]
 
         # --- PATH B: CSV/TEXT FILE ---
         else:
             print("Detected Text/CSV File.", flush=True)
-            # Robust Text Decoding
             try:
-                text_sample = raw_bytes[:4000].decode('utf-8')
+                full_text = raw_bytes.decode('utf-8', errors='ignore')
             except:
-                text_sample = raw_bytes[:4000].decode('latin1')
+                full_text = raw_bytes.decode('latin1', errors='ignore')
 
-            ai_config = get_file_structure_from_ai(text_sample)
+            lines = full_text.splitlines()
+            # OPTIMIZATION: Top 15 lines, Bottom 5 lines
+            text_head = "\n".join(lines[:15])
+            text_tail = "\n".join(lines[-5:]) if len(lines) > 20 else ""
+
+            ai_config = get_file_structure_from_ai(text_head, text_tail)
             
             if not ai_config:
-                return jsonify({"error": "AI analysis failed. Check logs."}), 500
+                return jsonify({"error": "AI analysis failed."}), 500
 
             delimiter = ai_config.get('delimiter', ',')
             header_index = ai_config.get('header_row_index', 0)
+            footer_count = ai_config.get('footer_skip_count', 0)
             mapping = ai_config.get('mapping', {})
             
-            print(f"AI Decision -> Delimiter: '{delimiter}' | Header Index: {header_index} | Mapping: {mapping}", flush=True)
-
-            # 2. LOAD DATA
             df = pd.read_csv(
                 io.BytesIO(raw_bytes), 
                 sep=delimiter, 
-                header=header_index, # <-- Magic happens here (skips garbage rows)
+                header=header_index, 
+                skipfooter=footer_count,
                 engine='python', 
                 encoding='utf-8-sig', 
                 on_bad_lines='skip'
             )
 
-        # --- FINAL CLEANUP & RESPONSE ---
         if df is not None:
-            # Cleanup column names (strip whitespace)
             df.columns = df.columns.astype(str).str.strip()
             
-            found_cols = [k for k, v in mapping.items() if v in df.columns]
-            print(f"Mapped {len(found_cols)} columns successfully.", flush=True)
+            # Prune columns
+            valid_headers = []
+            for key, header_name in mapping.items():
+                if header_name and header_name in df.columns:
+                    valid_headers.append(header_name)
+            
+            if valid_headers:
+                df = df[valid_headers]
 
-            # Prepare preview data (replace NaN with null for JSON)
             df_clean = df.astype(object).where(pd.notnull(df), None)
             
             return jsonify({
@@ -182,6 +184,7 @@ def analyze_file():
                 "columns": df.columns.tolist(),
                 "suggested_mapping": mapping,
                 "preview_data": df_clean.head(5).values.tolist(),
+                "all_data": df_clean.values.tolist(),
                 "detected_delimiter": delimiter,
                 "detected_header_row": header_index
             })
