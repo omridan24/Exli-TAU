@@ -6,6 +6,7 @@ exli-front/: React Frontend (Vite + Tailwind + Firebase)
 
 exli-backend/: Python API (Flask + Gemini AI + Pandas)
 
+
 🚀 Frontend Workflow (React)
 
 1. Run Locally (Development)
