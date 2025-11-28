@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid
@@ -6,7 +7,7 @@ import {
   LayoutGrid, Upload, Users, PieChart as PieIcon, Settings,
   ArrowRight, CheckCircle, Activity, Shield, DollarSign, Calendar,
   Trash2, SkipForward, ThumbsUp, Tag, XCircle, Plus, Edit2, Save, X, LogOut, Lock, AlertTriangle, User,
-  MapPin, Briefcase, GraduationCap, Globe, Search, Check
+  MapPin, Briefcase, GraduationCap, Globe, Search, Check, Heart, Clock
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import {
@@ -16,7 +17,6 @@ import {
   getFirestore, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, updateDoc, deleteDoc, setDoc, getDoc, writeBatch
 } from 'firebase/firestore';
 import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
-
 // --- CONFIGURATION ---
 
 // 1. LOCAL DEVELOPMENT (.env)
@@ -76,6 +76,8 @@ const OCCUPATIONS_LIST = [
   "Entrepreneur", "Artist", "Writer", "Nurse", "Architect", "Chef", "Pilot", "Police Officer"
 ];
 
+const STATUS_LIST = ["Single", "Married", "Divorced", "Widowed", "Partnership"];
+
 // --- SHARED COMPONENTS ---
 const Card = ({ children, className = "" }) => (<div className={`bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden ${className}`}>{children}</div>);
 const Button = ({ children, onClick, variant = "primary", className = "", disabled = false }) => {
@@ -89,24 +91,37 @@ const ExliLogo = () => (
 );
 
 // --- SELECTION MODAL ---
-const SelectionModal = ({ isOpen, onClose, title, data, onSelect, multiSelect = false, selectedItems = [] }) => {
+const SelectionModal = ({ isOpen, onClose, title, data, onSelect, multiSelect = false, selectedItems = [], allowCustom = false }) => {
   const [search, setSearch] = useState('');
-  const [customItem, setCustomItem] = useState('');
 
   if (!isOpen) return null;
 
-  const filteredData = data.filter(item =>
-    (item.name || item).toLowerCase().includes(search.toLowerCase())
+  // Merge predefined data with selected custom items that might not be in the list
+  const allItems = [...data];
+  if (multiSelect) {
+    selectedItems.forEach(item => {
+      // If item is a string and not in data (by checking name or direct string), add it
+      const exists = allItems.some(d => (d.name || d) === item);
+      if (!exists) allItems.unshift(item);
+    });
+  }
+
+  const filteredData = allItems.filter(item =>
+    (item.name || item).toString().toLowerCase().includes(search.toLowerCase())
   );
 
   const handleSelect = (item) => {
+    // Determine the value to save (string name or the item itself)
+    const val = item.name || item;
+
     if (multiSelect) {
-      if (selectedItems.includes(item)) {
-        onSelect(selectedItems.filter(i => i !== item));
+      if (selectedItems.includes(val)) {
+        onSelect(selectedItems.filter(i => i !== val));
       } else if (selectedItems.length < 3) {
-        onSelect([...selectedItems, item]);
+        onSelect([...selectedItems, val]);
       }
     } else {
+      // Pass the FULL item object if available, so parent can access .flag or .name
       onSelect(item);
       onClose();
     }
@@ -143,16 +158,20 @@ const SelectionModal = ({ isOpen, onClose, title, data, onSelect, multiSelect = 
         <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {/* Custom Add Option */}
-            <div className="col-span-full mb-2">
-              {search && !filteredData.find(i => (i.name || i).toLowerCase() === search.toLowerCase()) && (
+            {allowCustom && search && !filteredData.find(i => (i.name || i).toString().toLowerCase() === search.toLowerCase()) && (
+              <div className="col-span-full mb-2">
                 <button
                   onClick={() => handleSelect(search)}
                   className="w-full p-3 rounded-xl border-2 border-dashed border-emerald-300 bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100 transition-all flex items-center justify-center gap-2"
                 >
                   <Plus className="w-4 h-4" /> Add "{search}"
                 </button>
-              )}
-            </div>
+              </div>
+            )}
+
+            {filteredData.length === 0 && !search && (
+              <div className="col-span-full text-center py-10 text-slate-400">No items found</div>
+            )}
 
             {filteredData.map((item, idx) => {
               const val = item.name || item;
@@ -160,7 +179,7 @@ const SelectionModal = ({ isOpen, onClose, title, data, onSelect, multiSelect = 
               return (
                 <button
                   key={idx}
-                  onClick={() => handleSelect(val)}
+                  onClick={() => handleSelect(item)}
                   className={`p-4 rounded-xl text-left border-2 transition-all group relative flex flex-col justify-between min-h-[100px]
                     ${isSelected ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-100' : 'border-white bg-white hover:border-emerald-200 hover:shadow-md'}
                   `}
@@ -181,6 +200,33 @@ const SelectionModal = ({ isOpen, onClose, title, data, onSelect, multiSelect = 
             <Button onClick={onClose}>Done ({selectedItems.length})</Button>
           </div>
         )}
+      </div>
+    </div>
+  );
+};
+
+// --- SIMPLE INPUT MODAL (For Age) ---
+const InputModal = ({ isOpen, onClose, title, value, onSave, type = "text" }) => {
+  const [val, setVal] = useState(value);
+  useEffect(() => setVal(value), [value, isOpen]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white w-full max-w-sm rounded-3xl shadow-xl p-6 animate-fade-in">
+        <h3 className="text-lg font-bold text-slate-800 mb-4">{title}</h3>
+        <input
+          type={type}
+          className="w-full p-3 border border-slate-300 rounded-xl outline-none focus:border-emerald-500 text-lg mb-6"
+          value={val}
+          onChange={e => setVal(e.target.value)}
+          autoFocus
+        />
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={onClose} className="flex-1 justify-center">Cancel</Button>
+          <Button onClick={() => { onSave(val); onClose(); }} className="flex-1 justify-center">Save</Button>
+        </div>
       </div>
     </div>
   );
@@ -212,14 +258,7 @@ const LoginScreen = () => {
         </div>
         <h1 className="text-3xl font-bold text-slate-800 mb-2">Welcome to Exli</h1>
         <p className="text-slate-500 mb-8">Your personal finance operating system.</p>
-
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 text-red-700 text-sm rounded-xl text-left border border-red-100 flex gap-2">
-            <Lock className="w-4 h-4 mt-0.5 shrink-0" />
-            <span className="break-words">{error}</span>
-          </div>
-        )}
-
+        {error && <div className="mb-6 p-4 bg-red-50 text-red-700 text-sm rounded-xl text-left border border-red-100 flex gap-2"><Lock className="w-4 h-4 mt-0.5 shrink-0" /><span className="break-words">{error}</span></div>}
         <button onClick={handleGoogleLogin} disabled={isChecking} className="w-full py-3 px-4 rounded-xl border border-slate-200 hover:bg-slate-50 transition-all flex items-center justify-center gap-3 font-bold text-slate-700 disabled:opacity-50">
           {isChecking ? "Signing in..." : <><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" /> Continue with Google</>}
         </button>
@@ -524,7 +563,6 @@ const AnalyticsNode = ({ data, categories, userId }) => {
   );
 };
 
-// --- SETTINGS NODE (New Card UI) ---
 const SettingsNode = ({ userId, categories, onUpdateCategories }) => {
   const [newCatName, setNewCatName] = useState('');
   const [newCatColor, setNewCatColor] = useState('#000000');
@@ -532,16 +570,16 @@ const SettingsNode = ({ userId, categories, onUpdateCategories }) => {
   // Profile State
   const [profile, setProfile] = useState({
     age: '', status: 'Single', city: '', country: '', isStudent: false,
-    occupation: [], university: '' // Changed occupation to array
+    occupation: [], university: ''
   });
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   // Modals State
-  const [modalType, setModalType] = useState(null); // 'country', 'city', 'occupation', 'university'
+  const [modalType, setModalType] = useState(null);
 
   // Data for Modals
   const [countries, setCountries] = useState([]);
-  const [cities, setCities] = useState([]); // Will just mock based on country
+  const [cities, setCities] = useState([]);
   const [universities, setUniversities] = useState([]);
 
   // Load Profile
@@ -570,14 +608,58 @@ const SettingsNode = ({ userId, categories, onUpdateCategories }) => {
       .catch(err => console.error("Country API Error", err));
   }, []);
 
+  // Fetch Cities logic
+  const fetchCities = async (countryName) => {
+    if (!countryName) return;
+    setModalType('city');
+    setCities([]); // Clear old cities
+    // Set loading state for cities (optional UI enhancement, keeping simple for now)
+    setCities(['Loading...']);
+
+    try {
+      const response = await fetch("https://countriesnow.space/api/v0.1/countries/cities", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ country: countryName }),
+      });
+      const data = await response.json();
+      if (!data.error) {
+        setCities(data.data);
+      } else {
+        setCities(['No cities found', 'Other']);
+      }
+    } catch (err) {
+      console.error("Cities API Error", err);
+      setCities(['Error fetching cities', 'Other']);
+    }
+  };
+
   // Fetch Universities when needed
   const fetchUniversities = (country) => {
     if (!country) return;
     setModalType('university');
-    fetch(`http://universities.hipolabs.com/search?country=${country}`)
+    setUniversities(['Loading...']); // Feedback
+
+    // UPDATED: Use raw GitHub content as API source (HTTPS)
+    fetch("https://raw.githubusercontent.com/Hipo/university-domains-list/master/world_universities_and_domains.json")
       .then(res => res.json())
-      .then(data => setUniversities(data.map(u => u.name)))
-      .catch(err => console.error("Uni API Error", err));
+      .then(data => {
+        // Filter in memory (Client-side)
+        const filtered = data
+          .filter(u => u.country.toLowerCase() === country.toLowerCase())
+          .map(u => u.name)
+          .sort();
+
+        if (filtered.length === 0) {
+          setUniversities(['No universities found', 'Other']);
+        } else {
+          setUniversities(filtered);
+        }
+      })
+      .catch(err => {
+        console.error("Uni API Error", err);
+        setUniversities(['Error fetching universities', 'Other']);
+      });
   };
 
   const handleSaveProfile = async (newProfile) => {
@@ -621,9 +703,10 @@ const SettingsNode = ({ userId, categories, onUpdateCategories }) => {
         isOpen={modalType === 'country'}
         onClose={() => setModalType(null)}
         title="Select Country"
-        data={countries} // Objects with {name, flag}
+        data={countries}
         onSelect={(c) => {
-          const newP = { ...profile, country: c.name, city: '' }; // Reset city on country change
+          const countryName = c.name || c; // Handle object or string
+          const newP = { ...profile, country: countryName, city: '' };
           handleSaveProfile(newP);
         }}
       />
@@ -631,7 +714,8 @@ const SettingsNode = ({ userId, categories, onUpdateCategories }) => {
         isOpen={modalType === 'city'}
         onClose={() => setModalType(null)}
         title={`Select City in ${profile.country}`}
-        data={['Tel Aviv', 'Jerusalem', 'Haifa', 'Eilat', 'New York', 'London', 'Paris', 'Berlin', 'Tokyo', 'Other']} // Mocked for stability
+        data={cities}
+        allowCustom={true} // Allow typing a custom city
         onSelect={(c) => handleSaveProfile({ ...profile, city: c })}
       />
       <SelectionModal
@@ -640,6 +724,7 @@ const SettingsNode = ({ userId, categories, onUpdateCategories }) => {
         title="Select Occupation (Max 3)"
         data={OCCUPATIONS_LIST}
         multiSelect
+        allowCustom={true}
         selectedItems={profile.occupation}
         onSelect={(newOccupations) => handleSaveProfile({ ...profile, occupation: newOccupations })}
       />
@@ -648,7 +733,24 @@ const SettingsNode = ({ userId, categories, onUpdateCategories }) => {
         onClose={() => setModalType(null)}
         title={`Universities in ${profile.country}`}
         data={universities}
+        allowCustom={true}
         onSelect={(u) => handleSaveProfile({ ...profile, university: u })}
+      />
+      <InputModal
+        isOpen={modalType === 'age'}
+        onClose={() => setModalType(null)}
+        title="Your Age"
+        value={profile.age}
+        type="number"
+        onSave={(val) => handleSaveProfile({ ...profile, age: val })}
+      />
+      <SelectionModal
+        isOpen={modalType === 'status'}
+        onClose={() => setModalType(null)}
+        title="Relationship Status"
+        data={STATUS_LIST}
+        selectedItems={profile.status} // Single select highlights
+        onSelect={(s) => handleSaveProfile({ ...profile, status: s })}
       />
 
       {/* HEADER */}
@@ -673,7 +775,7 @@ const SettingsNode = ({ userId, categories, onUpdateCategories }) => {
           value={profile.city}
           onClick={() => {
             if (!profile.country) return alert("Please select a country first.");
-            setModalType('city');
+            fetchCities(profile.country);
           }}
         />
         <ProfileItem
@@ -682,59 +784,59 @@ const SettingsNode = ({ userId, categories, onUpdateCategories }) => {
           value={profile.occupation}
           onClick={() => setModalType('occupation')}
         />
-        <div className="bg-white p-4 rounded-xl border border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${profile.isStudent ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-300'}`}>
-              <GraduationCap className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Student Status</div>
-              <div className="flex items-center gap-2">
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" checked={profile.isStudent} onChange={(e) => {
-                    const isStudent = e.target.checked;
-                    if (isStudent && profile.country) fetchUniversities(profile.country);
-                    handleSaveProfile({ ...profile, isStudent });
-                  }} className="sr-only peer" />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                </label>
-                <span className="text-sm font-medium text-slate-700">{profile.isStudent ? 'Active Student' : 'Not a Student'}</span>
+        <ProfileItem
+          icon={Clock}
+          label="Age"
+          value={profile.age}
+          onClick={() => setModalType('age')}
+        />
+        <ProfileItem
+          icon={Heart}
+          label="Status"
+          value={profile.status}
+          onClick={() => setModalType('status')}
+        />
+
+        {/* Student Toggle Card */}
+        <div className="bg-white p-4 rounded-xl border border-slate-100 flex flex-col justify-center gap-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${profile.isStudent ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-300'}`}>
+                <GraduationCap className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Student Status</div>
+                <div className="text-sm font-medium text-slate-700">{profile.isStudent ? 'Active Student' : 'Not a Student'}</div>
               </div>
             </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" checked={profile.isStudent} onChange={(e) => {
+                const isStudent = e.target.checked;
+                handleSaveProfile({ ...profile, isStudent });
+                // Auto-open uni modal if enabled and country selected
+                if (isStudent && profile.country) fetchUniversities(profile.country);
+              }} className="sr-only peer" />
+              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+            </label>
           </div>
-          {profile.isStudent && (
-            <button onClick={() => fetchUniversities(profile.country)} className="text-xs bg-blue-50 text-blue-600 px-3 py-1 rounded-full font-bold hover:bg-blue-100">
-              {profile.university || "Select Uni"}
-            </button>
-          )}
-        </div>
 
-        <div className="bg-white p-4 rounded-xl border border-slate-100">
-          <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Age & Status</div>
-          <div className="flex gap-4">
-            <input
-              type="number"
-              value={profile.age}
-              onChange={e => setProfile({ ...profile, age: e.target.value })}
-              onBlur={() => handleSaveProfile()}
-              className="w-20 p-2 border border-slate-200 rounded-lg text-center font-bold text-slate-700 outline-none focus:border-emerald-500"
-              placeholder="Age"
-            />
-            <select
-              value={profile.status}
-              onChange={e => handleSaveProfile({ ...profile, status: e.target.value })}
-              className="flex-1 p-2 border border-slate-200 rounded-lg font-medium text-slate-700 outline-none focus:border-emerald-500 bg-white"
+          {/* University Selection (Only visible if Student) */}
+          {profile.isStudent && (
+            <div
+              onClick={() => {
+                if (!profile.country) return alert("Select country first");
+                fetchUniversities(profile.country);
+              }}
+              className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-100 cursor-pointer hover:bg-blue-100 transition-colors flex items-center justify-between"
             >
-              <option>Single</option>
-              <option>Married</option>
-              <option>Divorced</option>
-              <option>Partnership</option>
-            </select>
-          </div>
+              <span className="text-sm font-bold text-blue-700">{profile.university || "Select University..."}</span>
+              <Edit2 className="w-4 h-4 text-blue-400" />
+            </div>
+          )}
         </div>
       </div>
 
-      {/* CATEGORIES SECTION (Simplified for this view) */}
+      {/* CATEGORIES SECTION */}
       <div className="mt-8 pt-8 border-t border-slate-200">
         <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2"><Settings className="w-5 h-5 text-slate-600" /> Transaction Categories</h2>
 
@@ -830,7 +932,7 @@ export default function App() {
     loadCats();
   }, [user, isWhitelisted]);
 
-  if (!user) return <LoginScreen />;
+  if (!user) return <LoginScreen debugStatus={debugStatus} />;
 
   if (isWhitelisted === null) {
     return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-400 animate-pulse">Verifying access permissions...</div>;
