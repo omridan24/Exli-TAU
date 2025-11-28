@@ -1,5 +1,6 @@
 import io
 import pandas as pd
+import re
 from config import logger
 from services.ai_service import analyze_file_structure
 
@@ -19,12 +20,12 @@ def process_uploaded_file(file):
         # --- STRATEGY 1: EXCEL ---
         if filename.endswith(('.xls', '.xlsx')):
             logger.info("Detected Excel format.")
-            # Read raw to get context for AI
+            # Read raw (header=None) to see the full layout including garbage at top
             df_raw = pd.read_excel(io.BytesIO(raw_bytes), header=None)
             
-            # Extract samples
-            text_head = df_raw.head(20).to_csv(index=False, header=False)
-            text_tail = df_raw.tail(5).to_csv(index=False, header=False)
+            # IMPROVED: Send more context (50 lines) so AI can skip large headers
+            text_head = df_raw.head(50).to_csv(index=False, header=False)
+            text_tail = df_raw.tail(10).to_csv(index=False, header=False)
             
             # Ask AI
             ai_config = analyze_file_structure(text_head, text_tail)
@@ -50,8 +51,9 @@ def process_uploaded_file(file):
                 full_text = raw_bytes.decode('latin1', errors='ignore')
             
             lines = full_text.splitlines()
-            text_head = "\n".join(lines[:15])
-            text_tail = "\n".join(lines[-5:]) if len(lines) > 20 else ""
+            # IMPROVED: Send 50 lines of context
+            text_head = "\n".join(lines[:50])
+            text_tail = "\n".join(lines[-10:]) if len(lines) > 50 else ""
             
             # Ask AI
             ai_config = analyze_file_structure(text_head, text_tail)
@@ -77,14 +79,38 @@ def process_uploaded_file(file):
 
         # --- FINAL CLEANUP ---
         if df is not None:
-            # Clean headers
-            df.columns = df.columns.astype(str).str.strip()
+            # Helper to normalize headers (remove newlines, collapse spaces)
+            def clean_header_name(h):
+                if not isinstance(h, str): return str(h)
+                # Replace newlines/tabs with space
+                h = h.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
+                # Collapse multiple spaces to one and strip
+                return re.sub(r'\s+', ' ', h).strip()
+
+            # 1. Clean DataFrame Columns
+            df.columns = [clean_header_name(c) for c in df.columns]
             
-            # Prune columns (Keep only mapped ones)
-            valid_headers = [name for name in mapping.values() if name and name in df.columns]
+            # 2. Clean Mapping Values (to match the DataFrame)
+            cleaned_mapping = {}
+            for k, v in mapping.items():
+                if v:
+                    cleaned_mapping[k] = clean_header_name(v)
+                else:
+                    cleaned_mapping[k] = None
+            mapping = cleaned_mapping
+
+            # 3. Prune columns (Keep only mapped ones)
+            valid_headers = []
+            for name in mapping.values():
+                if name and name in df.columns:
+                    valid_headers.append(name)
             
-            if valid_headers:
+            # Safety: Only prune if we actually matched enough columns
+            if len(valid_headers) >= 2:
+                logger.info(f"Pruning columns. Keeping: {valid_headers}")
                 df = df[valid_headers]
+            else:
+                logger.warning(f"Only matched {len(valid_headers)} columns. Skipping pruning to prevent data loss.")
             
             # Clean NaNs for JSON
             df_clean = df.astype(object).where(pd.notnull(df), None)

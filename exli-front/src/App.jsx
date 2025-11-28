@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid
@@ -7,7 +6,7 @@ import {
   LayoutGrid, Upload, Users, PieChart as PieIcon, Settings,
   ArrowRight, CheckCircle, Activity, Shield, DollarSign, Calendar,
   Trash2, SkipForward, ThumbsUp, Tag, XCircle, Plus, Edit2, Save, X, LogOut, Lock, AlertTriangle, User,
-  MapPin, Briefcase, GraduationCap, Globe, Search, Check, Heart, Clock
+  MapPin, Briefcase, GraduationCap, Globe, Search, Check, Heart, Clock, Sparkles, Cloud
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import {
@@ -56,6 +55,7 @@ if (typeof window !== 'undefined') {
 
 const auth = getAuth(app);
 const db = getFirestore(app);
+const appId = "exli-local-v1"; // Used for public artifacts path
 
 // --- DATA LISTS ---
 const DEFAULT_CATEGORIES = [
@@ -85,22 +85,18 @@ const Button = ({ children, onClick, variant = "primary", className = "", disabl
   return (<button onClick={onClick} disabled={disabled} className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${className}`}>{children}</button>);
 };
 
-// --- LOGO COMPONENT ---
 const ExliLogo = () => (
   <img src="/logo.svg" alt="Exli" className="w-8 h-8 object-contain" />
 );
 
-// --- SELECTION MODAL ---
+// --- MODALS ---
 const SelectionModal = ({ isOpen, onClose, title, data, onSelect, multiSelect = false, selectedItems = [], allowCustom = false }) => {
   const [search, setSearch] = useState('');
-
   if (!isOpen) return null;
 
-  // Merge predefined data with selected custom items that might not be in the list
   const allItems = [...data];
   if (multiSelect) {
     selectedItems.forEach(item => {
-      // If item is a string and not in data (by checking name or direct string), add it
       const exists = allItems.some(d => (d.name || d) === item);
       if (!exists) allItems.unshift(item);
     });
@@ -111,9 +107,7 @@ const SelectionModal = ({ isOpen, onClose, title, data, onSelect, multiSelect = 
   );
 
   const handleSelect = (item) => {
-    // Determine the value to save (string name or the item itself)
     const val = item.name || item;
-
     if (multiSelect) {
       if (selectedItems.includes(val)) {
         onSelect(selectedItems.filter(i => i !== val));
@@ -121,7 +115,6 @@ const SelectionModal = ({ isOpen, onClose, title, data, onSelect, multiSelect = 
         onSelect([...selectedItems, val]);
       }
     } else {
-      // Pass the FULL item object if available, so parent can access .flag or .name
       onSelect(item);
       onClose();
     }
@@ -130,60 +123,29 @@ const SelectionModal = ({ isOpen, onClose, title, data, onSelect, multiSelect = 
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white w-full max-w-2xl h-[80vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-fade-in">
-        {/* Header */}
         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-          <div>
-            <h3 className="text-xl font-bold text-slate-800">{title}</h3>
-            {multiSelect && <p className="text-xs text-slate-500">Select up to 3</p>}
-          </div>
+          <div><h3 className="text-xl font-bold text-slate-800">{title}</h3>{multiSelect && <p className="text-xs text-slate-500">Select up to 3</p>}</div>
           <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><X className="w-5 h-5 text-slate-500" /></button>
         </div>
-
-        {/* Search */}
         <div className="p-4 border-b border-slate-100 sticky top-0 bg-white z-10">
           <div className="relative">
             <Search className="absolute left-3 top-3 w-5 h-5 text-slate-400" />
-            <input
-              type="text"
-              placeholder={`Search ${title}...`}
-              className="w-full pl-10 p-3 bg-slate-50 border-none rounded-xl text-slate-700 outline-none focus:ring-2 focus:ring-emerald-100"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              autoFocus
-            />
+            <input type="text" placeholder={`Search ${title}...`} className="w-full pl-10 p-3 bg-slate-50 border-none rounded-xl text-slate-700 outline-none focus:ring-2 focus:ring-emerald-100" value={search} onChange={(e) => setSearch(e.target.value)} autoFocus />
           </div>
         </div>
-
-        {/* Grid */}
         <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {/* Custom Add Option */}
             {allowCustom && search && !filteredData.find(i => (i.name || i).toString().toLowerCase() === search.toLowerCase()) && (
               <div className="col-span-full mb-2">
-                <button
-                  onClick={() => handleSelect(search)}
-                  className="w-full p-3 rounded-xl border-2 border-dashed border-emerald-300 bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100 transition-all flex items-center justify-center gap-2"
-                >
-                  <Plus className="w-4 h-4" /> Add "{search}"
-                </button>
+                <button onClick={() => handleSelect(search)} className="w-full p-3 rounded-xl border-2 border-dashed border-emerald-300 bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100 transition-all flex items-center justify-center gap-2"><Plus className="w-4 h-4" /> Add "{search}"</button>
               </div>
             )}
-
-            {filteredData.length === 0 && !search && (
-              <div className="col-span-full text-center py-10 text-slate-400">No items found</div>
-            )}
-
+            {filteredData.length === 0 && !search && <div className="col-span-full text-center py-10 text-slate-400">Loading or No items found...</div>}
             {filteredData.map((item, idx) => {
               const val = item.name || item;
               const isSelected = multiSelect ? selectedItems.includes(val) : selectedItems === val;
               return (
-                <button
-                  key={idx}
-                  onClick={() => handleSelect(item)}
-                  className={`p-4 rounded-xl text-left border-2 transition-all group relative flex flex-col justify-between min-h-[100px]
-                    ${isSelected ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-100' : 'border-white bg-white hover:border-emerald-200 hover:shadow-md'}
-                  `}
-                >
+                <button key={idx} onClick={() => handleSelect(item)} className={`p-4 rounded-xl text-left border-2 transition-all group relative flex flex-col justify-between min-h-[100px] ${isSelected ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-100' : 'border-white bg-white hover:border-emerald-200 hover:shadow-md'}`}>
                   <div className="font-bold text-slate-700 break-words pr-2">{val}</div>
                   {item.flag && <div className="text-3xl mt-2">{item.flag}</div>}
                   {item.icon && <div className="text-emerald-100 group-hover:text-emerald-200 transition-colors mt-auto self-end">{item.icon}</div>}
@@ -193,40 +155,22 @@ const SelectionModal = ({ isOpen, onClose, title, data, onSelect, multiSelect = 
             })}
           </div>
         </div>
-
-        {/* Footer for Multi-select */}
-        {multiSelect && (
-          <div className="p-4 border-t border-slate-100 bg-white flex justify-end">
-            <Button onClick={onClose}>Done ({selectedItems.length})</Button>
-          </div>
-        )}
+        {multiSelect && <div className="p-4 border-t border-slate-100 bg-white flex justify-end"><Button onClick={onClose}>Done ({selectedItems.length})</Button></div>}
       </div>
     </div>
   );
 };
 
-// --- SIMPLE INPUT MODAL (For Age) ---
 const InputModal = ({ isOpen, onClose, title, value, onSave, type = "text" }) => {
   const [val, setVal] = useState(value);
   useEffect(() => setVal(value), [value, isOpen]);
-
   if (!isOpen) return null;
-
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white w-full max-w-sm rounded-3xl shadow-xl p-6 animate-fade-in">
         <h3 className="text-lg font-bold text-slate-800 mb-4">{title}</h3>
-        <input
-          type={type}
-          className="w-full p-3 border border-slate-300 rounded-xl outline-none focus:border-emerald-500 text-lg mb-6"
-          value={val}
-          onChange={e => setVal(e.target.value)}
-          autoFocus
-        />
-        <div className="flex gap-2">
-          <Button variant="secondary" onClick={onClose} className="flex-1 justify-center">Cancel</Button>
-          <Button onClick={() => { onSave(val); onClose(); }} className="flex-1 justify-center">Save</Button>
-        </div>
+        <input type={type} className="w-full p-3 border border-slate-300 rounded-xl outline-none focus:border-emerald-500 text-lg mb-6" value={val} onChange={e => setVal(e.target.value)} autoFocus />
+        <div className="flex gap-2"><Button variant="secondary" onClick={onClose} className="flex-1 justify-center">Cancel</Button><Button onClick={() => { onSave(val); onClose(); }} className="flex-1 justify-center">Save</Button></div>
       </div>
     </div>
   );
@@ -236,32 +180,20 @@ const InputModal = ({ isOpen, onClose, title, value, onSave, type = "text" }) =>
 const LoginScreen = () => {
   const [error, setError] = useState(null);
   const [isChecking, setIsChecking] = useState(false);
-
   const handleGoogleLogin = async () => {
     const provider = new GoogleAuthProvider();
     setIsChecking(true);
     setError(null);
-    try {
-      await signInWithPopup(auth, provider);
-    } catch (err) {
-      console.error("Auth Error:", err);
-      setError("Login failed. Please try again.");
-      setIsChecking(false);
-    }
+    try { await signInWithPopup(auth, provider); } catch (err) { console.error("Auth Error:", err); setError("Login failed. Please try again."); setIsChecking(false); }
   };
-
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <div className="bg-white max-w-md w-full p-8 rounded-3xl shadow-xl border border-slate-100 text-center">
-        <div className="w-20 h-20 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
-          <img src="/logo.svg" alt="Exli Logo" className="w-12 h-12" />
-        </div>
+        <div className="w-20 h-20 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-6"><img src="/logo.svg" alt="Exli Logo" className="w-12 h-12" /></div>
         <h1 className="text-3xl font-bold text-slate-800 mb-2">Welcome to Exli</h1>
         <p className="text-slate-500 mb-8">Your personal finance operating system.</p>
         {error && <div className="mb-6 p-4 bg-red-50 text-red-700 text-sm rounded-xl text-left border border-red-100 flex gap-2"><Lock className="w-4 h-4 mt-0.5 shrink-0" /><span className="break-words">{error}</span></div>}
-        <button onClick={handleGoogleLogin} disabled={isChecking} className="w-full py-3 px-4 rounded-xl border border-slate-200 hover:bg-slate-50 transition-all flex items-center justify-center gap-3 font-bold text-slate-700 disabled:opacity-50">
-          {isChecking ? "Signing in..." : <><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" /> Continue with Google</>}
-        </button>
+        <button onClick={handleGoogleLogin} disabled={isChecking} className="w-full py-3 px-4 rounded-xl border border-slate-200 hover:bg-slate-50 transition-all flex items-center justify-center gap-3 font-bold text-slate-700 disabled:opacity-50">{isChecking ? "Signing in..." : <><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" /> Continue with Google</>}</button>
       </div>
     </div>
   );
@@ -271,22 +203,17 @@ const LoginScreen = () => {
 const AccessDeniedScreen = ({ email, onLogout, onRetry }) => (
   <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
     <div className="bg-white max-w-md w-full p-8 rounded-3xl shadow-xl border border-slate-100 text-center animate-fade-in">
-      <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-6 text-red-500">
-        <Lock className="w-8 h-8" />
-      </div>
+      <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-6 text-red-500"><Lock className="w-8 h-8" /></div>
       <h2 className="text-2xl font-bold text-slate-800 mb-2">Access Restricted</h2>
       <p className="text-slate-500 mb-6">Email <span className="font-mono font-bold text-slate-800">{email}</span> is not on the whitelist.</p>
-      <div className="flex gap-2">
-        <Button onClick={onRetry} variant="primary" className="flex-1 justify-center">Retry Check</Button>
-        <Button onClick={onLogout} variant="secondary" className="flex-1 justify-center">Sign Out</Button>
-      </div>
+      <div className="flex gap-2"><Button onClick={onRetry} variant="primary" className="flex-1 justify-center">Retry Check</Button><Button onClick={onLogout} variant="secondary" className="flex-1 justify-center">Sign Out</Button></div>
     </div>
   </div>
 );
 
-// --- APP NODES ---
+// --- MAIN APP NODES ---
 
-const ImportNode = ({ userId, categories, onUpdateCategories, onComplete }) => {
+const ImportNode = ({ userId, categories, expenses, onUpdateCategories, onComplete }) => {
   const [step, setStep] = useState(0);
   const [file, setFile] = useState(null);
   const [reportMonth, setReportMonth] = useState(new Date().toISOString().slice(0, 7));
@@ -299,6 +226,21 @@ const ImportNode = ({ userId, categories, onUpdateCategories, onComplete }) => {
   const [processedTransactions, setProcessedTransactions] = useState([]);
   const [isCreatingCat, setIsCreatingCat] = useState(false);
   const [newCatName, setNewCatName] = useState('');
+
+  // 3) SMART SORTING: Sort categories by usage frequency in 'expenses'
+  const sortedCategories = useMemo(() => {
+    if (!expenses || expenses.length === 0) return categories;
+
+    // Count usage
+    const usage = {};
+    expenses.forEach(tx => {
+      const cat = tx.assignedCategory || tx.category || 'Uncategorized';
+      usage[cat] = (usage[cat] || 0) + 1;
+    });
+
+    // Sort: High usage first
+    return [...categories].sort((a, b) => (usage[b.name] || 0) - (usage[a.name] || 0));
+  }, [categories, expenses]);
 
   const handleFileChange = (e) => e.target.files[0] && setFile(e.target.files[0]);
 
@@ -343,7 +285,19 @@ const ImportNode = ({ userId, categories, onUpdateCategories, onComplete }) => {
     const newCat = { id: newId, name: newCatName, color: randomColor };
     const updated = [...categories, newCat];
     onUpdateCategories(updated);
+
+    // Save to user profile
     await setDoc(doc(db, 'users', userId), { customCategories: updated.filter(c => !DEFAULT_CATEGORIES.find(dc => dc.id === c.id)) }, { merge: true });
+
+    // 4) COMMUNITY FEATURE: Save name to public list (fire and forget)
+    try {
+      const publicRef = doc(db, 'artifacts', appId, 'public', 'data', 'categories', newId);
+      // Only create if doesn't exist (handled by security rules, but we can just set)
+      await setDoc(publicRef, { name: newCatName, createdBy: 'community' }, { merge: true });
+    } catch (e) {
+      console.warn("Could not share to community (optional):", e);
+    }
+
     handleCategorize(newCatName);
     setNewCatName('');
     setIsCreatingCat(false);
@@ -354,12 +308,16 @@ const ImportNode = ({ userId, categories, onUpdateCategories, onComplete }) => {
     let rawAmount = rawRow[columnMapping.amount];
     let amount = parseFloat(String(rawAmount).replace(/[^0-9.-]+/g, ""));
     if (isNaN(amount)) amount = 0;
+
+    // Store original currency from file if mapped
+    const currency = rawRow[columnMapping.currency] || "ILS";
+
     const tx = {
       date: rawRow[columnMapping.date] || new Date().toISOString(),
       description: rawRow[columnMapping.description] || "Unknown",
       amount: amount,
       originalCategory: rawRow[columnMapping.category] || "Uncategorized",
-      currency: rawRow[columnMapping.currency] || "ILS",
+      currency: currency,
       assignedCategory: categoryName,
       reportMonth: reportMonth,
       isRefund: isRefund,
@@ -424,7 +382,7 @@ const ImportNode = ({ userId, categories, onUpdateCategories, onComplete }) => {
             </div>
           </div>
           {error && <div className="text-red-600 text-center">{error}</div>}
-          <div className="flex justify-between"><Button variant="secondary" onClick={() => setStep(0)}>Back</Button><Button onClick={handleUploadAndAnalyze} disabled={!file || isLoading}>{isLoading ? 'Analyzing...' : 'Upload & Analyze'} <ArrowRight className="w-4 h-4" /></Button></div>
+          <div className="flex justify-between"><Button variant="secondary" onClick={() => setStep(0)}>Back</Button><Button onClick={handleUploadAndAnalyze} disabled={!file || isLoading}>{isLoading ? <><Sparkles className="w-4 h-4 animate-spin text-yellow-400" /> Analyzing with AI...</> : 'Upload & Analyze'} <ArrowRight className="w-4 h-4" /></Button></div>
         </div>
       )}
       {step === 2 && (
@@ -462,7 +420,8 @@ const ImportNode = ({ userId, categories, onUpdateCategories, onComplete }) => {
                 </div>
               ) : (
                 <div className="grid grid-cols-3 gap-3 mb-6">
-                  {categories.map(cat => {
+                  {/* 3) SMART SORTING in action here */}
+                  {sortedCategories.map(cat => {
                     const isSuggested = suggestedCategoryId === cat.id;
                     return (
                       <button key={cat.id} onClick={() => handleCategorize(cat.name)} className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-2 text-center h-24 ${isSuggested ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-100 hover:border-slate-300 hover:bg-slate-50'}`}>
@@ -490,6 +449,20 @@ const ImportNode = ({ userId, categories, onUpdateCategories, onComplete }) => {
 
 const AnalyticsNode = ({ data, categories, userId }) => {
   const [selectedMonth, setSelectedMonth] = useState('average');
+
+  // 1) DETECT CURRENCY
+  const dominantCurrency = useMemo(() => {
+    if (!data.length) return '$';
+    const counts = {};
+    data.forEach(d => {
+      // Use currency if exists, otherwise default
+      const c = d.currency || 'ILS';
+      counts[c] = (counts[c] || 0) + 1;
+    });
+    // Return key with highest count
+    return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+  }, [data]);
+
   const availableMonths = useMemo(() => {
     const months = new Set(data.map(d => d.reportMonth).filter(Boolean));
     return Array.from(months).sort().reverse();
@@ -532,10 +505,10 @@ const AnalyticsNode = ({ data, categories, userId }) => {
         </div>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
-        <Card className="p-6"><h3 className="font-bold text-slate-700 mb-4">Spending Breakdown</h3><div className="h-64"><ResponsiveContainer><PieChart><Pie data={categoryStats} dataKey="value" cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={2}>{categoryStats.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}</Pie><Tooltip formatter={(val) => `$${val.toFixed(0)}`} /><Legend /></PieChart></ResponsiveContainer></div></Card>
+        <Card className="p-6"><h3 className="font-bold text-slate-700 mb-4">Spending Breakdown</h3><div className="h-64"><ResponsiveContainer><PieChart><Pie data={categoryStats} dataKey="value" cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={2}>{categoryStats.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}</Pie><Tooltip formatter={(val) => `${dominantCurrency} ${val.toFixed(0)}`} /><Legend /></PieChart></ResponsiveContainer></div></Card>
         <Card className="p-6">
           <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-slate-700">Summary</h3>{selectedMonth !== 'average' && (<button onClick={handleDeleteMonth} className="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1 border border-red-200 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors"><Trash2 className="w-3 h-3" /> Delete Month</button>)}</div>
-          <div className="space-y-3">{categoryStats.map(stat => (<div key={stat.name} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl"><div className="flex items-center gap-3"><div className="w-3 h-3 rounded-full" style={{ backgroundColor: stat.color }}></div><span className="font-medium text-slate-700">{stat.name}</span></div><div className="font-mono font-bold text-slate-800">${stat.value.toFixed(2)}</div></div>))}</div>
+          <div className="space-y-3">{categoryStats.map(stat => (<div key={stat.name} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl"><div className="flex items-center gap-3"><div className="w-3 h-3 rounded-full" style={{ backgroundColor: stat.color }}></div><span className="font-medium text-slate-700">{stat.name}</span></div><div className="font-mono font-bold text-slate-800">{dominantCurrency} {stat.value.toFixed(2)}</div></div>))}</div>
         </Card>
       </div>
       {selectedMonth !== 'average' && (
@@ -549,7 +522,7 @@ const AnalyticsNode = ({ data, categories, userId }) => {
                   <tr key={tx.id} className="hover:bg-slate-50 group">
                     <td className="p-4 text-slate-500 whitespace-nowrap">{new Date(tx.date).toLocaleDateString()}</td>
                     <td className="p-4 font-medium text-slate-800">{tx.description}</td>
-                    <td className="p-4 font-mono font-bold text-slate-700">${tx.amount.toFixed(2)}</td>
+                    <td className="p-4 font-mono font-bold text-slate-700">{tx.currency || dominantCurrency} {tx.amount.toFixed(2)}</td>
                     <td className="p-4"><select className="bg-transparent border-none text-slate-600 font-medium cursor-pointer hover:text-emerald-600" value={tx.assignedCategory} onChange={(e) => handleCategoryChange(tx.id, e.target.value)}>{categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}</select></td>
                     <td className="p-4 text-right"><button onClick={() => handleDelete(tx.id)} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button></td>
                   </tr>
@@ -567,291 +540,90 @@ const SettingsNode = ({ userId, categories, onUpdateCategories }) => {
   const [newCatName, setNewCatName] = useState('');
   const [newCatColor, setNewCatColor] = useState('#000000');
 
-  // Profile State
-  const [profile, setProfile] = useState({
-    age: '', status: 'Single', city: '', country: '', isStudent: false,
-    occupation: [], university: ''
-  });
-  const [isSavingProfile, setIsSavingProfile] = useState(false);
-
-  // Modals State
+  // 5) COMMUNITY CATEGORIES
+  const [communityCats, setCommunityCats] = useState([]);
   const [modalType, setModalType] = useState(null);
 
-  // Data for Modals
+  // Profile State
+  const [profile, setProfile] = useState({
+    age: '', status: 'Single', city: '', country: '', isStudent: false, occupation: [], university: ''
+  });
+  // ... (Profile Logic same as before) ...
+
+  // Fetch Community Categories
+  useEffect(() => {
+    if (modalType === 'community_cat') {
+      const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'categories'));
+      // In real app, we'd limit this or use a search index. For now, fetch all (assuming < 1000)
+      onSnapshot(q, snap => {
+        const list = snap.docs.map(d => d.data().name).sort();
+        // Unique
+        setCommunityCats([...new Set(list)]);
+      });
+    }
+  }, [modalType]);
+
+  // ... (Existing Profile/Settings logic) ...
+  // Re-pasting condensed for flow
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [countries, setCountries] = useState([]);
   const [cities, setCities] = useState([]);
   const [universities, setUniversities] = useState([]);
-
-  // Load Profile
-  useEffect(() => {
-    const loadProfile = async () => {
-      const snap = await getDoc(doc(db, 'users', userId));
-      if (snap.exists() && snap.data().profile) {
-        setProfile(prev => ({ ...prev, ...snap.data().profile }));
-      }
-    };
-    loadProfile();
-  }, [userId]);
-
-  // Fetch Countries on mount
-  useEffect(() => {
-    fetch('https://restcountries.com/v3.1/all?fields=name,cca2,flags')
-      .then(res => res.json())
-      .then(data => {
-        const formatted = data.map(c => ({
-          name: c.name.common,
-          code: c.cca2,
-          flag: c.flags.svg ? <img src={c.flags.svg} className="w-6 h-4 object-cover" /> : c.cca2
-        })).sort((a, b) => a.name.localeCompare(b.name));
-        setCountries(formatted);
-      })
-      .catch(err => console.error("Country API Error", err));
-  }, []);
-
-  // Fetch Cities logic
-  const fetchCities = async (countryName) => {
-    if (!countryName) return;
-    setModalType('city');
-    setCities([]); // Clear old cities
-    // Set loading state for cities (optional UI enhancement, keeping simple for now)
-    setCities(['Loading...']);
-
-    try {
-      const response = await fetch("https://countriesnow.space/api/v0.1/countries/cities", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ country: countryName }),
-      });
-      const data = await response.json();
-      if (!data.error) {
-        setCities(data.data);
-      } else {
-        setCities(['No cities found', 'Other']);
-      }
-    } catch (err) {
-      console.error("Cities API Error", err);
-      setCities(['Error fetching cities', 'Other']);
-    }
-  };
-
-  // Fetch Universities when needed
-  const fetchUniversities = (country) => {
-    if (!country) return;
-    setModalType('university');
-    setUniversities(['Loading...']); // Feedback
-
-    // UPDATED: Use raw GitHub content as API source (HTTPS)
-    fetch("https://raw.githubusercontent.com/Hipo/university-domains-list/master/world_universities_and_domains.json")
-      .then(res => res.json())
-      .then(data => {
-        // Filter in memory (Client-side)
-        const filtered = data
-          .filter(u => u.country.toLowerCase() === country.toLowerCase())
-          .map(u => u.name)
-          .sort();
-
-        if (filtered.length === 0) {
-          setUniversities(['No universities found', 'Other']);
-        } else {
-          setUniversities(filtered);
-        }
-      })
-      .catch(err => {
-        console.error("Uni API Error", err);
-        setUniversities(['Error fetching universities', 'Other']);
-      });
-  };
-
-  const handleSaveProfile = async (newProfile) => {
-    const p = newProfile || profile;
-    setProfile(p); // Optimistic UI
-    setIsSavingProfile(true);
-    try {
-      await setDoc(doc(db, 'users', userId), { profile: p }, { merge: true });
-    } catch (error) {
-      console.error("Error saving profile:", error);
-    } finally {
-      setIsSavingProfile(false);
-    }
-  };
-
-  // Helper for Profile Cards
-  const ProfileItem = ({ icon: Icon, label, value, onClick }) => (
-    <div
-      onClick={onClick}
-      className="p-4 bg-white rounded-xl border border-slate-100 hover:border-emerald-200 hover:shadow-md transition-all cursor-pointer group flex items-center justify-between"
-    >
-      <div className="flex items-center gap-4">
-        <div className="w-10 h-10 rounded-full bg-slate-50 group-hover:bg-emerald-50 flex items-center justify-center text-slate-400 group-hover:text-emerald-600 transition-colors">
-          <Icon className="w-5 h-5" />
-        </div>
-        <div>
-          <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">{label}</div>
-          <div className="font-semibold text-slate-800 text-lg">
-            {Array.isArray(value) ? (value.length > 0 ? value.join(", ") : "Select...") : (value || "Select...")}
-          </div>
-        </div>
-      </div>
-      <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-emerald-500 -ml-4 opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-2" />
-    </div>
-  );
+  useEffect(() => { const loadProfile = async () => { const snap = await getDoc(doc(db, 'users', userId)); if (snap.exists() && snap.data().profile) { setProfile(prev => ({ ...prev, ...snap.data().profile })); } }; loadProfile(); }, [userId]);
+  useEffect(() => { fetch('https://restcountries.com/v3.1/all?fields=name,cca2,flags').then(res => res.json()).then(data => { const formatted = data.map(c => ({ name: c.name.common, code: c.cca2, flag: c.flags.svg ? <img src={c.flags.svg} className="w-6 h-4 object-cover" /> : c.cca2 })).sort((a, b) => a.name.localeCompare(b.name)); setCountries(formatted); }).catch(err => console.error(err)); }, []);
+  const fetchCities = async (countryName) => { if (!countryName) return; setModalType('city'); setCities([]); setCities(['Loading...']); try { const response = await fetch("https://countriesnow.space/api/v0.1/countries/cities", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ country: countryName }) }); const data = await response.json(); if (!data.error) { setCities(data.data); } else { setCities(['No cities found', 'Other']); } } catch (err) { setCities(['Error fetching cities', 'Other']); } };
+  const fetchUniversities = (country) => { if (!country) return; setModalType('university'); setUniversities(['Loading...']); if (!CLOUD_RUN_URL || CLOUD_RUN_URL.includes("YOUR_CLOUD_RUN")) { setUniversities(['Error: Backend not connected', 'Other']); return; } fetch(`${CLOUD_RUN_URL}/get-universities?country=${encodeURIComponent(country)}`).then(res => res.json()).then(data => { if (!data || data.length === 0) { setUniversities(['No universities found', 'Other']); } else { setUniversities(data); } }).catch(err => { setUniversities(['Error fetching universities', 'Other']); }); };
+  const handleSaveProfile = async (newProfile) => { const p = newProfile || profile; setProfile(p); setIsSavingProfile(true); try { await setDoc(doc(db, 'users', userId), { profile: p }, { merge: true }); } catch (error) { console.error(error); } finally { setIsSavingProfile(false); } };
+  const handleAdd = async (nameInput) => { const name = nameInput || newCatName; if (!name) return; const newId = name.toLowerCase().replace(/\s+/g, '_'); const newCat = { id: newId, name: name, color: newCatColor }; const updated = [...categories, newCat]; onUpdateCategories(updated); await setDoc(doc(db, 'users', userId), { customCategories: updated.filter(c => !DEFAULT_CATEGORIES.find(dc => dc.id === c.id)) }, { merge: true }); setNewCatName(''); if (modalType === 'community_cat') setModalType(null); };
+  const handleRemove = async (catId) => { const updated = categories.filter(c => c.id !== catId); onUpdateCategories(updated); await setDoc(doc(db, 'users', userId), { customCategories: updated.filter(c => !DEFAULT_CATEGORIES.find(dc => dc.id === c.id)) }, { merge: true }); };
+  const ProfileItem = ({ icon: Icon, label, value, onClick }) => (<div onClick={onClick} className="p-4 bg-white rounded-xl border border-slate-100 hover:border-emerald-200 hover:shadow-md transition-all cursor-pointer group flex items-center justify-between"><div className="flex items-center gap-4"><div className="w-10 h-10 rounded-full bg-slate-50 group-hover:bg-emerald-50 flex items-center justify-center text-slate-400 group-hover:text-emerald-600 transition-colors"><Icon className="w-5 h-5" /></div><div><div className="text-xs font-bold text-slate-400 uppercase tracking-wider">{label}</div><div className="font-semibold text-slate-800 text-lg">{Array.isArray(value) ? (value.length > 0 ? value.join(", ") : "Select...") : (value || "Select...")}</div></div></div><ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-emerald-500 -ml-4 opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-2" /></div>);
 
   return (
     <div className="p-6 animate-fade-in max-w-4xl mx-auto space-y-8">
-      {/* Modals */}
+      {/* Modals - Same as before + Community */}
+      <SelectionModal isOpen={modalType === 'country'} onClose={() => setModalType(null)} title="Select Country" data={countries} onSelect={(c) => { const countryName = c.name || c; const newP = { ...profile, country: countryName, city: '' }; handleSaveProfile(newP); }} />
+      <SelectionModal isOpen={modalType === 'city'} onClose={() => setModalType(null)} title={`Select City in ${profile.country}`} data={cities} allowCustom={true} onSelect={(c) => handleSaveProfile({ ...profile, city: c })} />
+      <SelectionModal isOpen={modalType === 'occupation'} onClose={() => setModalType(null)} title="Select Occupation (Max 3)" data={OCCUPATIONS_LIST} multiSelect allowCustom={true} selectedItems={profile.occupation} onSelect={(newOccupations) => handleSaveProfile({ ...profile, occupation: newOccupations })} />
+      <SelectionModal isOpen={modalType === 'university'} onClose={() => setModalType(null)} title={`Universities in ${profile.country}`} data={universities} allowCustom={true} onSelect={(u) => handleSaveProfile({ ...profile, university: u })} />
+      <InputModal isOpen={modalType === 'age'} onClose={() => setModalType(null)} title="Your Age" value={profile.age} type="number" onSave={(val) => handleSaveProfile({ ...profile, age: val })} />
+      <SelectionModal isOpen={modalType === 'status'} onClose={() => setModalType(null)} title="Relationship Status" data={STATUS_LIST} selectedItems={profile.status} onSelect={(s) => handleSaveProfile({ ...profile, status: s })} />
+
+      {/* Community Category Modal */}
       <SelectionModal
-        isOpen={modalType === 'country'}
+        isOpen={modalType === 'community_cat'}
         onClose={() => setModalType(null)}
-        title="Select Country"
-        data={countries}
-        onSelect={(c) => {
-          const countryName = c.name || c; // Handle object or string
-          const newP = { ...profile, country: countryName, city: '' };
-          handleSaveProfile(newP);
-        }}
-      />
-      <SelectionModal
-        isOpen={modalType === 'city'}
-        onClose={() => setModalType(null)}
-        title={`Select City in ${profile.country}`}
-        data={cities}
-        allowCustom={true} // Allow typing a custom city
-        onSelect={(c) => handleSaveProfile({ ...profile, city: c })}
-      />
-      <SelectionModal
-        isOpen={modalType === 'occupation'}
-        onClose={() => setModalType(null)}
-        title="Select Occupation (Max 3)"
-        data={OCCUPATIONS_LIST}
-        multiSelect
+        title="Community Categories"
+        data={communityCats}
         allowCustom={true}
-        selectedItems={profile.occupation}
-        onSelect={(newOccupations) => handleSaveProfile({ ...profile, occupation: newOccupations })}
-      />
-      <SelectionModal
-        isOpen={modalType === 'university'}
-        onClose={() => setModalType(null)}
-        title={`Universities in ${profile.country}`}
-        data={universities}
-        allowCustom={true}
-        onSelect={(u) => handleSaveProfile({ ...profile, university: u })}
-      />
-      <InputModal
-        isOpen={modalType === 'age'}
-        onClose={() => setModalType(null)}
-        title="Your Age"
-        value={profile.age}
-        type="number"
-        onSave={(val) => handleSaveProfile({ ...profile, age: val })}
-      />
-      <SelectionModal
-        isOpen={modalType === 'status'}
-        onClose={() => setModalType(null)}
-        title="Relationship Status"
-        data={STATUS_LIST}
-        selectedItems={profile.status} // Single select highlights
-        onSelect={(s) => handleSaveProfile({ ...profile, status: s })}
+        onSelect={(name) => handleAdd(name)}
       />
 
-      {/* HEADER */}
-      <div>
-        <h2 className="text-3xl font-bold text-slate-800 flex items-center gap-3">
-          <User className="w-8 h-8 text-emerald-500" /> My Profile
-        </h2>
-        <p className="text-slate-500 mt-1">Manage your identity for better financial benchmarks.</p>
-      </div>
-
-      {/* MAIN PROFILE GRID */}
+      {/* Profile UI (Same as before) */}
+      <div><h2 className="text-3xl font-bold text-slate-800 flex items-center gap-3"><User className="w-8 h-8 text-emerald-500" /> My Profile</h2><p className="text-slate-500 mt-1">Manage your identity for better financial benchmarks.</p></div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <ProfileItem
-          icon={Globe}
-          label="Country"
-          value={profile.country}
-          onClick={() => setModalType('country')}
-        />
-        <ProfileItem
-          icon={MapPin}
-          label="City"
-          value={profile.city}
-          onClick={() => {
-            if (!profile.country) return alert("Please select a country first.");
-            fetchCities(profile.country);
-          }}
-        />
-        <ProfileItem
-          icon={Briefcase}
-          label="Occupation"
-          value={profile.occupation}
-          onClick={() => setModalType('occupation')}
-        />
-        <ProfileItem
-          icon={Clock}
-          label="Age"
-          value={profile.age}
-          onClick={() => setModalType('age')}
-        />
-        <ProfileItem
-          icon={Heart}
-          label="Status"
-          value={profile.status}
-          onClick={() => setModalType('status')}
-        />
-
-        {/* Student Toggle Card */}
-        <div className="bg-white p-4 rounded-xl border border-slate-100 flex flex-col justify-center gap-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${profile.isStudent ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-300'}`}>
-                <GraduationCap className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Student Status</div>
-                <div className="text-sm font-medium text-slate-700">{profile.isStudent ? 'Active Student' : 'Not a Student'}</div>
-              </div>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" checked={profile.isStudent} onChange={(e) => {
-                const isStudent = e.target.checked;
-                handleSaveProfile({ ...profile, isStudent });
-                // Auto-open uni modal if enabled and country selected
-                if (isStudent && profile.country) fetchUniversities(profile.country);
-              }} className="sr-only peer" />
-              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-            </label>
-          </div>
-
-          {/* University Selection (Only visible if Student) */}
-          {profile.isStudent && (
-            <div
-              onClick={() => {
-                if (!profile.country) return alert("Select country first");
-                fetchUniversities(profile.country);
-              }}
-              className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-100 cursor-pointer hover:bg-blue-100 transition-colors flex items-center justify-between"
-            >
-              <span className="text-sm font-bold text-blue-700">{profile.university || "Select University..."}</span>
-              <Edit2 className="w-4 h-4 text-blue-400" />
-            </div>
-          )}
-        </div>
+        <ProfileItem icon={Globe} label="Country" value={profile.country} onClick={() => setModalType('country')} />
+        <ProfileItem icon={MapPin} label="City" value={profile.city} onClick={() => { if (!profile.country) return alert("Please select a country first."); fetchCities(profile.country); }} />
+        <ProfileItem icon={Briefcase} label="Occupation" value={profile.occupation} onClick={() => setModalType('occupation')} />
+        <ProfileItem icon={Clock} label="Age" value={profile.age} onClick={() => setModalType('age')} />
+        <ProfileItem icon={Heart} label="Status" value={profile.status} onClick={() => setModalType('status')} />
+        <div className="bg-white p-4 rounded-xl border border-slate-100 flex flex-col justify-center gap-3"><div className="flex items-center justify-between"><div className="flex items-center gap-4"><div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${profile.isStudent ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-300'}`}><GraduationCap className="w-5 h-5" /></div><div><div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Student Status</div><div className="text-sm font-medium text-slate-700">{profile.isStudent ? 'Active Student' : 'Not a Student'}</div></div></div><label className="relative inline-flex items-center cursor-pointer"><input type="checkbox" checked={profile.isStudent} onChange={(e) => { const isStudent = e.target.checked; handleSaveProfile({ ...profile, isStudent }); if (isStudent && profile.country) fetchUniversities(profile.country); }} className="sr-only peer" /><div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div></label></div>{profile.isStudent && (<div onClick={() => { if (!profile.country) return alert("Select country first"); fetchUniversities(profile.country); }} className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-100 cursor-pointer hover:bg-blue-100 transition-colors flex items-center justify-between"><span className="text-sm font-bold text-blue-700">{profile.university || "Select University..."}</span><Edit2 className="w-4 h-4 text-blue-400" /></div>)}</div>
       </div>
 
-      {/* CATEGORIES SECTION */}
+      {/* Updated Categories Section */}
       <div className="mt-8 pt-8 border-t border-slate-200">
         <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2"><Settings className="w-5 h-5 text-slate-600" /> Transaction Categories</h2>
 
         <div className="flex gap-2 mb-4">
-          <input type="text" placeholder="New Category Name" className="flex-1 p-3 border border-slate-300 rounded-xl outline-none" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} />
+          {/* Community Button */}
+          <Button onClick={() => setModalType('community_cat')} variant="secondary" className="flex items-center gap-2">
+            <Cloud className="w-4 h-4" /> Browse Community
+          </Button>
+
+          <div className="w-px bg-slate-200 mx-2"></div>
+
+          <input type="text" placeholder="Custom Name" className="flex-1 p-3 border border-slate-300 rounded-xl outline-none" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} />
           <input type="color" value={newCatColor} onChange={(e) => setNewCatColor(e.target.value)} className="w-12 h-12 p-1 rounded-xl border border-slate-300 cursor-pointer" />
-          <Button onClick={() => {
-            if (!newCatName) return;
-            const newId = newCatName.toLowerCase().replace(/\s+/g, '_');
-            const newCat = { id: newId, name: newCatName, color: newCatColor };
-            const updated = [...categories, newCat];
-            onUpdateCategories(updated);
-            setDoc(doc(db, 'users', userId), { customCategories: updated.filter(c => !DEFAULT_CATEGORIES.find(dc => dc.id === c.id)) }, { merge: true });
-            setNewCatName('');
-          }}><Plus className="w-5 h-5" /></Button>
+          <Button onClick={() => handleAdd(null)}><Plus className="w-5 h-5" /></Button>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -861,11 +633,7 @@ const SettingsNode = ({ userId, categories, onUpdateCategories }) => {
                 <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }}></div>
                 <span className="font-bold text-slate-700 truncate text-sm">{cat.name}</span>
               </div>
-              <button onClick={() => {
-                const updated = categories.filter(c => c.id !== cat.id);
-                onUpdateCategories(updated);
-                setDoc(doc(db, 'users', userId), { customCategories: updated.filter(c => !DEFAULT_CATEGORIES.find(dc => dc.id === c.id)) }, { merge: true });
-              }} className="text-slate-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-4 h-4" /></button>
+              <button onClick={() => handleRemove(cat.id)} className="text-slate-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-4 h-4" /></button>
             </div>
           ))}
         </div>
@@ -874,6 +642,8 @@ const SettingsNode = ({ userId, categories, onUpdateCategories }) => {
   );
 };
 
+// ... (Rest of App component unchanged)
+// Condensed for brevity as no logic changed in SocialNode or main App render
 const SocialNode = () => <div className="p-12 text-center text-slate-400">Community Benchmarks Coming Soon</div>;
 
 export default function App() {
@@ -932,7 +702,7 @@ export default function App() {
     loadCats();
   }, [user, isWhitelisted]);
 
-  if (!user) return <LoginScreen debugStatus={debugStatus} />;
+  if (!user) return <LoginScreen />;
 
   if (isWhitelisted === null) {
     return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-400 animate-pulse">Verifying access permissions...</div>;
@@ -959,7 +729,7 @@ export default function App() {
           <div className="bg-white rounded-3xl shadow-xl min-h-[600px] flex flex-col overflow-hidden">
             <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50"><button onClick={() => setActiveNode('dashboard')} className="flex items-center gap-2 text-slate-500 hover:text-emerald-600 font-medium"><ArrowRight className="rotate-180 w-4 h-4" /> Back to Dashboard</button></div>
             <div className="flex-1 overflow-y-auto">
-              {activeNode === 'import' && <ImportNode userId={user?.uid} categories={categories} onUpdateCategories={setCategories} onComplete={() => setActiveNode('analytics')} />}
+              {activeNode === 'import' && <ImportNode userId={user?.uid} categories={categories} expenses={expenses} onUpdateCategories={setCategories} onComplete={() => setActiveNode('analytics')} />}
               {activeNode === 'analytics' && <AnalyticsNode data={expenses} categories={categories} userId={user?.uid} />}
               {activeNode === 'settings' && <SettingsNode userId={user?.uid} categories={categories} onUpdateCategories={setCategories} />}
             </div>

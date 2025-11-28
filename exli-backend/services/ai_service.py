@@ -2,7 +2,6 @@ import json
 import google.generativeai as genai
 from config import Config, logger
 
-# Configure Gemini once
 if Config.GEMINI_API_KEY:
     genai.configure(api_key=Config.GEMINI_API_KEY)
 
@@ -10,8 +9,6 @@ def get_best_available_model():
     """Finds the best available Gemini model for the current API key."""
     try:
         all_models = [m.name for m in genai.list_models()]
-        
-        # Priority list (Fastest & Newest first)
         priorities = [
             'gemini-2.5-flash',
             'gemini-2.0-flash',
@@ -19,7 +16,6 @@ def get_best_available_model():
             'gemini-3-pro-preview',
             'gemini-pro'
         ]
-        
         for p in priorities:
             for m in all_models:
                 if p in m:
@@ -37,35 +33,43 @@ def analyze_file_structure(text_head, text_tail):
     model_name = get_best_available_model()
     logger.info(f"AI Service: Using model {model_name}")
 
+    # CHAIN OF THOUGHT PROMPT
+    # We ask the model to analyze the layout "step-by-step" inside a 'reasoning' field.
     prompt = f"""
-    You are a financial data parsing assistant.
+    You are a specialized financial data parser. 
+    You are looking for the MAIN TRANSACTION TABLE in a bank export file.
     
-    FILE START (First 15 lines):
+    FILE START (First 50 lines):
     '''
     {text_head}
     '''
     
-    FILE END (Last 5 lines):
+    FILE END (Last 10 lines):
     '''
     {text_tail}
     '''
     
-    TASK:
-    1. Identify HEADER ROW INDEX (0-based).
-    2. Identify FOOTER SKIP COUNT (lines to ignore at bottom).
-    3. Identify DELIMITER character.
-    4. Map headers to: "date", "amount", "currency", "category", "description".
+    YOUR GOAL: Find the actual list of expenses, ignoring any "Account Summary", "Balance", or "User Details" tables at the top.
     
-    RULES:
-    - Use EXACT header strings from the file.
-    - If concept not found, return null.
+    STEPS:
+    1. Scan the lines. Look for a row that contains column headers like "Date", "Value", "Description", "Debit", "Credit".
+    2. Verify that the rows IMMEDIATELY following it look like transaction data (dates, numbers).
+    3. Determine the 0-based index of that header row.
+    4. Determine if there are garbage lines at the very bottom (totals, disclaimers).
     
-    OUTPUT JSON:
+    OUTPUT FORMAT (JSON ONLY):
     {{
+      "reasoning": "Explain here why you chose the specific row index. e.g. 'Row 0-4 are user details. Row 5 contains 'Date' and 'Amount', and Row 6 has data.'",
       "header_row_index": <int>,
       "footer_skip_count": <int>,
       "delimiter": "<char>",
-      "mapping": {{ "date": "...", "amount": "...", "currency": "...", "category": "...", "description": "..." }}
+      "mapping": {{ 
+         "date": "<Exact Header String>", 
+         "amount": "<Exact Header String>", 
+         "currency": "<Exact Header String>", 
+         "category": "<Exact Header String>", 
+         "description": "<Exact Header String>" 
+      }}
     }}
     """
 
@@ -73,7 +77,12 @@ def analyze_file_structure(text_head, text_tail):
         model = genai.GenerativeModel(model_name)
         response = model.generate_content(prompt)
         clean_text = response.text.replace("```json", "").replace("```", "").strip()
-        return json.loads(clean_text)
+        data = json.loads(clean_text)
+        
+        # Log the reasoning for debugging
+        logger.info(f"AI Reasoning: {data.get('reasoning', 'No reasoning provided')}")
+        
+        return data
     except Exception as e:
         logger.error(f"AI Analysis Failed: {e}")
         return None
