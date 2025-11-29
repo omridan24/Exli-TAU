@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutGrid, Upload, PieChart as PieIcon, Settings, LogOut, Wallet } from 'lucide-react';
+import { LayoutGrid, Upload, PieChart as PieIcon, Settings, LogOut, Wallet, ArrowRight } from 'lucide-react';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { collection, query, orderBy, onSnapshot, doc, getDoc } from 'firebase/firestore';
 
