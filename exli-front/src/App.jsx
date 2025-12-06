@@ -8,7 +8,7 @@ import { DEFAULT_CATEGORIES } from './config/constants';
 import LoginScreen from './features/auth/LoginScreen';
 import AccessDeniedScreen from './features/auth/AccessDeniedScreen';
 import { ExpenseNode } from './features/expenses/ExpenseNode';
-import { IncomeNode } from './features/income/IncomeNode';
+import { IncomeNode } from './features/Income/IncomeNode';
 import { AnalyticsNode } from './features/analytics/AnalyticsNode';
 import { SettingsNode } from './features/settings/SettingsNode';
 import { ExliLogo } from './components/UI';
