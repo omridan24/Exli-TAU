@@ -1,5 +1,6 @@
+
 import React, { useState, useMemo } from 'react';
-import { Upload, ArrowRight, Sparkles, CheckCircle, Trash2, XCircle, Plus } from 'lucide-react';
+import { Upload, ArrowRight, Sparkles, CheckCircle, Trash2, XCircle, Plus, X } from 'lucide-react';
 import { collection, addDoc, serverTimestamp, doc, setDoc } from 'firebase/firestore';
 import { db, CLOUD_RUN_URL } from '../../config/firebase.js';
 import { DEFAULT_CATEGORIES } from '../../config/constants.js';
@@ -19,15 +20,8 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
   const [isCreatingCat, setIsCreatingCat] = useState(false);
   const [newCatName, setNewCatName] = useState('');
 
-  const sortedCategories = useMemo(() => {
-    if (!expenses || expenses.length === 0) return categories;
-    const usage = {};
-    expenses.forEach(tx => {
-      const cat = tx.assignedCategory || tx.category || 'Uncategorized';
-      usage[cat] = (usage[cat] || 0) + 1;
-    });
-    return [...categories].sort((a, b) => (usage[b.name] || 0) - (usage[a.name] || 0));
-  }, [categories, expenses]);
+  // Fixed order to prevent cards from moving while classifying
+  const sortedCategories = categories;
 
   const handleFileChange = (e) => e.target.files[0] && setFile(e.target.files[0]);
 
