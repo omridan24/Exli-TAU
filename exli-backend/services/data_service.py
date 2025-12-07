@@ -3,7 +3,16 @@ import pandas as pd
 import re
 from config import logger
 from services.ai_service import analyze_multiple_files_structure, convert_pdf_to_csv
+from services.ai_service import analyze_multiple_files_structure, convert_pdf_to_csv
 
+def process_uploaded_files(files):
+    """
+    Orchestrates the reading of MULTIPLE files.
+    1. Pre-process (PDF->CSV, read Excels) to get text samples.
+    2. Send ALL samples to AI in one batch call.
+    3. Process each file using its specific AI-determined config.
+    """
+    logger.info(f"Data Service: Processing {len(files)} files")
 def process_uploaded_files(files):
     """
     Orchestrates the reading of MULTIPLE files.
@@ -161,5 +170,6 @@ def process_uploaded_files(files):
         return {"status": "success", "files": final_output}
 
     except Exception as e:
+        logger.error(f"Batch Processing Error: {e}", exc_info=True)
         logger.error(f"Batch Processing Error: {e}", exc_info=True)
         return {"status": "error", "message": str(e)}
