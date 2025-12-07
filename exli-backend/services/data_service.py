@@ -2,7 +2,7 @@ import io
 import pandas as pd
 import re
 from config import logger
-from services.ai_service import analyze_file_structure
+from services.ai_service import analyze_file_structure, convert_pdf_to_csv
 
 def process_uploaded_file(file):
     """Orchestrates the reading, AI analysis, and cleaning of a file."""
@@ -17,8 +17,21 @@ def process_uploaded_file(file):
     header_index = 0
     
     try:
+        # --- PRE-PROCESS: PDF TO CSV ---
+        if filename.lower().endswith('.pdf'):
+            logger.info("Detected PDF format. Initiating AI extraction...")
+            csv_string = convert_pdf_to_csv(raw_bytes)
+            
+            if not csv_string:
+                raise ValueError("AI could not extract data from this PDF.")
+                
+            # Replace raw_bytes with the generated CSV data so the rest of the logic handles it as a CSV
+            raw_bytes = csv_string.encode('utf-8')
+            logger.info("PDF converted to CSV successfully. Proceeding to analysis.")
+
         # --- STRATEGY 1: EXCEL ---
-        if filename.endswith(('.xls', '.xlsx')):
+        # Note: We check extension again. If it was a PDF, it falls through to Strategy 2.
+        if filename.endswith(('.xls', '.xlsx')) and not filename.lower().endswith('.pdf'):
             logger.info("Detected Excel format.")
             # Read raw (header=None) to see the full layout including garbage at top
             df_raw = pd.read_excel(io.BytesIO(raw_bytes), header=None)
@@ -41,9 +54,9 @@ def process_uploaded_file(file):
                 if footer_count > 0:
                     df = df.iloc[:-footer_count]
 
-        # --- STRATEGY 2: CSV/TEXT ---
+        # --- STRATEGY 2: CSV/TEXT (Handles original CSVs and Converted PDFs) ---
         else:
-            logger.info("Detected CSV/Text format.")
+            logger.info("Detected CSV/Text format (or Converted PDF).")
             # Decode text safely
             try:
                 full_text = raw_bytes.decode('utf-8', errors='ignore')
@@ -55,7 +68,7 @@ def process_uploaded_file(file):
             text_head = "\n".join(lines[:50])
             text_tail = "\n".join(lines[-10:]) if len(lines) > 50 else ""
             
-            # Ask AI
+            # Ask AI (Call 2 for PDFs, Call 1 for CSVs)
             ai_config = analyze_file_structure(text_head, text_tail)
             
             if not ai_config:
