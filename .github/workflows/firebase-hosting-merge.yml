@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # 1. BUILD
       - name: Build
         run: npm ci && npm run build
         working-directory: exli-front
@@ -22,3 +24,12 @@ jobs:
           VITE_FIREBASE_SENDER_ID: ${{ secrets.VITE_FIREBASE_SENDER_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
           VITE_CLOUD_RUN_URL: ${{ secrets.VITE_CLOUD_RUN_URL_PROD }} 
+
+      # 2. DEPLOY (This part was missing!)
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: '${{ secrets.GITHUB_TOKEN }}'
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_EXLI_24 }}'
+          channelId: live
+          projectId: exli-24
+          entryPoint: exli-front
