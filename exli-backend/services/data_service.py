@@ -2,143 +2,164 @@ import io
 import pandas as pd
 import re
 from config import logger
-from services.ai_service import analyze_file_structure, convert_pdf_to_csv
+from services.ai_service import analyze_multiple_files_structure, convert_pdf_to_csv
 
-def process_uploaded_file(file):
-    """Orchestrates the reading, AI analysis, and cleaning of a file."""
-    filename = file.filename
-    logger.info(f"Data Service: Processing {filename}")
+def process_uploaded_files(files):
+    """
+    Orchestrates the reading of MULTIPLE files.
+    1. Pre-process (PDF->CSV, read Excels) to get text samples.
+    2. Send ALL samples to AI in one batch call.
+    3. Process each file using its specific AI-determined config.
+    """
+    logger.info(f"Data Service: Processing {len(files)} files")
     
-    raw_bytes = file.read()
-    
-    df = None
-    delimiter = None
-    mapping = {}
-    header_index = 0
-    
+    # Storage for the pre-processed text/bytes to avoid re-reading
+    prepped_files = [] 
+    samples_for_ai = []
+
     try:
-        # --- PRE-PROCESS: PDF TO CSV ---
-        if filename.lower().endswith('.pdf'):
-            logger.info("Detected PDF format. Initiating AI extraction...")
-            csv_string = convert_pdf_to_csv(raw_bytes)
+        # --- PHASE 1: PREPARE SAMPLES ---
+        for idx, file in enumerate(files):
+            filename = file.filename
+            raw_bytes = file.read()
+            text_head = ""
+            text_tail = ""
+            is_excel = False
             
-            if not csv_string:
-                raise ValueError("AI could not extract data from this PDF.")
-                
-            # Replace raw_bytes with the generated CSV data so the rest of the logic handles it as a CSV
-            raw_bytes = csv_string.encode('utf-8')
-            logger.info("PDF converted to CSV successfully. Proceeding to analysis.")
+            # PDF Handling
+            if filename.lower().endswith('.pdf'):
+                logger.info(f"[{idx}] Converting PDF: {filename}")
+                csv_string = convert_pdf_to_csv(raw_bytes)
+                if not csv_string:
+                    raise ValueError(f"Failed to extract PDF data from {filename}")
+                raw_bytes = csv_string.encode('utf-8') # Replace with CSV data
+                # Generate sample from CSV string
+                lines = csv_string.splitlines()
+                text_head = "\n".join(lines[:50])
+                text_tail = "\n".join(lines[-10:])
+            
+            # Excel Handling
+            elif filename.endswith(('.xls', '.xlsx')):
+                logger.info(f"[{idx}] Reading Excel: {filename}")
+                is_excel = True
+                try:
+                    df_raw = pd.read_excel(io.BytesIO(raw_bytes), header=None)
+                    text_head = df_raw.head(50).to_csv(index=False, header=False)
+                    text_tail = df_raw.tail(10).to_csv(index=False, header=False)
+                except Exception as e:
+                    logger.error(f"Failed to read Excel preview: {e}")
+                    raise ValueError(f"Excel file {filename} is corrupted or password protected.")
+            
+            # CSV Handling
+            else:
+                logger.info(f"[{idx}] Reading CSV: {filename}")
+                try:
+                    full_text = raw_bytes.decode('utf-8', errors='ignore')
+                except:
+                    full_text = raw_bytes.decode('latin1', errors='ignore')
+                lines = full_text.splitlines()
+                text_head = "\n".join(lines[:50])
+                text_tail = "\n".join(lines[-10:])
 
-        # --- STRATEGY 1: EXCEL ---
-        # Note: We check extension again. If it was a PDF, it falls through to Strategy 2.
-        if filename.endswith(('.xls', '.xlsx')) and not filename.lower().endswith('.pdf'):
-            logger.info("Detected Excel format.")
-            # Read raw (header=None) to see the full layout including garbage at top
-            df_raw = pd.read_excel(io.BytesIO(raw_bytes), header=None)
+            # Store for Phase 2 & 3
+            prepped_files.append({
+                "filename": filename,
+                "bytes": raw_bytes,
+                "is_excel": is_excel
+            })
             
-            # IMPROVED: Send more context (50 lines) so AI can skip large headers
-            text_head = df_raw.head(50).to_csv(index=False, header=False)
-            text_tail = df_raw.tail(10).to_csv(index=False, header=False)
+            samples_for_ai.append({
+                "filename": filename,
+                "head": text_head,
+                "tail": text_tail
+            })
+
+        # --- PHASE 2: ONE AI CALL ---
+        logger.info("Sending batch to AI...")
+        ai_response = analyze_multiple_files_structure(samples_for_ai)
+        
+        if not ai_response or "results" not in ai_response:
+            raise ValueError("AI failed to return valid structure for batch.")
+
+        ai_results = ai_response["results"]
+        final_output = []
+
+        # --- PHASE 3: PARSE DATA FRAMES ---
+        for idx, file_data in enumerate(prepped_files):
+            # Find matching AI config
+            config = next((r for r in ai_results if r.get('file_index') == idx), ai_results[idx])
             
-            # Ask AI
-            ai_config = analyze_file_structure(text_head, text_tail)
+            delimiter = config.get('delimiter', ',')
+            header_index = config.get('header_row_index', 0)
+            footer_count = config.get('footer_skip_count', 0)
+            mapping = config.get('mapping', {})
+            card_info = config.get('card_info', file_data['filename'])
+
+            # Load DF
+            df = None
             
-            if ai_config:
-                header_index = ai_config.get('header_row_index', 0)
-                footer_count = ai_config.get('footer_skip_count', 0)
-                mapping = ai_config.get('mapping', {})
-                delimiter = "Excel"
-                
-                # Reload with correct settings
-                df = pd.read_excel(io.BytesIO(raw_bytes), header=header_index)
+            # FIX: Check internal flag 'is_excel' instead of trusting AI delimiter for engine selection
+            if file_data['is_excel']:
+                logger.info(f"[{idx}] Parsing Excel Engine: {file_data['filename']}")
+                df = pd.read_excel(io.BytesIO(file_data['bytes']), header=header_index)
                 if footer_count > 0:
                     df = df.iloc[:-footer_count]
-
-        # --- STRATEGY 2: CSV/TEXT (Handles original CSVs and Converted PDFs) ---
-        else:
-            logger.info("Detected CSV/Text format (or Converted PDF).")
-            # Decode text safely
-            try:
-                full_text = raw_bytes.decode('utf-8', errors='ignore')
-            except:
-                full_text = raw_bytes.decode('latin1', errors='ignore')
-            
-            lines = full_text.splitlines()
-            # IMPROVED: Send 50 lines of context
-            text_head = "\n".join(lines[:50])
-            text_tail = "\n".join(lines[-10:]) if len(lines) > 50 else ""
-            
-            # Ask AI (Call 2 for PDFs, Call 1 for CSVs)
-            ai_config = analyze_file_structure(text_head, text_tail)
-            
-            if not ai_config:
-                raise ValueError("AI could not determine file structure")
-
-            delimiter = ai_config.get('delimiter', ',')
-            header_index = ai_config.get('header_row_index', 0)
-            footer_count = ai_config.get('footer_skip_count', 0)
-            mapping = ai_config.get('mapping', {})
-            
-            # Load Data
-            df = pd.read_csv(
-                io.BytesIO(raw_bytes), 
-                sep=delimiter, 
-                header=header_index, 
-                skipfooter=footer_count,
-                engine='python', 
-                encoding='utf-8-sig', 
-                on_bad_lines='skip'
-            )
-
-        # --- FINAL CLEANUP ---
-        if df is not None:
-            # Helper to normalize headers (remove newlines, collapse spaces)
-            def clean_header_name(h):
-                if not isinstance(h, str): return str(h)
-                # Replace newlines/tabs with space
-                h = h.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
-                # Collapse multiple spaces to one and strip
-                return re.sub(r'\s+', ' ', h).strip()
-
-            # 1. Clean DataFrame Columns
-            df.columns = [clean_header_name(c) for c in df.columns]
-            
-            # 2. Clean Mapping Values (to match the DataFrame)
-            cleaned_mapping = {}
-            for k, v in mapping.items():
-                if v:
-                    cleaned_mapping[k] = clean_header_name(v)
-                else:
-                    cleaned_mapping[k] = None
-            mapping = cleaned_mapping
-
-            # 3. Prune columns (Keep only mapped ones)
-            valid_headers = []
-            for name in mapping.values():
-                if name and name in df.columns:
-                    valid_headers.append(name)
-            
-            # Safety: Only prune if we actually matched enough columns
-            if len(valid_headers) >= 2:
-                logger.info(f"Pruning columns. Keeping: {valid_headers}")
-                df = df[valid_headers]
             else:
-                logger.warning(f"Only matched {len(valid_headers)} columns. Skipping pruning to prevent data loss.")
-            
-            # Clean NaNs for JSON
-            df_clean = df.astype(object).where(pd.notnull(df), None)
-            
-            return {
-                "status": "success",
-                "columns": df.columns.tolist(),
-                "suggested_mapping": mapping,
-                "preview_data": df_clean.head(5).values.tolist(),
-                "all_data": df_clean.values.tolist(),
-                "detected_delimiter": delimiter
-            }
-            
-        return {"status": "error", "message": "Failed to load DataFrame"}
+                logger.info(f"[{idx}] Parsing CSV Engine: {file_data['filename']}")
+                # Try multiple encodings for robustness (Hebrew/Windows vs UTF-8)
+                encodings = ['utf-8-sig', 'cp1255', 'latin1']
+                for enc in encodings:
+                    try:
+                        df = pd.read_csv(
+                            io.BytesIO(file_data['bytes']),
+                            sep=delimiter,
+                            header=header_index,
+                            skipfooter=footer_count,
+                            engine='python',
+                            encoding=enc,
+                            on_bad_lines='skip'
+                        )
+                        break # Stop if successful
+                    except UnicodeDecodeError:
+                        continue # Try next encoding
+                    except Exception as e:
+                        logger.warning(f"CSV Parse failed with {enc}: {e}")
+                        
+                if df is None:
+                    raise ValueError(f"Could not decode file {file_data['filename']}. Unknown encoding.")
+
+            # Cleanup Headers & Columns
+            if df is not None:
+                def clean_header(h):
+                    h = str(h).replace('\n', ' ').replace('\r', ' ')
+                    return re.sub(r'\s+', ' ', h).strip()
+
+                df.columns = [clean_header(c) for c in df.columns]
+                
+                # Normalize Mapping
+                cleaned_mapping = {k: clean_header(v) if v else None for k, v in mapping.items()}
+                
+                # Prune
+                valid_headers = [name for name in cleaned_mapping.values() if name and name in df.columns]
+                
+                # Safety check: Only prune if we actually found mapped columns
+                if len(valid_headers) >= 2:
+                    df = df[valid_headers]
+                
+                # Prepare JSON result
+                df_clean = df.astype(object).where(pd.notnull(df), None)
+                
+                final_output.append({
+                    "filename": file_data['filename'],
+                    "card_info": card_info,
+                    "columns": df.columns.tolist(),
+                    "suggested_mapping": cleaned_mapping,
+                    "preview_data": df_clean.head(5).values.tolist(),
+                    "all_data": df_clean.values.tolist()
+                })
+
+        return {"status": "success", "files": final_output}
 
     except Exception as e:
-        logger.error(f"Processing Error: {e}", exc_info=True)
+        logger.error(f"Batch Processing Error: {e}", exc_info=True)
         return {"status": "error", "message": str(e)}

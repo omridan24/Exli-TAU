@@ -2,30 +2,36 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from config import logger, Config
 import os
-from services.data_service import process_uploaded_file
+from services.data_service import process_uploaded_files
 from services.ai_service import analyze_income_statement
 from services.stock_service import search_symbol, get_stock_details
 
-print("--- EXLI BACKEND v11.0 (INVESTMENTS) ---", flush=True)
+print("--- EXLI BACKEND v12.0 (MULTI-FILE) ---", flush=True)
 
 app = Flask(__name__)
 CORS(app)
 
 @app.route('/', methods=['GET'])
 def health_check():
-    return "Exli Backend v11.0 is Online", 200
+    return "Exli Backend v12.0 is Online", 200
 
 # --- Expense Processing ---
 @app.route('/analyze-file', methods=['POST'])
 def analyze_file():
-    if 'file' not in request.files:
-        return jsonify({"error": "No file part"}), 400
+    # Check for multiple files (the key is usually 'files')
+    # If the frontend sends 'file', we handle that too for backward compat,
+    # but the new frontend will send 'files'.
     
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({"error": "No selected file"}), 400
+    uploaded_files = request.files.getlist('files')
+    
+    # Fallback if single 'file' was sent
+    if not uploaded_files and 'file' in request.files:
+        uploaded_files = [request.files['file']]
 
-    result = process_uploaded_file(file)
+    if not uploaded_files or uploaded_files[0].filename == '':
+        return jsonify({"error": "No files uploaded"}), 400
+
+    result = process_uploaded_files(uploaded_files)
     
     if result["status"] == "error":
         return jsonify({"error": result["message"]}), 500

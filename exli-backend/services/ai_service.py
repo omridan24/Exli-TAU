@@ -10,8 +10,6 @@ def get_best_available_model():
     """Finds the best available Gemini model for the current API key."""
     try:
         all_models = [m.name for m in genai.list_models()]
-        
-        # Priority list (Updated to prefer gemini-3-pro-preview)
         priorities = [
             'gemini-3-pro-preview',
             'gemini-2.5-flash',
@@ -20,7 +18,6 @@ def get_best_available_model():
             'gemini-flash-latest',
             'gemini-pro'
         ]
-        
         for p in priorities:
             for m in all_models:
                 if p in m:
@@ -56,64 +53,73 @@ def convert_pdf_to_csv(file_bytes):
 
     try:
         model = genai.GenerativeModel(model_name)
-        
-        # Create the content part for the file
-        file_part = {
-            "mime_type": "application/pdf",
-            "data": file_bytes
-        }
-        
+        file_part = {"mime_type": "application/pdf", "data": file_bytes}
         response = model.generate_content([prompt, file_part])
-        # Clean response (sometimes it adds markdown tags despite instructions)
         clean_csv = response.text.replace("```csv", "").replace("```", "").strip()
         return clean_csv
     except Exception as e:
         logger.error(f"AI PDF Extraction Failed: {e}")
         return None
 
-def analyze_file_structure(text_head, text_tail):
-    """Sends file samples to Gemini to detect structure (CSV/Excel)."""
+def analyze_multiple_files_structure(file_samples):
+    """
+    Sends multiple file samples to Gemini in ONE call.
+    file_samples: List of dicts [{'filename': '...', 'head': '...', 'tail': '...'}]
+    Returns: List of analysis results.
+    """
     if not Config.GEMINI_API_KEY:
         return None
 
     model_name = get_best_available_model()
-    logger.info(f"AI Service: Using model {model_name}")
+    logger.info(f"AI Service (Batch Analysis): Using model {model_name} for {len(file_samples)} files")
+
+    # Construct the combined prompt
+    samples_text = ""
+    for idx, f in enumerate(file_samples):
+        samples_text += f"""
+        --- FILE {idx+1}: {f['filename']} ---
+        START (First 50 lines):
+        '''
+        {f['head']}
+        '''
+        END (Last 10 lines):
+        '''
+        {f['tail']}
+        '''
+        -------------------------------------
+        """
 
     prompt = f"""
-    You are a financial data parsing assistant.
+    You are a financial data parsing assistant processing multiple files at once.
     
-    FILE START (First 50 lines):
-    '''
-    {text_head}
-    '''
-    
-    FILE END (Last 10 lines):
-    '''
-    {text_tail}
-    '''
+    INPUT DATA:
+    {samples_text}
     
     TASK:
-    1. Identify HEADER ROW INDEX (0-based).
-    2. Identify FOOTER SKIP COUNT (lines to ignore at bottom).
-    3. Identify DELIMITER character.
-    4. Map headers to: "date", "amount", "currency", "category", "description".
+    For EACH file, analyze the structure and return the parsing configuration.
     
-    CRITICAL MAPPING RULES & PITFALLS:
-    - **Date**: Look for "Transaction Date" or "Date of Purchase". PREFER this over "Billing Date", "Posting Date", or "Debit Date". We need when the money was spent, not when it was banked.
-    - **Amount**: Identify the transaction value. 
-        - IGNORE "Balance", "Cumulative", or "Total" columns.
-        - If "Debit" and "Credit" exist, choose "Debit" or the column representing the charge amount.
-        - If "Original Amount" and "Billing Amount" exist, prefer "Billing Amount" (the final currency charged).
-    - **Description**: Look for "Payee", "Merchant", "Name", or "Description".
-        - DO NOT map "Card Number", "Reference ID", "Index", or "Voucher" to description.
-    - **Header Selection**: If headers seem split across rows, pick the row containing the primary labels (Date, Amount, etc.).
+    CRITICAL RULES:
+    1. **Card Info**: Look at the top/bottom of the file text for hints about the card (e.g., "Visa 5096", "Amex", "Leumi Card"). Return a short string like "Visa 5096". If unknown, use the filename.
+    2. **Date**: Prefer "Transaction Date" over "Billing Date".
+    3. **Amount**: Ignore "Balance" columns. Prefer "Billing Amount" or "Debit".
+    4. **Header Row**: Identify the 0-based index of the row containing column names.
+    5. **Footer Skip**: Count lines to skip at the bottom (totals, disclaimers).
     
-    OUTPUT JSON:
+    OUTPUT FORMAT:
+    Return a JSON Object containing a single key "results" which is a LIST of objects (one per file, in order).
+    
     {{
-      "header_row_index": <int>,
-      "footer_skip_count": <int>,
-      "delimiter": "<char>",
-      "mapping": {{ "date": "...", "amount": "...", "currency": "...", "category": "...", "description": "..." }}
+      "results": [
+        {{
+          "file_index": 0,
+          "card_info": "Visa Ending 1234",
+          "header_row_index": <int>,
+          "footer_skip_count": <int>,
+          "delimiter": "<char>",
+          "mapping": {{ "date": "...", "amount": "...", "currency": "...", "category": "...", "description": "..." }}
+        }},
+        ...
+      ]
     }}
     """
 
@@ -121,54 +127,26 @@ def analyze_file_structure(text_head, text_tail):
         model = genai.GenerativeModel(model_name)
         response = model.generate_content(prompt)
         clean_text = response.text.replace("```json", "").replace("```", "").strip()
+        # Handle cases where model might wrap it weirdly
+        if clean_text.startswith("json"): clean_text = clean_text[4:].strip()
         return json.loads(clean_text)
     except Exception as e:
-        logger.error(f"AI Analysis Failed: {e}")
+        logger.error(f"AI Batch Analysis Failed: {e}")
         return None
 
 def analyze_income_statement(file_bytes, mime_type):
-    """Sends an image/PDF to Gemini to extract income details."""
+    # (Same as before)
     if not Config.GEMINI_API_KEY:
         return None
-
     model_name = get_best_available_model()
-    logger.info(f"AI Service (Income): Using model {model_name} for {mime_type}")
-
     prompt = """
     Analyze this Income Statement / Payslip.
-    Extract the following monthly totals as single numeric values.
-    
-    FIELDS TO EXTRACT:
-    1. bruto: The total Gross Income (before deductions).
-    2. neto: The final Net Income (amount paid to bank).
-    3. taxes: Sum of all mandatory state taxes (Income Tax, Social Security/National Insurance, Health Tax).
-    4. pension: Total Pension contributions (Employee + Employer part if visible, or just Employee).
-    5. other_deposits: Any other savings/funds deducted (Study funds, stock options, etc).
-
-    RULES:
-    - Return ONLY numbers (no currency symbols).
-    - If a field is 0 or not found, return 0.
-    - Ignore personal IDs, Names, or Addresses.
-    
-    OUTPUT FORMAT (JSON):
-    {
-        "bruto": <number>,
-        "neto": <number>,
-        "taxes": <number>,
-        "pension": <number>,
-        "other_deposits": <number>
-    }
+    Extract: bruto, neto, taxes, pension, other_deposits.
+    Return JSON { "bruto": 0, ... }
     """
-
     try:
         model = genai.GenerativeModel(model_name)
-        
-        # Create the content part for the file
-        file_part = {
-            "mime_type": mime_type,
-            "data": file_bytes
-        }
-        
+        file_part = {"mime_type": mime_type, "data": file_bytes}
         response = model.generate_content([prompt, file_part])
         clean_text = response.text.replace("```json", "").replace("```", "").strip()
         return json.loads(clean_text)
