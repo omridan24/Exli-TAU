@@ -20,6 +20,7 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
   const [newCatName, setNewCatName] = useState('');
 
   // Fixed order to prevent cards from moving while classifying
+  //adding this to force rebuild
   const sortedCategories = categories;
 
   const handleFileChange = (e) => e.target.files[0] && setFile(e.target.files[0]);
