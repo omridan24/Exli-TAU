@@ -6,55 +6,107 @@ from config import Config, logger
 if Config.GEMINI_API_KEY:
     genai.configure(api_key=Config.GEMINI_API_KEY)
 
-def get_best_available_model():
-    """Finds the best available Gemini model for the current API key."""
+def get_model_by_tier(tier="flash"):
+    """
+    Finds the best model based on the requested tier.
+    tier="pro": Prioritizes Gemini 3 Pro / 1.5 Pro (High intelligence/Vision for PDFs)
+    tier="flash": Prioritizes Gemini 2.5 Flash / 2.0 Flash (Speed/Cost for CSVs)
+    """
     try:
         all_models = [m.name for m in genai.list_models()]
-        priorities = [
-            'gemini-3-pro-preview',
-            'gemini-2.5-flash',
-            'gemini-2.0-flash',
-            'gemini-1.5-pro',
-            'gemini-flash-latest',
-            'gemini-pro'
-        ]
+        
+        if tier == "pro":
+            priorities = [
+                'gemini-3-pro-preview', # User requested specific model
+                'gemini-2.0-pro', 
+                'gemini-1.5-pro',
+                'gemini-pro'
+            ]
+        else: # flash
+            priorities = [
+                'gemini-2.5-flash', # User requested specific model
+                'gemini-2.0-flash',
+                'gemini-1.5-flash',
+                'gemini-flash'
+            ]
+
+        # Find the first available model from the priority list
         for p in priorities:
             for m in all_models:
                 if p in m:
                     return m
+        
+        # Fallback to a safe default if nothing matches
         return 'gemini-1.5-flash'
     except Exception as e:
         logger.error(f"Error listing models: {e}")
         return 'gemini-1.5-flash'
 
 def convert_pdf_to_csv(file_bytes):
-    """Extracts transaction data from a PDF and converts it to a CSV string."""
+    """
+    Extracts the main transaction table from a PDF into a raw CSV string.
+    Uses a High-Intelligence Model (Pro tier) for better vision/layout understanding.
+    """
     if not Config.GEMINI_API_KEY:
         return None
 
-    model_name = get_best_available_model()
+    # Use the Pro tier model for complex PDF vision tasks
+    model_name = get_model_by_tier("pro")
     logger.info(f"AI Service (PDF Extraction): Using model {model_name}")
 
+    # REVISED PROMPT: Strict column separation and noise removal
     prompt = """
-    You are a bank statement data extractor. 
-    Task: Extract all financial transaction rows from the provided PDF document pages.
-    
-    OUTPUT FORMAT:
-    - Strictly CSV format.
-    - Headers: Date, Description, Amount, Category (if explicitly present, else leave empty), Currency (if explicitly present, else ILS/USD).
-    - No markdown formatting (no ```csv ... ```). Just the raw CSV text.
-    
-    RULES:
-    1. Extract transactions from ALL pages.
-    2. Ignore "Opening Balance", "Closing Balance", "Total", or "Forwarded" rows. We only want individual spending/income transactions.
-    3. Ensure the Amount is a single number (e.g., 150.50). If Credit/Debit are separate columns, merge them into one Amount column (negative for expenses if possible, or just raw numbers).
-    4. If the description spans multiple lines, merge it into a single line description.
+    You are a specialized "Bank Statement to CSV" converter. 
+    Your goal is to extract the **Main Transaction Table** with pixel-perfect precision.
+
+    ### 🔍 SCANNING & FILTERING RULES (WHAT TO KEEP VS IGNORE):
+    1. **Identify the Main Table**: Find the list of chronological transactions (Date, Description, Amount).
+    2. **REMOVE PAGE HEADERS/FOOTERS**: 
+       - **Top of Page**: Ignore bank logos, addresses, dates, and "Account Summary" boxes.
+       - **Bottom of Page**: Ignore page numbers, legal disclaimers, or "Continued on next page".
+    3. **REMOVE SUMMARY TABLES**: 
+       - Ignore tables labeled "Total by Category", "Foreign Currency Summary", "Concentration of Data", or "Payment Plan Details". 
+       - ONLY extract the detailed transaction rows.
+    4. **IGNORE "INFORMATION ONLY"**: 
+       - Skip sections labeled "Pending", "Transactions for Knowledge" (עסקאות לידיעה), or "Future Charges".
+
+    ### 📐 COLUMN ALIGNMENT & ACCURACY (CRITICAL):
+    1. **Card Number vs Amount**: 
+       - Many statements show the "Card Number" (4 digits like 2728, 5096) near the Amount column.
+       - **NEVER** put the Card Number in the Amount column.
+       - **NEVER** put the Amount in the Card Number column.
+       - Amount must be a monetary value (e.g., 150.00). Card number is just an ID (e.g., 2728).
+    2. **One Row Per Transaction**:
+       - Process the table strictly line-by-line.
+       - If a description wraps to a second line, merge it into the description column of the SAME row. Do not create a new row with an empty date/amount.
+
+    ### 🔨 VISUAL FIDELITY:
+    - Output the **EXACT** headers found in the document (e.g., "תאריך עסקה", "שם בית עסק"). Do not translate them yet.
+    - Do not reformat dates (keep "15/10/2023" as is).
+    - Keep the exact numeric string for amounts (e.g., "1,200.50").
+
+    ### 📝 OUTPUT FORMAT:
+    - Return ONLY the raw CSV text.
+    - No markdown formatting (no ```csv).
+    - No conversational text.
     """
 
     try:
         model = genai.GenerativeModel(model_name)
         file_part = {"mime_type": "application/pdf", "data": file_bytes}
-        response = model.generate_content([prompt, file_part])
+        
+        # Use low temperature for deterministic data extraction
+        generation_config = genai.types.GenerationConfig(
+            candidate_count=1,
+            max_output_tokens=8192, 
+            temperature=0.0 
+        )
+
+        response = model.generate_content(
+            [prompt, file_part],
+            generation_config=generation_config
+        )
+        
         clean_csv = response.text.replace("```csv", "").replace("```", "").strip()
         return clean_csv
     except Exception as e:
@@ -63,14 +115,14 @@ def convert_pdf_to_csv(file_bytes):
 
 def analyze_multiple_files_structure(file_samples):
     """
-    Sends multiple file samples to Gemini in ONE call.
-    file_samples: List of dicts [{'filename': '...', 'head': '...', 'tail': '...'}]
-    Returns: List of analysis results.
+    Analyzes CSV/Excel structure to map headers and clean data.
+    Uses a Fast/Cost-Effective Model (Flash tier).
     """
     if not Config.GEMINI_API_KEY:
         return None
 
-    model_name = get_best_available_model()
+    # Use the Flash tier model for text analysis
+    model_name = get_model_by_tier("flash")
     logger.info(f"AI Service (Batch Analysis): Using model {model_name} for {len(file_samples)} files")
 
     # Construct the combined prompt
@@ -135,10 +187,15 @@ def analyze_multiple_files_structure(file_samples):
         return None
 
 def analyze_income_statement(file_bytes, mime_type):
-    # (Same as before)
+    """
+    Analyzes payslips/income statements.
+    """
     if not Config.GEMINI_API_KEY:
         return None
-    model_name = get_best_available_model()
+        
+    # Payslips often have complex layouts, so we default to Pro for better accuracy
+    model_name = get_model_by_tier("pro")
+    
     prompt = """
     Analyze this Income Statement / Payslip.
     Extract: bruto, neto, taxes, pension, other_deposits.
