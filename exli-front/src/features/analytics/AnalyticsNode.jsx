@@ -55,23 +55,17 @@ const StatsOverview = ({ totals, currency }) => (
 // --- SUB-COMPONENT: YEAR DASHBOARD ---
 const YearDashboard = ({ year, data, income, categories, userId, onBack }) => {
     const [viewMode, setViewMode] = useState('month');
-    const [trendType, setTrendType] = useState('expense'); // 'expense' | 'income'
+    const [trendType, setTrendType] = useState('expense'); 
     const [selectedMonth, setSelectedMonth] = useState('average');
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
-    // Selection state
     const [selectedCategory, setSelectedCategory] = useState(categories[0]?.name || '');
-    const [selectedIncomeType, setSelectedIncomeType] = useState('neto'); // neto, bruto, taxes...
+    const [selectedIncomeType, setSelectedIncomeType] = useState('neto');
 
     const formatDate = (dateStr) => {
-        try {
-            return new Date(dateStr).toLocaleDateString();
-        } catch (e) {
-            return dateStr;
-        }
+        try { return new Date(dateStr).toLocaleDateString(); } catch (e) { return dateStr; }
     };
 
-    // --- FILTERING LOGIC ---
     const filteredData = useMemo(() => {
         return {
             expenses: data.filter(d => (d.reportMonth || "").startsWith(year)),
@@ -79,13 +73,22 @@ const YearDashboard = ({ year, data, income, categories, userId, onBack }) => {
         };
     }, [data, income, year]);
 
+    // ROBUST CURRENCY CHECKER
     const dominantCurrency = useMemo(() => {
         if (!data.length) return 'ILS';
         const counts = {};
+        const validCurrencies = ['ILS', 'USD', 'EUR', 'GBP', '₪', '$', '€', '£'];
+        
         data.forEach(d => {
-            const c = d.currency || 'ILS';
+            let c = d.currency || 'ILS';
+            // If the currency is Hebrew/Long string/Garbage, ignore it or force ILS
+            if (!validCurrencies.includes(c) && c.length > 3) {
+                c = 'ILS'; 
+            }
             counts[c] = (counts[c] || 0) + 1;
         });
+        
+        if (Object.keys(counts).length === 0) return 'ILS';
         return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
     }, [data]);
 
@@ -138,7 +141,6 @@ const YearDashboard = ({ year, data, income, categories, userId, onBack }) => {
         return agg;
     }, [displayIncome, selectedMonth, availableMonths]);
 
-    // --- TREND HELPERS ---
     const expenseTrendData = useMemo(() => {
         if (trendType !== 'expense' || !selectedCategory) return [];
         const relevantTx = filteredData.expenses.filter(d => (d.assignedCategory || 'Uncategorized') === selectedCategory && !d.isRefund);
@@ -199,10 +201,8 @@ const YearDashboard = ({ year, data, income, categories, userId, onBack }) => {
     const handleDelete = async (docId) => { if (confirm('Delete?')) await deleteDoc(doc(db, 'users', userId, 'expenses', docId)); };
     const handleCategoryChange = async (docId, newCat) => { await updateDoc(doc(db, 'users', userId, 'expenses', docId), { assignedCategory: newCat }); };
 
-    // --- RENDER ---
     return (
         <div className="animate-fade-in">
-            {/* Header / Nav */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <div className="flex items-center gap-4">
                     <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-full text-slate-500"><ArrowLeft className="w-6 h-6" /></button>
@@ -214,7 +214,6 @@ const YearDashboard = ({ year, data, income, categories, userId, onBack }) => {
                 </div>
             </div>
 
-            {/* Sub-Nav Months */}
             {viewMode === 'month' && (
                 <div className="flex items-center gap-2 overflow-x-auto pb-4 mb-4 border-b border-slate-100">
                     <button onClick={() => setSelectedMonth('average')} className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${selectedMonth === 'average' ? 'bg-blue-600 text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>📊 Yearly Avg</button>
@@ -224,7 +223,6 @@ const YearDashboard = ({ year, data, income, categories, userId, onBack }) => {
                 </div>
             )}
 
-            {/* Views */}
             {viewMode === 'month' ? (
                 <>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -269,7 +267,6 @@ const YearDashboard = ({ year, data, income, categories, userId, onBack }) => {
                         </div>
                     )}
 
-                    {/* Table */}
                     {selectedMonth !== 'average' && (
                         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
                             <table className="w-full text-sm text-left">
@@ -294,9 +291,7 @@ const YearDashboard = ({ year, data, income, categories, userId, onBack }) => {
                     )}
                 </>
             ) : (
-                // TRENDS VIEW
                 <div className="animate-fade-in">
-                    {/* Toggle Income/Expense */}
                     <div className="flex justify-center mb-8">
                         <div className="bg-slate-100 p-1 rounded-xl inline-flex">
                             <button onClick={() => setTrendType('expense')} className={`px-6 py-2 rounded-lg font-bold text-sm transition-all ${trendType === 'expense' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>Expense Trends</button>
@@ -304,7 +299,6 @@ const YearDashboard = ({ year, data, income, categories, userId, onBack }) => {
                         </div>
                     </div>
 
-                    {/* Selectors */}
                     <div className="mb-8">
                         <div className="text-xs font-bold text-slate-400 uppercase mb-2">Select {trendType === 'expense' ? 'Category' : 'Metric'} to Analyze</div>
                         <div className="flex gap-2 flex-wrap">
@@ -316,17 +310,14 @@ const YearDashboard = ({ year, data, income, categories, userId, onBack }) => {
                         </div>
                     </div>
 
-                    {/* Stats */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                         <Card className="p-4"><div className="text-slate-400 text-xs font-bold uppercase">Total {trendType === 'expense' ? 'Spent' : 'Received'}</div><div className="text-2xl font-bold text-slate-800">{dominantCurrency} {trendOverview.total.toLocaleString()}</div></Card>
                         <Card className="p-4"><div className="text-slate-400 text-xs font-bold uppercase">Monthly Avg</div><div className="text-2xl font-bold text-blue-600">{dominantCurrency} {trendOverview.avg.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div></Card>
                         <Card className="p-4"><div className="text-slate-400 text-xs font-bold uppercase">Highest Month</div><div className="text-2xl font-bold text-orange-500">{dominantCurrency} {trendOverview.max.toLocaleString()}</div></Card>
                     </div>
 
-                    {/* Chart */}
                     <Card className="p-6 mb-8 h-64"><ResponsiveContainer><BarChart data={activeTrendData}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="month" /><YAxis /><Tooltip /><Bar dataKey="amount" fill={trendType === 'expense' ? "#3b82f6" : "#10b981"} radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></Card>
 
-                    {/* Transaction List (NO DELETE) */}
                     <div className="mt-8">
                         <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><Filter className="w-4 h-4" /> History ({year})</h3>
                         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
@@ -357,11 +348,22 @@ export const AnalyticsNode = ({ data, income, categories, userId }) => {
     const dominantCurrency = useMemo(() => {
         if (!data.length) return 'ILS';
         const counts = {};
-        data.forEach(d => { const c = d.currency || 'ILS'; counts[c] = (counts[c] || 0) + 1; });
+        // VALIDATION LIST FOR CURRENCIES
+        const validCurrencies = ['ILS', 'USD', 'EUR', 'GBP', '₪', '$', '€', '£'];
+        
+        data.forEach(d => { 
+            let c = d.currency || 'ILS';
+            // Sanitize: If it's a long string or contains Hebrew, force it to default
+            if (!validCurrencies.includes(c) && c.length > 3) {
+                c = 'ILS'; 
+            }
+            counts[c] = (counts[c] || 0) + 1; 
+        });
+        
+        if (Object.keys(counts).length === 0) return 'ILS';
         return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
     }, [data]);
 
-    // Group Data by Year
     const years = useMemo(() => {
         const allYears = new Set([
             ...data.map(d => d.reportMonth?.split('-')[0]),
@@ -370,12 +372,10 @@ export const AnalyticsNode = ({ data, income, categories, userId }) => {
         return Array.from(allYears).sort().reverse();
     }, [data, income]);
 
-    // Auto-select if only 1 year
     useEffect(() => {
         if (years.length === 1) setSelectedYear(years[0]);
     }, [years]);
 
-    // Lifetime Stats
     const lifetimeTotals = useMemo(() => {
         const exp = data.reduce((acc, curr) => acc + (curr.isRefund ? 0 : Number(curr.amount)), 0);
         const incNet = income.reduce((acc, curr) => acc + (Number(curr.neto) || 0), 0);
@@ -384,7 +384,6 @@ export const AnalyticsNode = ({ data, income, categories, userId }) => {
         return { exp, incNet, wealth };
     }, [data, income]);
 
-    // 1. DETAIL VIEW
     if (selectedYear) {
         return (
             <YearDashboard
@@ -398,14 +397,11 @@ export const AnalyticsNode = ({ data, income, categories, userId }) => {
         );
     }
 
-    // 2. ROOT VIEW
     return (
         <div className="p-6 animate-fade-in max-w-5xl mx-auto">
-            {/* 4 Cards Stats Overview (Lifetime) */}
             <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">Lifetime Overview</h3>
             <StatsOverview totals={lifetimeTotals} currency={dominantCurrency} />
 
-            {/* Year Grid */}
             <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2"><Calendar className="w-5 h-5 text-slate-500" /> Select Fiscal Year</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                 {years.map(year => (

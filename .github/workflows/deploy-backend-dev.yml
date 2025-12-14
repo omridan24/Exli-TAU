@@ -39,5 +39,7 @@ jobs:
             --source . \
             --region ${{ env.REGION }} \
             --project ${{ env.PROJECT_ID }} \
-            --set-env-vars GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }} \
-            --allow-unauthenticated
+            --allow-unauthenticated \
+            --set-env-vars "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }},DOCAI_PROCESSOR_ID=${{ secrets.DOCAI_PROCESSOR_ID }},GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }},GCP_LOCATION=eu" \
+            --cpu 1 \
+            --memory 512Mi

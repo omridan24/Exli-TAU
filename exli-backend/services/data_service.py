@@ -1,28 +1,37 @@
 import io
 import pandas as pd
 import re
+import json
 from config import logger
-from services.ai_service import analyze_multiple_files_structure, convert_pdf_to_csv
-from services.ai_service import analyze_multiple_files_structure, convert_pdf_to_csv
+from services.ai_service import analyze_multiple_files_structure, convert_pdf_to_data
+
+def sanitize_dataframe(df):
+    """
+    Cleans up common AI mistakes in the DataFrame before sending to frontend.
+    Specifically targets the 'Currency' column.
+    """
+    # 1. Normalize headers (lowercase)
+    df.columns = [str(c).lower().strip() for c in df.columns]
+    
+    # 2. Fix Currency
+    if 'currency' in df.columns:
+        def clean_currency_value(val):
+            val_str = str(val).strip()
+            # If it contains Hebrew letters (range \u0590-\u05FF), it's likely a category error
+            if re.search(r'[\u0590-\u05FF]', val_str):
+                return 'ILS'
+            # If it's too long to be a code (e.g. "Miscellaneous"), default to ILS
+            if len(val_str) > 4: 
+                return 'ILS'
+            return val_str.upper()
+            
+        df['currency'] = df['currency'].apply(clean_currency_value)
+    
+    return df
 
 def process_uploaded_files(files):
-    """
-    Orchestrates the reading of MULTIPLE files.
-    1. Pre-process (PDF->CSV, read Excels) to get text samples.
-    2. Send ALL samples to AI in one batch call.
-    3. Process each file using its specific AI-determined config.
-    """
-    logger.info(f"Data Service: Processing {len(files)} files")
-def process_uploaded_files(files):
-    """
-    Orchestrates the reading of MULTIPLE files.
-    1. Pre-process (PDF->CSV, read Excels) to get text samples.
-    2. Send ALL samples to AI in one batch call.
-    3. Process each file using its specific AI-determined config.
-    """
     logger.info(f"Data Service: Processing {len(files)} files")
     
-    # Storage for the pre-processed text/bytes to avoid re-reading
     prepped_files = [] 
     samples_for_ai = []
 
@@ -37,15 +46,21 @@ def process_uploaded_files(files):
             
             # PDF Handling
             if filename.lower().endswith('.pdf'):
-                logger.info(f"[{idx}] Converting PDF: {filename}")
-                csv_string = convert_pdf_to_csv(raw_bytes)
-                if not csv_string:
-                    raise ValueError(f"Failed to extract PDF data from {filename}")
-                raw_bytes = csv_string.encode('utf-8') # Replace with CSV data
-                # Generate sample from CSV string
-                lines = csv_string.splitlines()
-                text_head = "\n".join(lines[:50])
-                text_tail = "\n".join(lines[-10:])
+                logger.info(f"[{idx}] Converting PDF to Structured Data: {filename}")
+                json_data = convert_pdf_to_data(raw_bytes)
+                
+                if not json_data or not isinstance(json_data, list):
+                    raise ValueError(f"Failed to extract structured data from {filename}")
+                
+                df_pdf = pd.DataFrame(json_data)
+                
+                # SANITIZE HERE immediately for PDFs
+                df_pdf = sanitize_dataframe(df_pdf)
+
+                csv_string = df_pdf.to_csv(index=False)
+                raw_bytes = csv_string.encode('utf-8') 
+                text_head = df_pdf.head(20).to_csv(index=False)
+                text_tail = "" 
             
             # Excel Handling
             elif filename.endswith(('.xls', '.xlsx')):
@@ -70,7 +85,6 @@ def process_uploaded_files(files):
                 text_head = "\n".join(lines[:50])
                 text_tail = "\n".join(lines[-10:])
 
-            # Store for Phase 2 & 3
             prepped_files.append({
                 "filename": filename,
                 "bytes": raw_bytes,
@@ -84,19 +98,20 @@ def process_uploaded_files(files):
             })
 
         # --- PHASE 2: ONE AI CALL ---
-        logger.info("Sending batch to AI...")
+        logger.info("Sending batch to AI for structure analysis...")
         ai_response = analyze_multiple_files_structure(samples_for_ai)
         
         if not ai_response or "results" not in ai_response:
-            raise ValueError("AI failed to return valid structure for batch.")
+            logger.warning("AI Batch failed, using default mapping.")
+            ai_results = [{"file_index": i, "header_row_index": 0} for i in range(len(files))]
+        else:
+            ai_results = ai_response["results"]
 
-        ai_results = ai_response["results"]
         final_output = []
 
         # --- PHASE 3: PARSE DATA FRAMES ---
         for idx, file_data in enumerate(prepped_files):
-            # Find matching AI config
-            config = next((r for r in ai_results if r.get('file_index') == idx), ai_results[idx])
+            config = next((r for r in ai_results if r.get('file_index') == idx), {})
             
             delimiter = config.get('delimiter', ',')
             header_index = config.get('header_row_index', 0)
@@ -104,10 +119,8 @@ def process_uploaded_files(files):
             mapping = config.get('mapping', {})
             card_info = config.get('card_info', file_data['filename'])
 
-            # Load DF
             df = None
             
-            # FIX: Check internal flag 'is_excel' instead of trusting AI delimiter for engine selection
             if file_data['is_excel']:
                 logger.info(f"[{idx}] Parsing Excel Engine: {file_data['filename']}")
                 df = pd.read_excel(io.BytesIO(file_data['bytes']), header=header_index)
@@ -115,27 +128,26 @@ def process_uploaded_files(files):
                     df = df.iloc[:-footer_count]
             else:
                 logger.info(f"[{idx}] Parsing CSV Engine: {file_data['filename']}")
-                # Try multiple encodings for robustness (Hebrew/Windows vs UTF-8)
-                encodings = ['utf-8-sig', 'cp1255', 'latin1']
+                encodings = ['utf-8', 'utf-8-sig', 'cp1255', 'latin1']
                 for enc in encodings:
                     try:
                         df = pd.read_csv(
                             io.BytesIO(file_data['bytes']),
-                            sep=delimiter,
+                            sep=delimiter if delimiter else ',',
                             header=header_index,
                             skipfooter=footer_count,
                             engine='python',
                             encoding=enc,
                             on_bad_lines='skip'
                         )
-                        break # Stop if successful
+                        break
                     except UnicodeDecodeError:
-                        continue # Try next encoding
+                        continue
                     except Exception as e:
                         logger.warning(f"CSV Parse failed with {enc}: {e}")
                         
                 if df is None:
-                    raise ValueError(f"Could not decode file {file_data['filename']}. Unknown encoding.")
+                    raise ValueError(f"Could not decode file {file_data['filename']}")
 
             # Cleanup Headers & Columns
             if df is not None:
@@ -144,18 +156,20 @@ def process_uploaded_files(files):
                     return re.sub(r'\s+', ' ', h).strip()
 
                 df.columns = [clean_header(c) for c in df.columns]
-                
-                # Normalize Mapping
                 cleaned_mapping = {k: clean_header(v) if v else None for k, v in mapping.items()}
                 
-                # Prune
+                if file_data['filename'].lower().endswith('.pdf'):
+                    for standard_col in ['date', 'description', 'amount', 'category', 'currency']:
+                        if standard_col in df.columns and (standard_col not in cleaned_mapping.values()):
+                            cleaned_mapping[standard_col] = standard_col
+
                 valid_headers = [name for name in cleaned_mapping.values() if name and name in df.columns]
-                
-                # Safety check: Only prune if we actually found mapped columns
                 if len(valid_headers) >= 2:
                     df = df[valid_headers]
                 
-                # Prepare JSON result
+                # SANITIZE AGAIN (For Excel/CSV files that skipped the PDF logic)
+                df = sanitize_dataframe(df)
+
                 df_clean = df.astype(object).where(pd.notnull(df), None)
                 
                 final_output.append({
@@ -170,6 +184,5 @@ def process_uploaded_files(files):
         return {"status": "success", "files": final_output}
 
     except Exception as e:
-        logger.error(f"Batch Processing Error: {e}", exc_info=True)
         logger.error(f"Batch Processing Error: {e}", exc_info=True)
         return {"status": "error", "message": str(e)}

@@ -1,5 +1,7 @@
 import json
 import google.generativeai as genai
+from google.cloud import documentai
+from google.api_core.client_options import ClientOptions
 from config import Config, logger
 
 # Configure Gemini once
@@ -7,206 +9,168 @@ if Config.GEMINI_API_KEY:
     genai.configure(api_key=Config.GEMINI_API_KEY)
 
 def get_model_by_tier(tier="flash"):
-    """
-    Finds the best model based on the requested tier.
-    tier="pro": Prioritizes Gemini 3 Pro / 1.5 Pro (High intelligence/Vision for PDFs)
-    tier="flash": Prioritizes Gemini 2.5 Flash / 2.0 Flash (Speed/Cost for CSVs)
-    """
     try:
         all_models = [m.name for m in genai.list_models()]
-        
         if tier == "pro":
-            priorities = [
-                'gemini-3-pro-preview', # User requested specific model
-                'gemini-2.0-pro', 
-                'gemini-1.5-pro',
-                'gemini-pro'
-            ]
-        else: # flash
-            priorities = [
-                'gemini-2.5-flash', # User requested specific model
-                'gemini-2.0-flash',
-                'gemini-1.5-flash',
-                'gemini-flash'
-            ]
+            priorities = ['gemini-3.0-pro', 'gemini-2.0-pro', 'gemini-pro']
+        else: 
+            priorities = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash']
 
-        # Find the first available model from the priority list
         for p in priorities:
             for m in all_models:
-                if p in m:
-                    return m
-        
-        # Fallback to a safe default if nothing matches
+                if p in m: return m
         return 'gemini-1.5-flash'
     except Exception as e:
         logger.error(f"Error listing models: {e}")
         return 'gemini-1.5-flash'
 
-def convert_pdf_to_csv(file_bytes):
+# --- NEW HELPER: GEOMETRY SORTING ---
+def geometry_sort_text(document_object):
     """
-    Extracts the main transaction table from a PDF into a raw CSV string.
-    Uses a High-Intelligence Model (Pro tier) for better vision/layout understanding.
+    Reconstructs text from DocAI by sorting lines based on Y coordinates.
     """
-    if not Config.GEMINI_API_KEY:
+    full_text = ""
+    for page in document_object.pages:
+        page_lines = []
+        for line in page.lines:
+            try:
+                segment = line.layout.text_anchor.text_segments[0]
+                line_text = document_object.text[segment.start_index:segment.end_index]
+            except:
+                continue
+            y = line.layout.bounding_poly.normalized_vertices[0].y
+            page_lines.append({"y": y, "text": line_text.strip()})
+        
+        page_lines.sort(key=lambda x: x["y"])
+        for pl in page_lines:
+            full_text += pl["text"] + "\n"
+    return full_text
+
+def extract_text_with_google_docai(file_bytes, mime_type="application/pdf"):
+    try:
+        if not Config.DOCAI_PROCESSOR_ID or not Config.GCP_PROJECT_ID:
+            logger.error("Document AI Credentials missing.")
+            return None
+
+        logger.info(f"DocAI: Sending to Processor {Config.DOCAI_PROCESSOR_ID} ({Config.GCP_LOCATION})...")
+        opts = ClientOptions(api_endpoint=f"{Config.GCP_LOCATION}-documentai.googleapis.com")
+        client = documentai.DocumentProcessorServiceClient(client_options=opts)
+        name = client.processor_path(Config.GCP_PROJECT_ID, Config.GCP_LOCATION, Config.DOCAI_PROCESSOR_ID)
+        raw_document = documentai.RawDocument(content=file_bytes, mime_type=mime_type)
+        request = documentai.ProcessRequest(name=name, raw_document=raw_document)
+        result = client.process_document(request=request)
+        return result.document  
+    except Exception as e:
+        logger.error(f"Document AI Failed: {e}")
         return None
 
-    # Use the Pro tier model for complex PDF vision tasks
-    model_name = get_model_by_tier("pro")
-    logger.info(f"AI Service (PDF Extraction): Using model {model_name}")
+def convert_pdf_to_data(file_bytes):
+    if not Config.GEMINI_API_KEY: return None
 
-    # REVISED PROMPT: Strict column separation and noise removal
-    prompt = """
-    You are a specialized "Bank Statement to CSV" converter. 
-    Your goal is to extract the **Main Transaction Table** with pixel-perfect precision.
+    # Step 1: Get Document Object
+    doc_object = extract_text_with_google_docai(file_bytes)
+    
+    if not doc_object:
+        logger.warning("DocAI failed. Falling back.")
+        return None
 
-    ### 🔍 SCANNING & FILTERING RULES (WHAT TO KEEP VS IGNORE):
-    1. **Identify the Main Table**: Find the list of chronological transactions (Date, Description, Amount).
-    2. **REMOVE PAGE HEADERS/FOOTERS**: 
-       - **Top of Page**: Ignore bank logos, addresses, dates, and "Account Summary" boxes.
-       - **Bottom of Page**: Ignore page numbers, legal disclaimers, or "Continued on next page".
-    3. **REMOVE SUMMARY TABLES**: 
-       - Ignore tables labeled "Total by Category", "Foreign Currency Summary", "Concentration of Data", or "Payment Plan Details". 
-       - ONLY extract the detailed transaction rows.
-    4. **IGNORE "INFORMATION ONLY"**: 
-       - Skip sections labeled "Pending", "Transactions for Knowledge" (עסקאות לידיעה), or "Future Charges".
+    # Step 2: Reconstruct Text using Geometry
+    sorted_text = geometry_sort_text(doc_object)
+    
+    # Step 3: Send Sorted Text to Flash
+    model_name = get_model_by_tier("flash") 
+    logger.info(f"AI Service: Extracting structured data with {model_name}")
 
-    ### 📐 COLUMN ALIGNMENT & ACCURACY (CRITICAL):
-    1. **Card Number vs Amount**: 
-       - Many statements show the "Card Number" (4 digits like 2728, 5096) near the Amount column.
-       - **NEVER** put the Card Number in the Amount column.
-       - **NEVER** put the Amount in the Card Number column.
-       - Amount must be a monetary value (e.g., 150.00). Card number is just an ID (e.g., 2728).
-    2. **One Row Per Transaction**:
-       - Process the table strictly line-by-line.
-       - If a description wraps to a second line, merge it into the description column of the SAME row. Do not create a new row with an empty date/amount.
-
-    ### 🔨 VISUAL FIDELITY:
-    - Output the **EXACT** headers found in the document (e.g., "תאריך עסקה", "שם בית עסק"). Do not translate them yet.
-    - Do not reformat dates (keep "15/10/2023" as is).
-    - Keep the exact numeric string for amounts (e.g., "1,200.50").
-
-    ### 📝 OUTPUT FORMAT:
-    - Return ONLY the raw CSV text.
-    - No markdown formatting (no ```csv).
-    - No conversational text.
+    prompt = f"""
+    You are a financial data extractor. 
+    I have pre-sorted this bank statement text line-by-line based on visual layout.
+    
+    ### RAW SORTED TEXT:
+    '''
+    {sorted_text[:50000]} 
+    '''
+    
+    ### TASK:
+    Extract valid transactions into a JSON list.
+    
+    ### RULES:
+    1. **Context**: Because the text is sorted by Y-coordinate, the Amount will be immediately before or after the Description.
+    2. **Anchor**: Find the Date first.
+    3. **Positive Only**: Return absolute values.
+    4. **Installments**: If "Payment X of Y", use the monthly charged amount.
+    5. **CURRENCY VALIDATION (CRITICAL)**: 
+       - "Currency" MUST be a standard code (ILS, USD, EUR, GBP) or symbol (₪, $, €, £).
+       - NEVER use Hebrew words (like "שונות", "רגילה", "חובה") as the currency. If unsure, default to "ILS".
+    
+    ### OUTPUT:
+    JSON Array of {{ "date", "description", "amount", "currency", "category" }}
     """
 
     try:
-        model = genai.GenerativeModel(model_name)
-        file_part = {"mime_type": "application/pdf", "data": file_bytes}
-        
-        # Use low temperature for deterministic data extraction
-        generation_config = genai.types.GenerationConfig(
-            candidate_count=1,
-            max_output_tokens=8192, 
-            temperature=0.0 
-        )
-
-        response = model.generate_content(
-            [prompt, file_part],
-            generation_config=generation_config
+        model = genai.GenerativeModel(
+            model_name,
+            generation_config={"response_mime_type": "application/json", "temperature": 0.0}
         )
         
-        clean_csv = response.text.replace("```csv", "").replace("```", "").strip()
-        return clean_csv
+        response = model.generate_content(prompt)
+        return json.loads(response.text)
+        
     except Exception as e:
-        logger.error(f"AI PDF Extraction Failed: {e}")
+        logger.error(f"AI Cleaning Failed: {e}")
         return None
 
 def analyze_multiple_files_structure(file_samples):
     """
     Analyzes CSV/Excel structure to map headers and clean data.
-    Uses a Fast/Cost-Effective Model (Flash tier).
     """
-    if not Config.GEMINI_API_KEY:
-        return None
+    if not Config.GEMINI_API_KEY: return None
 
-    # Use the Flash tier model for text analysis
     model_name = get_model_by_tier("flash")
-    logger.info(f"AI Service (Batch Analysis): Using model {model_name} for {len(file_samples)} files")
+    logger.info(f"AI Service (Batch Analysis): Using model {model_name}")
 
-    # Construct the combined prompt
     samples_text = ""
     for idx, f in enumerate(file_samples):
         samples_text += f"""
         --- FILE {idx+1}: {f['filename']} ---
-        START (First 50 lines):
-        '''
-        {f['head']}
-        '''
-        END (Last 10 lines):
-        '''
-        {f['tail']}
-        '''
+        START:
+        '''{f['head']}'''
         -------------------------------------
         """
 
     prompt = f"""
-    You are a financial data parsing assistant processing multiple files at once.
-    
+    You are a financial data parsing assistant.
     INPUT DATA:
     {samples_text}
     
     TASK:
-    For EACH file, analyze the structure and return the parsing configuration.
+    For EACH file, analyze the structure and return parsing config.
     
     CRITICAL RULES:
-    1. **Card Info**: Look at the top/bottom of the file text for hints about the card (e.g., "Visa 5096", "Amex", "Leumi Card"). Return a short string like "Visa 5096". If unknown, use the filename.
-    2. **Date**: Prefer "Transaction Date" over "Billing Date".
-    3. **Amount**: Ignore "Balance" columns. Prefer "Billing Amount" or "Debit".
-    4. **Header Row**: Identify the 0-based index of the row containing column names.
-    5. **Footer Skip**: Count lines to skip at the bottom (totals, disclaimers).
+    1. **Card Info**: Identify card/bank (e.g., "Visa 5096").
+    2. **Mapping**: Map the columns to: 'date', 'amount', 'currency', 'category', 'description'.
+    3. **Currency Column**: Identify the column that contains symbols (₪, $) or codes (ILS). Do NOT map a "Comments" or "Type" column (containing Hebrew words like "שונות") to Currency.
+    4. **Header Row**: 0-based index of the header.
     
     OUTPUT FORMAT:
-    Return a JSON Object containing a single key "results" which is a LIST of objects (one per file, in order).
-    
-    {{
-      "results": [
-        {{
-          "file_index": 0,
-          "card_info": "Visa Ending 1234",
-          "header_row_index": <int>,
-          "footer_skip_count": <int>,
-          "delimiter": "<char>",
-          "mapping": {{ "date": "...", "amount": "...", "currency": "...", "category": "...", "description": "..." }}
-        }},
-        ...
-      ]
-    }}
+    Return JSON Object: {{ "results": [ {{ "file_index": 0, "card_info": "...", "header_row_index": 0, "mapping": {{...}} }}, ... ] }}
     """
 
     try:
-        model = genai.GenerativeModel(model_name)
+        model = genai.GenerativeModel(model_name, generation_config={"response_mime_type": "application/json"})
         response = model.generate_content(prompt)
-        clean_text = response.text.replace("```json", "").replace("```", "").strip()
-        # Handle cases where model might wrap it weirdly
-        if clean_text.startswith("json"): clean_text = clean_text[4:].strip()
-        return json.loads(clean_text)
+        return json.loads(response.text)
     except Exception as e:
         logger.error(f"AI Batch Analysis Failed: {e}")
-        return None
+        return {"results": []} # Safe fallback
 
 def analyze_income_statement(file_bytes, mime_type):
-    """
-    Analyzes payslips/income statements.
-    """
-    if not Config.GEMINI_API_KEY:
-        return None
-        
-    # Payslips often have complex layouts, so we default to Pro for better accuracy
+    if not Config.GEMINI_API_KEY: return None
     model_name = get_model_by_tier("pro")
-    
-    prompt = """
-    Analyze this Income Statement / Payslip.
-    Extract: bruto, neto, taxes, pension, other_deposits.
-    Return JSON { "bruto": 0, ... }
-    """
+    prompt = "Analyze this Payslip. Return JSON { \"bruto\": 0, \"neto\": 0, \"taxes\": 0, \"pension\": 0, \"other_deposits\": 0 }"
     try:
-        model = genai.GenerativeModel(model_name)
+        model = genai.GenerativeModel(model_name, generation_config={"response_mime_type": "application/json"})
         file_part = {"mime_type": mime_type, "data": file_bytes}
         response = model.generate_content([prompt, file_part])
-        clean_text = response.text.replace("```json", "").replace("```", "").strip()
-        return json.loads(clean_text)
+        return json.loads(response.text)
     except Exception as e:
-        logger.error(f"AI Income Analysis Failed: {e}")
         return None

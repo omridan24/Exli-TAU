@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Upload, ArrowRight, Sparkles, CheckCircle, Trash2, XCircle, Plus, X, FileText, ChevronLeft, ChevronRight, CreditCard, PenTool } from 'lucide-react';
+import { Upload, ArrowRight, Sparkles, CheckCircle, Trash2, XCircle, Plus, X, FileText, ChevronLeft, ChevronRight, CreditCard, PenTool, Edit2, Check, ArrowUp, ArrowDown } from 'lucide-react';
 import { collection, addDoc, serverTimestamp, doc, setDoc } from 'firebase/firestore';
 import { db, CLOUD_RUN_URL } from '../../config/firebase.js';
 import { DEFAULT_CATEGORIES, CURRENCIES } from '../../config/constants.js';
@@ -7,7 +7,6 @@ import { Button } from '../../components/UI.jsx';
 
 export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, onComplete }) => {
   const [step, setStep] = useState(0);
-  const [file, setFile] = useState(null);
   const [reportMonth, setReportMonth] = useState(new Date().toISOString().slice(0, 7));
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -24,6 +23,10 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
   const [isCreatingCat, setIsCreatingCat] = useState(false);
   const [newCatName, setNewCatName] = useState('');
 
+  // Editing Amount State
+  const [isEditingAmount, setIsEditingAmount] = useState(false);
+  const [editAmountValue, setEditAmountValue] = useState('');
+
   // Manual Entry State
   const [isManualMode, setIsManualMode] = useState(false);
   const [manualData, setManualData] = useState({
@@ -36,40 +39,27 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
 
   const sortedCategories = categories;
 
-  // --- HELPERS ---
   const parseDate = (dateStr) => {
     if (!dateStr) return new Date().toISOString();
-
-    // Check if it's an Excel serial number (numeric)
     if (!isNaN(dateStr) && !dateStr.includes('-') && !dateStr.includes('/')) {
       const date = new Date((dateStr - (25567 + 2)) * 86400 * 1000);
       return date.toISOString();
     }
-
     const str = String(dateStr).trim();
-
-    // Try ISO first
     let d = new Date(str);
     if (!isNaN(d.getTime())) return d.toISOString();
-
-    // Handle DD/MM/YYYY or DD.MM.YYYY
     const parts = str.split(/[\/\-\.]/);
     if (parts.length === 3) {
-      // Assume DD/MM/YYYY if first part > 12 (definitely day) or generic fallback
-      // Note: This forces DD/MM/YYYY interpretation for ambiguity which is safer for IL/EU
       const day = parseInt(parts[0], 10);
-      const month = parseInt(parts[1], 10) - 1; // JS months are 0-11
+      const month = parseInt(parts[1], 10) - 1;
       let year = parseInt(parts[2], 10);
-      if (year < 100) year += 2000; // Handle 2-digit years
-
+      if (year < 100) year += 2000;
       d = new Date(Date.UTC(year, month, day));
       if (!isNaN(d.getTime())) return d.toISOString();
     }
-
-    return new Date().toISOString(); // Fallback to now
+    return new Date().toISOString();
   };
 
-  // --- FILE HANDLERS ---
   const handleFileChange = (e) => {
     const selected = Array.from(e.target.files);
     if (selected.length + files.length > 4) {
@@ -96,7 +86,6 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
       if (!response.ok) throw new Error(`Server Error: ${response.statusText}`);
 
       const data = await response.json();
-
       const initProcessed = data.files.map(f => ({
         ...f,
         columnMapping: mapBackendToIndices(f.suggested_mapping, f.columns)
@@ -140,9 +129,9 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
         if (isNaN(amount)) amount = 0;
 
         return {
-          date: parseDate(row[columnMapping.date]), // Use robust parser
+          date: parseDate(row[columnMapping.date]),
           description: row[columnMapping.description] || "Unknown",
-          amount: amount,
+          amount: Math.abs(amount),
           originalCategory: row[columnMapping.category] || "Uncategorized",
           currency: row[columnMapping.currency] || "ILS",
           sourceCard: card_info
@@ -157,7 +146,41 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
     setStep(3);
   };
 
+  // --- NEW: SHIFT AMOUNT LOGIC ---
+  const handleShiftAmount = (direction) => {
+    // direction: -1 (up/prev), 1 (down/next)
+    const targetIndex = currentIndex + direction;
+
+    // Safety check
+    if (targetIndex < 0 || targetIndex >= allTransactions.length) return;
+
+    const newTransactions = [...allTransactions];
+    const currentItem = newTransactions[currentIndex];
+    const targetItem = newTransactions[targetIndex];
+
+    // Swap amounts and currencies
+    const tempAmount = currentItem.amount;
+    const tempCurrency = currentItem.currency;
+
+    newTransactions[currentIndex] = { ...currentItem, amount: targetItem.amount, currency: targetItem.currency };
+    newTransactions[targetIndex] = { ...targetItem, amount: tempAmount, currency: tempCurrency };
+
+    setAllTransactions(newTransactions);
+  };
+
+  const handleSaveAmountEdit = () => {
+    const newAmount = parseFloat(editAmountValue);
+    if (!isNaN(newAmount) && newAmount > 0) {
+      const updatedTx = [...allTransactions];
+      updatedTx[currentIndex].amount = newAmount;
+      setAllTransactions(updatedTx);
+    }
+    setIsEditingAmount(false);
+  };
+
   const handleCategorize = (categoryName, isRefund = false) => {
+    if (isEditingAmount) handleSaveAmountEdit();
+
     if (isManualMode) {
       if (!manualData.amount || !manualData.description) {
         alert("Please enter amount and description");
@@ -170,7 +193,6 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
     const currentTx = allTransactions[currentIndex];
     const tx = {
       ...currentTx,
-      // Date is already parsed in startSorting, but we ensure it exists
       date: currentTx.date || new Date().toISOString(),
       assignedCategory: categoryName,
       reportMonth: reportMonth,
@@ -188,7 +210,7 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
       const manualMonth = manualData.date.slice(0, 7);
 
       await addDoc(expensesRef, {
-        date: new Date(manualData.date).toISOString(), // Ensure ISO
+        date: new Date(manualData.date).toISOString(),
         description: manualData.description,
         amount: parseFloat(manualData.amount),
         currency: manualData.currency,
@@ -382,13 +404,51 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
             step === 3 && currentTx && (
               <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden mb-8 relative">
                 <div className="absolute top-4 right-4 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-sm opacity-80"><CreditCard className="w-3 h-3" /> {currentTx.sourceCard}</div>
-                <div className="bg-slate-50 p-6 border-b border-slate-100 flex justify-between items-start pt-10"><div><h3 className="text-xl font-bold text-slate-800">{currentTx.description}</h3><div className="text-sm text-slate-500 mt-1">{currentTx.date}</div></div><div className="text-right"><div className="text-3xl font-mono font-bold text-slate-800">{currentTx.amount} <span className="text-lg text-slate-400">{currentTx.currency}</span></div>{currentTx.originalCategory && (<div className="inline-block mt-2 px-2 py-1 bg-slate-200 text-slate-600 text-xs rounded">File: {currentTx.originalCategory}</div>)}</div></div>
+                <div className="bg-slate-50 p-6 border-b border-slate-100 flex justify-between items-start pt-10">
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-800">{currentTx.description}</h3>
+                    <div className="text-sm text-slate-500 mt-1">{currentTx.date}</div>
+                  </div>
+                  <div className="text-right flex flex-col items-end">
+                    {isEditingAmount ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          autoFocus
+                          value={editAmountValue}
+                          onChange={(e) => setEditAmountValue(e.target.value)}
+                          className="w-32 p-2 text-2xl font-mono font-bold text-slate-800 border border-emerald-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-200"
+                        />
+                        <button onClick={handleSaveAmountEdit} className="p-2 bg-emerald-100 text-emerald-700 rounded-full hover:bg-emerald-200"><Check className="w-5 h-5" /></button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-end gap-2 group">
+                        <div className="flex flex-col gap-1 mr-2 opacity-50 hover:opacity-100 transition-opacity">
+                          <button onClick={() => handleShiftAmount(-1)} className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-blue-500" title="Move amount to PREVIOUS transaction"><ArrowUp className="w-4 h-4" /></button>
+                          <button onClick={() => handleShiftAmount(1)} className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-blue-500" title="Move amount to NEXT transaction"><ArrowDown className="w-4 h-4" /></button>
+                        </div>
+                        <div className="text-3xl font-mono font-bold text-slate-800">
+                          {currentTx.amount} <span className="text-lg text-slate-400">{currentTx.currency}</span>
+                        </div>
+                        <button onClick={() => { setIsEditingAmount(true); setEditAmountValue(currentTx.amount); }} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-emerald-600 transition-colors opacity-0 group-hover:opacity-100" title="Edit Amount">
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                    {currentTx.originalCategory && (<div className="inline-block mt-2 px-2 py-1 bg-slate-200 text-slate-600 text-xs rounded">File: {currentTx.originalCategory}</div>)}
+                  </div>
+                </div>
                 <div className="p-6">
                   <div className="grid grid-cols-3 gap-3 mb-6">
                     {sortedCategories.map(cat => { const isSuggested = suggestedCategoryId === cat.id; return (<button key={cat.id} onClick={() => handleCategorize(cat.name)} className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-2 text-center h-24 ${isSuggested ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-100 hover:border-slate-300 hover:bg-slate-50'}`}><div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }}></div><span className={`text-xs font-bold ${isSuggested ? 'text-emerald-700' : 'text-slate-600'}`}>{cat.name}</span></button>); })}
                     <button onClick={() => setIsCreatingCat(true)} className="p-3 rounded-xl border-2 border-dashed border-slate-300 hover:border-emerald-400 hover:bg-emerald-50 transition-all flex flex-col items-center justify-center gap-2 text-center h-24 text-slate-400 hover:text-emerald-600"><Plus className="w-6 h-6" /><span className="text-xs font-bold">New Cat</span></button>
+                    <button onClick={() => handleCategorize('Refunded', true)} className="p-3 rounded-xl border-2 border-amber-200 bg-amber-50 hover:bg-amber-100 hover:border-amber-300 transition-all flex flex-col items-center justify-center gap-2 text-center h-24 text-amber-700"><XCircle className="w-6 h-6" /><span className="text-xs font-bold">Refunded</span></button>
                   </div>
-                  <div className="flex items-center justify-between border-t border-slate-100 pt-6"><button onClick={handleSkip} className="flex items-center gap-2 text-slate-400 hover:text-red-500 transition-colors px-4 py-2"><Trash2 className="w-5 h-5" /> Skip</button><button onClick={() => handleCategorize('Refunded', true)} className="flex items-center gap-2 text-slate-400 hover:text-amber-500 transition-colors px-4 py-2"><XCircle className="w-5 h-5" /> Mark Refunded</button></div>
+                  <div className="border-t border-slate-100 pt-6">
+                    <button onClick={handleSkip} className="w-full flex items-center justify-center gap-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors px-4 py-3 rounded-xl font-bold border border-transparent hover:border-slate-200">
+                      <Trash2 className="w-5 h-5" /> Skip Transaction
+                    </button>
+                  </div>
                 </div>
               </div>
             )
