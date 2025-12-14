@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Upload, ArrowRight, Sparkles, CheckCircle, Trash2, XCircle, Plus, X, FileText, ChevronLeft, ChevronRight, CreditCard, PenTool, Edit2, Check, ArrowUp, ArrowDown } from 'lucide-react';
+import { Upload, ArrowRight, Sparkles, CheckCircle, Trash2, XCircle, Plus, X, FileText, ChevronLeft, ChevronRight, CreditCard, PenTool, Edit2, Check, ArrowUp, ArrowDown, Clock } from 'lucide-react';
 import { collection, addDoc, serverTimestamp, doc, setDoc } from 'firebase/firestore';
 import { db, CLOUD_RUN_URL } from '../../config/firebase.js';
 import { DEFAULT_CATEGORIES, CURRENCIES } from '../../config/constants.js';
@@ -39,6 +39,15 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
 
   const sortedCategories = categories;
 
+  // --- NEW: Time Estimate Logic ---
+  const processingTimeEstimate = useMemo(() => {
+    if (!files.length) return null;
+    // If ANY file is a PDF, the backend uses the slower Vision model
+    const hasPdf = files.some(f => f.name.toLowerCase().endsWith('.pdf'));
+    return hasPdf ? "30s - 1 min" : "10s - 20s";
+  }, [files]);
+
+  // --- HELPERS ---
   const parseDate = (dateStr) => {
     if (!dateStr) return new Date().toISOString();
     if (!isNaN(dateStr) && !dateStr.includes('-') && !dateStr.includes('/')) {
@@ -60,6 +69,7 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
     return new Date().toISOString();
   };
 
+  // --- FILE HANDLERS ---
   const handleFileChange = (e) => {
     const selected = Array.from(e.target.files);
     if (selected.length + files.length > 4) {
@@ -148,17 +158,13 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
 
   // --- NEW: SHIFT AMOUNT LOGIC ---
   const handleShiftAmount = (direction) => {
-    // direction: -1 (up/prev), 1 (down/next)
     const targetIndex = currentIndex + direction;
-
-    // Safety check
     if (targetIndex < 0 || targetIndex >= allTransactions.length) return;
 
     const newTransactions = [...allTransactions];
     const currentItem = newTransactions[currentIndex];
     const targetItem = newTransactions[targetIndex];
 
-    // Swap amounts and currencies
     const tempAmount = currentItem.amount;
     const tempCurrency = currentItem.currency;
 
@@ -319,11 +325,19 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
             </div>
           )}
           {error && <div className="text-red-600 text-center">{error}</div>}
-          <div className="flex justify-between">
+          <div className="flex justify-between items-center">
             <Button variant="secondary" onClick={() => setStep(0)}>Back</Button>
-            <Button onClick={handleUploadAndAnalyze} disabled={files.length === 0 || isLoading}>
-              {isLoading ? <><Sparkles className="w-4 h-4 animate-spin text-yellow-400" /> Analyzing {files.length} files...</> : 'Analyze Files'} <ArrowRight className="w-4 h-4" />
-            </Button>
+            <div className="flex items-center gap-4">
+              {processingTimeEstimate && (
+                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-400 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 animate-fade-in">
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Est. {processingTimeEstimate}</span>
+                </div>
+              )}
+              <Button onClick={handleUploadAndAnalyze} disabled={files.length === 0 || isLoading}>
+                {isLoading ? <><Sparkles className="w-4 h-4 animate-spin text-yellow-400" /> Analyzing {files.length} files...</> : <>Analyze Files <ArrowRight className="w-4 h-4" /></>}
+              </Button>
+            </div>
           </div>
         </div>
       )}

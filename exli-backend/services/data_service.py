@@ -8,7 +8,6 @@ from services.ai_service import analyze_multiple_files_structure, convert_pdf_to
 def sanitize_dataframe(df):
     """
     Cleans up common AI mistakes in the DataFrame before sending to frontend.
-    Specifically targets the 'Currency' column.
     """
     # 1. Normalize headers (lowercase)
     df.columns = [str(c).lower().strip() for c in df.columns]
@@ -17,11 +16,8 @@ def sanitize_dataframe(df):
     if 'currency' in df.columns:
         def clean_currency_value(val):
             val_str = str(val).strip()
-            # If it contains Hebrew letters (range \u0590-\u05FF), it's likely a category error
-            if re.search(r'[\u0590-\u05FF]', val_str):
-                return 'ILS'
-            # If it's too long to be a code (e.g. "Miscellaneous"), default to ILS
-            if len(val_str) > 4: 
+            # If Hebrew/Garbage, force ILS
+            if re.search(r'[\u0590-\u05FF]', val_str) or len(val_str) > 4:
                 return 'ILS'
             return val_str.upper()
             
@@ -53,9 +49,7 @@ def process_uploaded_files(files):
                     raise ValueError(f"Failed to extract structured data from {filename}")
                 
                 df_pdf = pd.DataFrame(json_data)
-                
-                # SANITIZE HERE immediately for PDFs
-                df_pdf = sanitize_dataframe(df_pdf)
+                df_pdf = sanitize_dataframe(df_pdf) # Sanitize PDF result immediately
 
                 csv_string = df_pdf.to_csv(index=False)
                 raw_bytes = csv_string.encode('utf-8') 
@@ -116,11 +110,15 @@ def process_uploaded_files(files):
             delimiter = config.get('delimiter', ',')
             header_index = config.get('header_row_index', 0)
             footer_count = config.get('footer_skip_count', 0)
-            mapping = config.get('mapping', {})
+            # Use INDICES preference
+            mapping_indices = config.get('mapping_indices', {})
+            # Fallback to names (for PDF flows that might return names or backward compat)
+            mapping_names = config.get('mapping', {})
             card_info = config.get('card_info', file_data['filename'])
 
             df = None
             
+            # 3a. LOAD DATAFRAME
             if file_data['is_excel']:
                 logger.info(f"[{idx}] Parsing Excel Engine: {file_data['filename']}")
                 df = pd.read_excel(io.BytesIO(file_data['bytes']), header=header_index)
@@ -149,34 +147,47 @@ def process_uploaded_files(files):
                 if df is None:
                     raise ValueError(f"Could not decode file {file_data['filename']}")
 
-            # Cleanup Headers & Columns
+            # 3b. FILTER & RENAME COLUMNS (The Fix)
             if df is not None:
-                def clean_header(h):
-                    h = str(h).replace('\n', ' ').replace('\r', ' ')
-                    return re.sub(r'\s+', ' ', h).strip()
-
-                df.columns = [clean_header(c) for c in df.columns]
-                cleaned_mapping = {k: clean_header(v) if v else None for k, v in mapping.items()}
+                final_cols = {} # New Dataframe dict
                 
-                if file_data['filename'].lower().endswith('.pdf'):
-                    for standard_col in ['date', 'description', 'amount', 'category', 'currency']:
-                        if standard_col in df.columns and (standard_col not in cleaned_mapping.values()):
-                            cleaned_mapping[standard_col] = standard_col
-
-                valid_headers = [name for name in cleaned_mapping.values() if name and name in df.columns]
-                if len(valid_headers) >= 2:
-                    df = df[valid_headers]
+                # Option A: Map by Index (Preferred/Precise)
+                if mapping_indices and len(mapping_indices) >= 2:
+                    logger.info(f"[{idx}] Using Index Mapping: {mapping_indices}")
+                    for field, col_idx in mapping_indices.items():
+                        if isinstance(col_idx, int) and 0 <= col_idx < len(df.columns):
+                            # Extract column by index
+                            final_cols[field] = df.iloc[:, col_idx].values
                 
-                # SANITIZE AGAIN (For Excel/CSV files that skipped the PDF logic)
+                # Option B: Map by Name (Fallback / PDF Flow)
+                elif mapping_names:
+                    logger.info(f"[{idx}] Using Name Mapping: {mapping_names}")
+                    # Normalize DF headers for matching
+                    df.columns = [str(c).strip() for c in df.columns] 
+                    for field, header_name in mapping_names.items():
+                        # Fuzzy match header
+                        if header_name in df.columns:
+                            final_cols[field] = df[header_name].values
+                
+                # Create Clean DF if we found columns, otherwise keep original (with warning)
+                if final_cols:
+                    df = pd.DataFrame(final_cols)
+                
+                # SANITIZE AGAIN (Catches currency issues in Excel files)
                 df = sanitize_dataframe(df)
 
+                # Convert to List for Frontend
                 df_clean = df.astype(object).where(pd.notnull(df), None)
                 
+                # Generate "Suggested Mapping" for Frontend UI based on what we actually used
+                # Since we standardized the columns to 'date', 'amount', etc., the mapping is 1:1
+                frontend_mapping = {col: col for col in df.columns}
+
                 final_output.append({
                     "filename": file_data['filename'],
                     "card_info": card_info,
                     "columns": df.columns.tolist(),
-                    "suggested_mapping": cleaned_mapping,
+                    "suggested_mapping": frontend_mapping,
                     "preview_data": df_clean.head(5).values.tolist(),
                     "all_data": df_clean.values.tolist()
                 })

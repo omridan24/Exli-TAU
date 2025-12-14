@@ -121,7 +121,7 @@ def convert_pdf_to_data(file_bytes):
 
 def analyze_multiple_files_structure(file_samples):
     """
-    Analyzes CSV/Excel structure to map headers and clean data.
+    Analyzes CSV/Excel structure to map headers by INDEX (Integer).
     """
     if not Config.GEMINI_API_KEY: return None
 
@@ -142,17 +142,38 @@ def analyze_multiple_files_structure(file_samples):
     INPUT DATA:
     {samples_text}
     
-    TASK:
-    For EACH file, analyze the structure and return parsing config.
+    ### TASK:
+    For EACH file, identify the CSV structure.
+    Instead of column names, return the **0-based Column Index** (Integer).
     
-    CRITICAL RULES:
-    1. **Card Info**: Identify card/bank (e.g., "Visa 5096").
-    2. **Mapping**: Map the columns to: 'date', 'amount', 'currency', 'category', 'description'.
-    3. **Currency Column**: Identify the column that contains symbols (₪, $) or codes (ILS). Do NOT map a "Comments" or "Type" column (containing Hebrew words like "שונות") to Currency.
-    4. **Header Row**: 0-based index of the header.
+    ### RULES:
+    1. **Header Row**: Which row index contains the headers? (0-based)
+    2. **Mapping Indices**: 
+       - "date": Index of Date column
+       - "amount": Index of Amount/Billing/Debit column (Use the local currency billing amount)
+       - "description": Index of Payee/Business Name
+       - "currency": Index of Currency symbol (optional, if exists)
+       - "category": Index of Category (optional)
     
-    OUTPUT FORMAT:
-    Return JSON Object: {{ "results": [ {{ "file_index": 0, "card_info": "...", "header_row_index": 0, "mapping": {{...}} }}, ... ] }}
+    ### OUTPUT FORMAT:
+    Return JSON Object:
+    {{
+      "results": [
+        {{
+          "file_index": 0,
+          "card_info": "Visa 1234",
+          "header_row_index": 3,
+          "footer_skip_count": 1,
+          "mapping_indices": {{
+             "date": 0,
+             "description": 1,
+             "amount": 4,
+             "currency": 5,
+             "category": 2
+          }}
+        }}
+      ]
+    }}
     """
 
     try:
@@ -161,7 +182,7 @@ def analyze_multiple_files_structure(file_samples):
         return json.loads(response.text)
     except Exception as e:
         logger.error(f"AI Batch Analysis Failed: {e}")
-        return {"results": []} # Safe fallback
+        return {"results": []}
 
 def analyze_income_statement(file_bytes, mime_type):
     if not Config.GEMINI_API_KEY: return None
