@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Wallet, Sparkles, Upload, Shield, DollarSign, Activity, Tag, CheckCircle, ArrowRight } from 'lucide-react';
+import { Wallet, Sparkles, Upload, Shield, DollarSign, Activity, Tag, CheckCircle, ArrowRight, PenTool } from 'lucide-react';
 import { collection, addDoc, serverTimestamp, doc, setDoc, getDoc } from 'firebase/firestore';
 import { db, CLOUD_RUN_URL } from '../../config/firebase.js';
 import { CURRENCIES } from '../../config/constants.js';
@@ -40,15 +40,22 @@ export const IncomeNode = ({ userId, onComplete }) => {
         loadPref();
     }, [userId]);
 
-    const handleFileChange = (e) => e.target.files[0] && setFile(e.target.files[0]);
+    const handleFileChange = (e) => {
+        if (e.target.files[0]) {
+            setFile(e.target.files[0]);
+            handleAnalyzeIncome(e.target.files[0]);
+        }
+    };
+
     const handleInputChange = (field, val) => setIncomeData(prev => ({ ...prev, [field]: val }));
 
-    const handleAnalyzeIncome = async () => {
-        if (!file) return;
+    const handleAnalyzeIncome = async (uploadedFile) => {
+        const f = uploadedFile || file;
+        if (!f) return;
         setIsLoading(true);
         setError(null);
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append('file', f);
         try {
             if (!CLOUD_RUN_URL || CLOUD_RUN_URL.includes("YOUR_CLOUD_RUN")) throw new Error("Backend URL not configured.");
             const response = await fetch(`${CLOUD_RUN_URL}/analyze-income`, { method: 'POST', body: formData });
@@ -82,7 +89,29 @@ export const IncomeNode = ({ userId, onComplete }) => {
                 <select value={currency} onChange={e => setCurrency(e.target.value)} className="p-2 rounded-lg border border-slate-200 bg-white font-bold text-slate-700 outline-none focus:border-emerald-500">{CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}</select>
             </div>
             {step === 0 && (<div className="max-w-md mx-auto bg-white p-8 rounded-2xl shadow-sm border border-slate-100 text-center"><h3 className="text-lg font-bold text-slate-800 mb-2">Select Income Month</h3><input type="month" value={reportMonth} onChange={(e) => setReportMonth(e.target.value)} className="w-full p-3 border border-slate-300 rounded-xl text-center font-bold text-lg mb-6 outline-none" /><Button onClick={() => setStep(1)} className="w-full justify-center">Continue &rarr;</Button></div>)}
-            {step === 1 && (<div className="space-y-8"><div className="bg-slate-50 p-6 rounded-2xl border-2 border-dashed border-slate-200 text-center relative overflow-hidden group"><input type="file" accept=".pdf, .jpg, .jpeg, .png" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" /><div className="pointer-events-none relative z-0"><div className="w-16 h-16 bg-white rounded-full shadow-sm flex items-center justify-center mx-auto mb-4 text-emerald-500 group-hover:scale-110 transition-transform">{isLoading ? <Sparkles className="w-8 h-8 animate-pulse" /> : <Upload className="w-8 h-8" />}</div><h3 className="font-bold text-slate-700">Auto-Fill from Payslip</h3><p className="text-sm text-slate-400 mt-1 mb-4">Upload Image or PDF.</p><div className="inline-flex items-center gap-2 text-xs bg-amber-50 text-amber-700 px-3 py-1 rounded-full border border-amber-100"><Shield className="w-3 h-3" /> Redact personal details first.</div>{file && <div className="mt-4 font-bold text-emerald-600">{file.name}</div>}</div></div><div className="flex items-center gap-4"><div className="h-px bg-slate-200 flex-1"></div><span className="text-slate-400 text-sm font-medium">OR ENTER MANUALLY</span><div className="h-px bg-slate-200 flex-1"></div></div><div className="flex justify-center gap-4">{file && (<Button onClick={handleAnalyzeIncome} disabled={isLoading}>{isLoading ? 'Scanning...' : 'Extract Data'} <Sparkles className="w-4 h-4 ml-2" /></Button>)}<Button variant="secondary" onClick={() => setStep(2)}>Skip Upload &rarr;</Button></div>{error && <div className="text-red-500 text-center">{error}</div>}</div>)}
+
+            {step === 1 && (
+                <div className="space-y-6">
+                    <div className="flex gap-4">
+                        <div className="flex-1 border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center hover:bg-slate-50 transition-colors relative flex flex-col items-center justify-center min-h-[200px] group">
+                            <input type="file" accept=".pdf, .jpg, .jpeg, .png" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                            {isLoading ? <Sparkles className="w-12 h-12 text-yellow-400 animate-pulse mb-4" /> : <Upload className="w-12 h-12 text-slate-300 mb-4 group-hover:scale-110 transition-transform" />}
+                            <div className="font-bold text-lg text-slate-600">Upload Payslip</div>
+                            <p className="text-sm text-slate-400 mt-1">Auto-scan PDF or Image</p>
+                        </div>
+
+                        <div onClick={() => setStep(2)} className="w-1/3 border-2 border-slate-100 rounded-2xl p-8 text-center hover:bg-emerald-50 hover:border-emerald-200 transition-all cursor-pointer flex flex-col items-center justify-center gap-2 group">
+                            <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
+                                <PenTool className="w-6 h-6 text-slate-400 group-hover:text-emerald-600" />
+                            </div>
+                            <div className="font-bold text-slate-600 group-hover:text-emerald-700">Fill Manually</div>
+                        </div>
+                    </div>
+                    {error && <div className="text-red-500 text-center">{error}</div>}
+                    <div className="flex justify-start"><Button variant="secondary" onClick={() => setStep(0)}>Back</Button></div>
+                </div>
+            )}
+
             {step === 2 && (<div className="space-y-6"><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><IncomeCard label="Bruto Income" field="bruto" value={incomeData.bruto} onChange={handleInputChange} currency={currency} color="border-emerald-200 text-emerald-600" icon={DollarSign} /><IncomeCard label="Neto (Bank)" field="neto" value={incomeData.neto} onChange={handleInputChange} currency={currency} color="border-blue-200 text-blue-600" icon={Wallet} /><IncomeCard label="Total Taxes" field="taxes" value={incomeData.taxes} onChange={handleInputChange} currency={currency} color="border-red-200 text-red-600" icon={Activity} /><IncomeCard label="Pension" field="pension" value={incomeData.pension} onChange={handleInputChange} currency={currency} color="border-purple-200 text-purple-600" icon={Shield} /><IncomeCard label="Other Deposits" field="other_deposits" value={incomeData.other_deposits} onChange={handleInputChange} currency={currency} color="border-orange-200 text-orange-600" icon={Tag} /></div><div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex justify-between items-center"><div><div className="text-xs font-bold text-blue-400 uppercase">Calculated Savings Potential</div><div className="text-xl font-bold text-blue-800">{currency} {(Number(incomeData.neto || 0) + Number(incomeData.pension || 0) + Number(incomeData.other_deposits || 0)).toLocaleString()}</div></div><Button onClick={handleSave}>Save Income Report</Button></div><button onClick={() => setStep(1)} className="text-slate-400 text-sm hover:text-slate-600 w-full text-center">Back to Upload</button></div>)}
             {step === 3 && (<div className="text-center py-12"><CheckCircle className="w-16 h-16 text-emerald-500 mx-auto mb-4" /><h3 className="text-xl font-bold text-slate-800 mb-2">Income Saved!</h3><p className="text-slate-500 mb-6">Your financial picture for <b>{reportMonth}</b> is updated.</p><Button onClick={onComplete}>Back to Dashboard</Button></div>)}
         </div>

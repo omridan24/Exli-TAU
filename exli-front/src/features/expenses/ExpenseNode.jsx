@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Upload, ArrowRight, Sparkles, CheckCircle, Trash2, XCircle, Plus, X, FileText, ChevronLeft, ChevronRight, CreditCard, PenTool, Edit2, Check, ArrowUp, ArrowDown, Clock } from 'lucide-react';
+import { Upload, ArrowRight, Sparkles, CheckCircle, Trash2, XCircle, Plus, X, FileText, ChevronLeft, ChevronRight, CreditCard, PenTool, Edit2, Check, ArrowUp, ArrowDown, Clock, RotateCcw } from 'lucide-react';
 import { collection, addDoc, serverTimestamp, doc, setDoc } from 'firebase/firestore';
 import { db, CLOUD_RUN_URL } from '../../config/firebase.js';
 import { DEFAULT_CATEGORIES, CURRENCIES } from '../../config/constants.js';
@@ -7,6 +7,7 @@ import { Button } from '../../components/UI.jsx';
 
 export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, onComplete }) => {
   const [step, setStep] = useState(0);
+  const [file, setFile] = useState(null);
   const [reportMonth, setReportMonth] = useState(new Date().toISOString().slice(0, 7));
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -39,10 +40,9 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
 
   const sortedCategories = categories;
 
-  // --- NEW: Time Estimate Logic ---
+  // --- TIME ESTIMATE ---
   const processingTimeEstimate = useMemo(() => {
     if (!files.length) return null;
-    // If ANY file is a PDF, the backend uses the slower Vision model
     const hasPdf = files.some(f => f.name.toLowerCase().endsWith('.pdf'));
     return hasPdf ? "30s - 1 min" : "10s - 20s";
   }, [files]);
@@ -67,6 +67,11 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
       if (!isNaN(d.getTime())) return d.toISOString();
     }
     return new Date().toISOString();
+  };
+
+  const cleanDateDisplay = (isoString) => {
+    if (!isoString) return "";
+    return isoString.split('T')[0]; // Returns YYYY-MM-DD
   };
 
   // --- FILE HANDLERS ---
@@ -156,7 +161,7 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
     setStep(3);
   };
 
-  // --- NEW: SHIFT AMOUNT LOGIC ---
+  // --- ACTIONS ---
   const handleShiftAmount = (direction) => {
     const targetIndex = currentIndex + direction;
     if (targetIndex < 0 || targetIndex >= allTransactions.length) return;
@@ -207,6 +212,13 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
     };
     setProcessedTransactions(prev => [...prev, tx]);
     moveToNext();
+  };
+
+  const handleUndo = () => {
+    if (currentIndex > 0) {
+      setCurrentIndex(prev => prev - 1);
+      setProcessedTransactions(prev => prev.slice(0, -1)); // Remove the last processed item so we can redo it
+    }
   };
 
   const saveManualTransaction = async (categoryName) => {
@@ -418,10 +430,20 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
             step === 3 && currentTx && (
               <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden mb-8 relative">
                 <div className="absolute top-4 right-4 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-sm opacity-80"><CreditCard className="w-3 h-3" /> {currentTx.sourceCard}</div>
-                <div className="bg-slate-50 p-6 border-b border-slate-100 flex justify-between items-start pt-10">
+
+                {/* Header (Prev Button + Details) */}
+                <div className="absolute top-4 left-4">
+                  {currentIndex > 0 && (
+                    <button onClick={handleUndo} className="flex items-center gap-1 text-xs font-bold text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-full transition-colors">
+                      <RotateCcw className="w-3 h-3" /> Previous
+                    </button>
+                  )}
+                </div>
+
+                <div className="bg-slate-50 p-6 border-b border-slate-100 flex justify-between items-start pt-12">
                   <div>
                     <h3 className="text-xl font-bold text-slate-800">{currentTx.description}</h3>
-                    <div className="text-sm text-slate-500 mt-1">{currentTx.date}</div>
+                    <div className="text-sm text-slate-500 mt-1">{cleanDateDisplay(currentTx.date)}</div>
                   </div>
                   <div className="text-right flex flex-col items-end">
                     {isEditingAmount ? (
