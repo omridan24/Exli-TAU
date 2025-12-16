@@ -21,30 +21,31 @@ def get_model_by_tier(tier="flash"):
                 if p in m: return m
         return 'gemini-1.5-flash'
     except Exception as e:
-        logger.error(f"Error listing models: {e}")
+        logger.error(f"Error listing models: {e}",exc_info=True)
         return 'gemini-1.5-flash'
 
 # --- NEW HELPER: GEOMETRY SORTING ---
 def geometry_sort_text(document_object):
-    """
-    Reconstructs text from DocAI by sorting lines based on Y coordinates.
-    """
-    full_text = ""
-    for page in document_object.pages:
-        page_lines = []
-        for line in page.lines:
-            try:
-                segment = line.layout.text_anchor.text_segments[0]
-                line_text = document_object.text[segment.start_index:segment.end_index]
-            except:
-                continue
-            y = line.layout.bounding_poly.normalized_vertices[0].y
-            page_lines.append({"y": y, "text": line_text.strip()})
-        
-        page_lines.sort(key=lambda x: x["y"])
-        for pl in page_lines:
-            full_text += pl["text"] + "\n"
-    return full_text
+    try:
+        full_text = ""
+        for page in document_object.pages:
+            page_lines = []
+            for line in page.lines:
+                try:
+                    segment = line.layout.text_anchor.text_segments[0]
+                    line_text = document_object.text[segment.start_index:segment.end_index]
+                except:
+                    continue
+                y = line.layout.bounding_poly.normalized_vertices[0].y
+                page_lines.append({"y": y, "text": line_text.strip()})
+            
+            page_lines.sort(key=lambda x: x["y"])
+            for pl in page_lines:
+                full_text += pl["text"] + "\n"
+        return full_text
+    except Exception as e:
+        logger.error(f"Geometry Sort Failed: {e}", exc_info=True)
+        return "" # Return empty string on failure so we don't crash
 
 def extract_text_with_google_docai(file_bytes, mime_type="application/pdf"):
     try:
@@ -61,7 +62,7 @@ def extract_text_with_google_docai(file_bytes, mime_type="application/pdf"):
         result = client.process_document(request=request)
         return result.document  
     except Exception as e:
-        logger.error(f"Document AI Failed: {e}")
+        logger.error(f"Document AI Failed: {e}",exc_info=True)
         return None
 
 def convert_pdf_to_data(file_bytes):
@@ -181,7 +182,7 @@ def analyze_multiple_files_structure(file_samples):
         response = model.generate_content(prompt)
         return json.loads(response.text)
     except Exception as e:
-        logger.error(f"AI Batch Analysis Failed: {e}")
+        logger.error(f"AI Batch Analysis Failed: {e}", exc_info=True)
         return {"results": []}
 
 def analyze_income_statement(file_bytes, mime_type):
@@ -194,4 +195,5 @@ def analyze_income_statement(file_bytes, mime_type):
         response = model.generate_content([prompt, file_part])
         return json.loads(response.text)
     except Exception as e:
+        logger.error(f"AI Income Analysis Failed: {e}", exc_info=True)
         return None

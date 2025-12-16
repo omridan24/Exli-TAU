@@ -336,7 +336,16 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
               ))}
             </div>
           )}
-          {error && <div className="text-red-600 text-center">{error}</div>}
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl flex items-start gap-3 text-sm animate-fade-in text-left">
+              <XCircle className="w-5 h-5 shrink-0 mt-0.5" />
+              <div>
+                <div className="font-bold">Analysis Failed</div>
+                <div>{error}</div>
+                <div className="text-xs text-red-400 mt-1">Please try again or use manual entry.</div>
+              </div>
+            </div>
+          )}
           <div className="flex justify-between items-center">
             <Button variant="secondary" onClick={() => setStep(0)}>Back</Button>
             <div className="flex items-center gap-4">

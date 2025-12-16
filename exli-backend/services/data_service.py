@@ -26,7 +26,7 @@ def sanitize_dataframe(df):
     return df
 
 def process_uploaded_files(files):
-    logger.info(f"Data Service: Processing {len(files)} files")
+    logger.info(f"Data Service: Started processing {len(files)} files")
     
     prepped_files = [] 
     samples_for_ai = []
@@ -40,63 +40,66 @@ def process_uploaded_files(files):
             text_tail = ""
             is_excel = False
             
+            logger.info(f"[{idx}] Reading File: {filename} ({len(raw_bytes)} bytes)")
+
             # PDF Handling
             if filename.lower().endswith('.pdf'):
-                logger.info(f"[{idx}] Converting PDF to Structured Data: {filename}")
-                json_data = convert_pdf_to_data(raw_bytes)
-                
-                if not json_data or not isinstance(json_data, list):
-                    raise ValueError(f"Failed to extract structured data from {filename}")
-                
-                df_pdf = pd.DataFrame(json_data)
-                df_pdf = sanitize_dataframe(df_pdf) # Sanitize PDF result immediately
+                try:
+                    json_data = convert_pdf_to_data(raw_bytes)
+                    if not json_data:
+                        raise ValueError("AI could not extract text from this PDF. It might be an image scan or empty.")
+                    if not isinstance(json_data, list):
+                        raise ValueError("AI returned invalid data format for PDF.")
+                    
+                    df_pdf = pd.DataFrame(json_data)
+                    df_pdf = sanitize_dataframe(df_pdf)
+                    
+                    if df_pdf.empty:
+                         raise ValueError("PDF analysis resulted in 0 transactions found.")
 
-                csv_string = df_pdf.to_csv(index=False)
-                raw_bytes = csv_string.encode('utf-8') 
-                text_head = df_pdf.head(20).to_csv(index=False)
-                text_tail = "" 
+                    csv_string = df_pdf.to_csv(index=False)
+                    raw_bytes = csv_string.encode('utf-8') 
+                    text_head = df_pdf.head(20).to_csv(index=False)
+                except Exception as e:
+                     logger.error(f"PDF Error for {filename}: {e}", exc_info=True)
+                     # Re-raise with user friendly message
+                     raise ValueError(f"Failed to analyze PDF '{filename}'. {str(e)}")
             
             # Excel Handling
             elif filename.endswith(('.xls', '.xlsx')):
-                logger.info(f"[{idx}] Reading Excel: {filename}")
                 is_excel = True
                 try:
+                    # Check if valid excel
                     df_raw = pd.read_excel(io.BytesIO(raw_bytes), header=None)
                     text_head = df_raw.head(50).to_csv(index=False, header=False)
-                    text_tail = df_raw.tail(10).to_csv(index=False, header=False)
                 except Exception as e:
-                    logger.error(f"Failed to read Excel preview: {e}")
-                    raise ValueError(f"Excel file {filename} is corrupted or password protected.")
+                    logger.error(f"Excel Error for {filename}: {e}", exc_info=True)
+                    raise ValueError(f"Could not open '{filename}'. It might be password protected or corrupted.")
             
             # CSV Handling
             else:
-                logger.info(f"[{idx}] Reading CSV: {filename}")
                 try:
                     full_text = raw_bytes.decode('utf-8', errors='ignore')
-                except:
-                    full_text = raw_bytes.decode('latin1', errors='ignore')
-                lines = full_text.splitlines()
-                text_head = "\n".join(lines[:50])
-                text_tail = "\n".join(lines[-10:])
+                    if not full_text: raise ValueError("File is empty")
+                    lines = full_text.splitlines()
+                    text_head = "\n".join(lines[:50])
+                except Exception as e:
+                     logger.error(f"CSV Error for {filename}: {e}", exc_info=True)
+                     raise ValueError(f"Could not read text from '{filename}'. Check encoding.")
 
             prepped_files.append({
                 "filename": filename,
                 "bytes": raw_bytes,
                 "is_excel": is_excel
             })
-            
-            samples_for_ai.append({
-                "filename": filename,
-                "head": text_head,
-                "tail": text_tail
-            })
+            samples_for_ai.append({ "filename": filename, "head": text_head })
 
         # --- PHASE 2: ONE AI CALL ---
         logger.info("Sending batch to AI for structure analysis...")
         ai_response = analyze_multiple_files_structure(samples_for_ai)
         
         if not ai_response or "results" not in ai_response:
-            logger.warning("AI Batch failed, using default mapping.")
+            logger.warning("AI Batch failed to return results structure.")
             ai_results = [{"file_index": i, "header_row_index": 0} for i in range(len(files))]
         else:
             ai_results = ai_response["results"]
@@ -109,78 +112,60 @@ def process_uploaded_files(files):
             
             delimiter = config.get('delimiter', ',')
             header_index = config.get('header_row_index', 0)
+            
+            # --- FIX: Prevent Negative Header Index ---
+            if not isinstance(header_index, int) or header_index < 0:
+                logger.warning(f"[{idx}] AI returned invalid header index: {header_index} for {file_data['filename']}. Defaulting to 0.")
+                header_index = 0
+
             footer_count = config.get('footer_skip_count', 0)
-            # Use INDICES preference
             mapping_indices = config.get('mapping_indices', {})
-            # Fallback to names (for PDF flows that might return names or backward compat)
             mapping_names = config.get('mapping', {})
             card_info = config.get('card_info', file_data['filename'])
 
             df = None
             
-            # 3a. LOAD DATAFRAME
-            if file_data['is_excel']:
-                logger.info(f"[{idx}] Parsing Excel Engine: {file_data['filename']}")
-                df = pd.read_excel(io.BytesIO(file_data['bytes']), header=header_index)
-                if footer_count > 0:
-                    df = df.iloc[:-footer_count]
-            else:
-                logger.info(f"[{idx}] Parsing CSV Engine: {file_data['filename']}")
-                encodings = ['utf-8', 'utf-8-sig', 'cp1255', 'latin1']
-                for enc in encodings:
-                    try:
-                        df = pd.read_csv(
-                            io.BytesIO(file_data['bytes']),
-                            sep=delimiter if delimiter else ',',
-                            header=header_index,
-                            skipfooter=footer_count,
-                            engine='python',
-                            encoding=enc,
-                            on_bad_lines='skip'
-                        )
-                        break
-                    except UnicodeDecodeError:
-                        continue
-                    except Exception as e:
-                        logger.warning(f"CSV Parse failed with {enc}: {e}")
-                        
-                if df is None:
-                    raise ValueError(f"Could not decode file {file_data['filename']}")
+            try:
+                if file_data['is_excel']:
+                    df = pd.read_excel(io.BytesIO(file_data['bytes']), header=header_index)
+                    if footer_count > 0: df = df.iloc[:-footer_count]
+                else:
+                    # CSV Try/Catch Loop
+                    encodings = ['utf-8', 'utf-8-sig', 'cp1255', 'latin1']
+                    for enc in encodings:
+                        try:
+                            df = pd.read_csv(
+                                io.BytesIO(file_data['bytes']),
+                                sep=delimiter if delimiter else ',',
+                                header=header_index,
+                                skipfooter=footer_count,
+                                engine='python',
+                                encoding=enc,
+                                on_bad_lines='skip'
+                            )
+                            break
+                        except UnicodeDecodeError: continue
+                    
+                    if df is None:
+                        raise ValueError(f"Could not decode CSV '{file_data['filename']}' with standard encodings.")
 
-            # 3b. FILTER & RENAME COLUMNS (The Fix)
-            if df is not None:
-                final_cols = {} # New Dataframe dict
-                
-                # Option A: Map by Index (Preferred/Precise)
+                # Filter Columns
+                final_cols = {}
                 if mapping_indices and len(mapping_indices) >= 2:
-                    logger.info(f"[{idx}] Using Index Mapping: {mapping_indices}")
                     for field, col_idx in mapping_indices.items():
                         if isinstance(col_idx, int) and 0 <= col_idx < len(df.columns):
-                            # Extract column by index
                             final_cols[field] = df.iloc[:, col_idx].values
-                
-                # Option B: Map by Name (Fallback / PDF Flow)
                 elif mapping_names:
-                    logger.info(f"[{idx}] Using Name Mapping: {mapping_names}")
-                    # Normalize DF headers for matching
                     df.columns = [str(c).strip() for c in df.columns] 
                     for field, header_name in mapping_names.items():
-                        # Fuzzy match header
                         if header_name in df.columns:
                             final_cols[field] = df[header_name].values
                 
-                # Create Clean DF if we found columns, otherwise keep original (with warning)
                 if final_cols:
                     df = pd.DataFrame(final_cols)
                 
-                # SANITIZE AGAIN (Catches currency issues in Excel files)
                 df = sanitize_dataframe(df)
-
-                # Convert to List for Frontend
                 df_clean = df.astype(object).where(pd.notnull(df), None)
-                
-                # Generate "Suggested Mapping" for Frontend UI based on what we actually used
-                # Since we standardized the columns to 'date', 'amount', etc., the mapping is 1:1
                 frontend_mapping = {col: col for col in df.columns}
 
                 final_output.append({
@@ -191,9 +176,16 @@ def process_uploaded_files(files):
                     "preview_data": df_clean.head(5).values.tolist(),
                     "all_data": df_clean.values.tolist()
                 })
+                
+            except Exception as e:
+                # Capture parse errors per file
+                logger.error(f"Parse Error for {file_data['filename']}: {e}", exc_info=True)
+                raise ValueError(f"Error parsing '{file_data['filename']}': {str(e)}")
 
         return {"status": "success", "files": final_output}
 
     except Exception as e:
-        logger.error(f"Batch Processing Error: {e}", exc_info=True)
+        # Top level catch
+        logger.error(f"Batch Processing Fatal Error: {e}", exc_info=True)
+        # Return the actual error message to the user
         return {"status": "error", "message": str(e)}
