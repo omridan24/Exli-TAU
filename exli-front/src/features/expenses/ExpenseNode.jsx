@@ -1,34 +1,25 @@
 import React, { useState, useMemo } from 'react';
 import { Upload, ArrowRight, Sparkles, CheckCircle, Trash2, XCircle, Plus, X, FileText, ChevronLeft, ChevronRight, CreditCard, PenTool, Edit2, Check, ArrowUp, ArrowDown, Clock, RotateCcw } from 'lucide-react';
 import { collection, addDoc, serverTimestamp, doc, setDoc } from 'firebase/firestore';
-import { db, CLOUD_RUN_URL } from '../../config/firebase.js';
+import { db, CLOUD_RUN_URL, logUserAction } from '../../config/firebase.js';
 import { DEFAULT_CATEGORIES, CURRENCIES } from '../../config/constants.js';
-import { Button } from '../../components/UI.jsx';
+import { Button, CategoryIcon } from '../../components/UI.jsx';
 
 export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, onComplete }) => {
   const [step, setStep] = useState(0);
-  const [file, setFile] = useState(null);
   const [reportMonth, setReportMonth] = useState(new Date().toISOString().slice(0, 7));
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [files, setFiles] = useState([]);
-
-  // Multi-file state
   const [processedFiles, setProcessedFiles] = useState([]);
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
-
-  // Categorization state
   const [currentIndex, setCurrentIndex] = useState(0);
   const [allTransactions, setAllTransactions] = useState([]);
   const [processedTransactions, setProcessedTransactions] = useState([]);
   const [isCreatingCat, setIsCreatingCat] = useState(false);
   const [newCatName, setNewCatName] = useState('');
-
-  // Editing Amount State
   const [isEditingAmount, setIsEditingAmount] = useState(false);
   const [editAmountValue, setEditAmountValue] = useState('');
-
-  // Manual Entry State
   const [isManualMode, setIsManualMode] = useState(false);
   const [manualData, setManualData] = useState({
     date: new Date().toISOString().slice(0, 10),
@@ -40,14 +31,12 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
 
   const sortedCategories = categories;
 
-  // --- TIME ESTIMATE ---
   const processingTimeEstimate = useMemo(() => {
     if (!files.length) return null;
     const hasPdf = files.some(f => f.name.toLowerCase().endsWith('.pdf'));
     return hasPdf ? "30s - 1 min" : "10s - 20s";
   }, [files]);
 
-  // --- HELPERS ---
   const parseDate = (dateStr) => {
     if (!dateStr) return new Date().toISOString();
     if (!isNaN(dateStr) && !dateStr.includes('-') && !dateStr.includes('/')) {
@@ -71,10 +60,9 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
 
   const cleanDateDisplay = (isoString) => {
     if (!isoString) return "";
-    return isoString.split('T')[0]; // Returns YYYY-MM-DD
+    return isoString.split('T')[0];
   };
 
-  // --- FILE HANDLERS ---
   const handleFileChange = (e) => {
     const selected = Array.from(e.target.files);
     if (selected.length + files.length > 4) {
@@ -101,6 +89,8 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
       if (!response.ok) throw new Error(`Server Error: ${response.statusText}`);
 
       const data = await response.json();
+      if (data.status === 'error') throw new Error(data.message);
+
       const initProcessed = data.files.map(f => ({
         ...f,
         columnMapping: mapBackendToIndices(f.suggested_mapping, f.columns)
@@ -108,8 +98,10 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
 
       setProcessedFiles(initProcessed);
       setStep(2);
+      logUserAction(userId, 'FILE_ANALYSIS', `Analyzed ${files.length} files`);
     } catch (err) {
       setError(err.message || "Failed to analyze files.");
+      logUserAction(userId, 'ANALYSIS_ERROR', `Error: ${err.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -161,21 +153,16 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
     setStep(3);
   };
 
-  // --- ACTIONS ---
   const handleShiftAmount = (direction) => {
     const targetIndex = currentIndex + direction;
     if (targetIndex < 0 || targetIndex >= allTransactions.length) return;
-
     const newTransactions = [...allTransactions];
     const currentItem = newTransactions[currentIndex];
     const targetItem = newTransactions[targetIndex];
-
     const tempAmount = currentItem.amount;
     const tempCurrency = currentItem.currency;
-
     newTransactions[currentIndex] = { ...currentItem, amount: targetItem.amount, currency: targetItem.currency };
     newTransactions[targetIndex] = { ...targetItem, amount: tempAmount, currency: tempCurrency };
-
     setAllTransactions(newTransactions);
   };
 
@@ -217,7 +204,7 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
   const handleUndo = () => {
     if (currentIndex > 0) {
       setCurrentIndex(prev => prev - 1);
-      setProcessedTransactions(prev => prev.slice(0, -1)); // Remove the last processed item so we can redo it
+      setProcessedTransactions(prev => prev.slice(0, -1));
     }
   };
 
@@ -238,6 +225,7 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
         status: 'active',
         createdAt: serverTimestamp()
       });
+      logUserAction(userId, 'MANUAL_EXPENSE', `Added ${manualData.amount} for ${manualData.description}`);
       setStep(4);
     } catch (e) {
       setError("Failed to save manual expense.");
@@ -252,11 +240,12 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
     const newId = newCatName.toLowerCase().replace(/\s+/g, '_');
     const colors = ['#ef4444', '#f97316', '#eab308', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899'];
     const randomColor = colors[Math.floor(Math.random() * colors.length)];
-    const newCat = { id: newId, name: newCatName, color: randomColor };
+    const newCat = { id: newId, name: newCatName, color: randomColor, icon: 'Star' };
     const updated = [...categories, newCat];
     onUpdateCategories(updated);
     await setDoc(doc(db, 'users', userId), { customCategories: updated.filter(c => !DEFAULT_CATEGORIES.find(dc => dc.id === c.id)) }, { merge: true });
 
+    logUserAction(userId, 'CATEGORY_CREATE', `Created category: ${newCatName}`);
     handleCategorize(newCatName);
     setNewCatName('');
     setIsCreatingCat(false);
@@ -270,6 +259,7 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
     try {
       const expensesRef = collection(db, 'users', userId, 'expenses');
       await Promise.all(processedTransactions.map(tx => addDoc(expensesRef, { ...tx, source: "smart_import", createdAt: serverTimestamp() })));
+      logUserAction(userId, 'IMPORT_COMPLETE', `Imported ${processedTransactions.length} transactions`);
       setStep(4);
     } catch (err) { setError("Failed to save transactions."); }
     finally { setIsLoading(false); }
@@ -314,7 +304,6 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
               <div className="font-bold text-lg text-slate-600">Drop files here or Click</div>
               <p className="text-sm text-slate-400 mt-1">Up to 4 files (PDF, Excel, CSV)</p>
             </div>
-
             <div onClick={() => setIsManualMode(true)} className="w-1/3 border-2 border-slate-100 rounded-2xl p-8 text-center hover:bg-emerald-50 hover:border-emerald-200 transition-all cursor-pointer flex flex-col items-center justify-center gap-2 group">
               <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
                 <PenTool className="w-6 h-6 text-slate-400 group-hover:text-emerald-600" />
@@ -322,7 +311,6 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
               <div className="font-bold text-slate-600 group-hover:text-emerald-700">Add Manually</div>
             </div>
           </div>
-
           {files.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {files.map((f, i) => (
@@ -379,11 +367,13 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
             <div><label className="text-xs font-bold text-slate-400 uppercase">Description</label><input type="text" className="w-full p-3 border border-slate-200 rounded-xl font-medium outline-none focus:border-emerald-500" placeholder="e.g. Lunch at Aroma" value={manualData.description} onChange={e => setManualData({ ...manualData, description: e.target.value })} /></div>
             <div><label className="text-xs font-bold text-slate-400 uppercase">Date</label><input type="date" className="w-full p-3 border border-slate-200 rounded-xl font-medium outline-none" value={manualData.date} onChange={e => setManualData({ ...manualData, date: e.target.value })} /></div>
           </div>
-          <div className="text-xs font-bold text-slate-400 uppercase mb-3">Select Category to Save</div>
           <div className="grid grid-cols-3 gap-2">
             {sortedCategories.map(cat => (
-              <button key={cat.id} onClick={() => handleCategorize(cat.name)} className="p-2 rounded-lg border border-slate-100 hover:border-emerald-500 hover:bg-emerald-50 transition-all flex flex-col items-center gap-1">
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: cat.color }}></div><span className="text-xs font-bold text-slate-600">{cat.name}</span>
+              <button key={cat.id} onClick={() => handleCategorize(cat.name)} className="p-2 rounded-lg border border-slate-100 hover:border-emerald-500 hover:bg-emerald-50 transition-all flex flex-col items-center gap-1 group">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center bg-white border border-slate-100 shadow-sm group-hover:scale-110 transition-transform">
+                  <CategoryIcon iconName={cat.icon} color={cat.color} className="w-4 h-4" />
+                </div>
+                <span className="text-xs font-bold text-slate-600">{cat.name}</span>
               </button>
             ))}
             <button onClick={() => setIsCreatingCat(true)} className="p-2 rounded-lg border border-dashed border-slate-300 hover:border-emerald-500 hover:bg-emerald-50 text-slate-400 hover:text-emerald-600"><Plus className="w-4 h-4 mx-auto" /></button>
@@ -403,6 +393,8 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
             </div>
             <button disabled={currentFileIndex === processedFiles.length - 1} onClick={() => setCurrentFileIndex(prev => prev + 1)} className="p-2 hover:bg-slate-100 rounded-full disabled:opacity-30 disabled:cursor-not-allowed"><ChevronRight className="w-6 h-6 text-slate-600" /></button>
           </div>
+
+          {/* RESTORED COLUMN HEADERS MAPPING */}
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             {['Date', 'Description', 'Amount', 'Category', 'Currency'].map((field) => (
               <div key={field}>
@@ -411,6 +403,7 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
               </div>
             ))}
           </div>
+
           <div className="mt-6 border rounded-xl overflow-hidden shadow-sm bg-white">
             <div className="bg-slate-50 p-3 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">Preview: {currentFileData.card_info}</div>
             <div className="overflow-x-auto">
@@ -439,8 +432,6 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
             step === 3 && currentTx && (
               <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden mb-8 relative">
                 <div className="absolute top-4 right-4 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-sm opacity-80"><CreditCard className="w-3 h-3" /> {currentTx.sourceCard}</div>
-
-                {/* Header (Prev Button + Details) */}
                 <div className="absolute top-4 left-4">
                   {currentIndex > 0 && (
                     <button onClick={handleUndo} className="flex items-center gap-1 text-xs font-bold text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-full transition-colors">
@@ -448,7 +439,6 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
                     </button>
                   )}
                 </div>
-
                 <div className="bg-slate-50 p-6 border-b border-slate-100 flex justify-between items-start pt-12">
                   <div>
                     <h3 className="text-xl font-bold text-slate-800">{currentTx.description}</h3>
@@ -457,13 +447,7 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
                   <div className="text-right flex flex-col items-end">
                     {isEditingAmount ? (
                       <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          autoFocus
-                          value={editAmountValue}
-                          onChange={(e) => setEditAmountValue(e.target.value)}
-                          className="w-32 p-2 text-2xl font-mono font-bold text-slate-800 border border-emerald-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-200"
-                        />
+                        <input type="number" autoFocus value={editAmountValue} onChange={(e) => setEditAmountValue(e.target.value)} className="w-32 p-2 text-2xl font-mono font-bold text-slate-800 border border-emerald-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-200" />
                         <button onClick={handleSaveAmountEdit} className="p-2 bg-emerald-100 text-emerald-700 rounded-full hover:bg-emerald-200"><Check className="w-5 h-5" /></button>
                       </div>
                     ) : (
@@ -485,7 +469,13 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
                 </div>
                 <div className="p-6">
                   <div className="grid grid-cols-3 gap-3 mb-6">
-                    {sortedCategories.map(cat => { const isSuggested = suggestedCategoryId === cat.id; return (<button key={cat.id} onClick={() => handleCategorize(cat.name)} className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-2 text-center h-24 ${isSuggested ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-100 hover:border-slate-300 hover:bg-slate-50'}`}><div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }}></div><span className={`text-xs font-bold ${isSuggested ? 'text-emerald-700' : 'text-slate-600'}`}>{cat.name}</span></button>); })}
+                    {sortedCategories.map(cat => {
+                      const isSuggested = suggestedCategoryId === cat.id; return (
+                        <button key={cat.id} onClick={() => handleCategorize(cat.name)} className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-2 text-center h-24 ${isSuggested ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-100 hover:border-slate-300 hover:bg-slate-50'}`}>
+                          <CategoryIcon iconName={cat.icon} color={cat.color} className={`w-6 h-6 ${isSuggested ? 'text-emerald-600' : ''}`} />
+                          <span className={`text-xs font-bold ${isSuggested ? 'text-emerald-700' : 'text-slate-600'}`}>{cat.name}</span>
+                        </button>);
+                    })}
                     <button onClick={() => setIsCreatingCat(true)} className="p-3 rounded-xl border-2 border-dashed border-slate-300 hover:border-emerald-400 hover:bg-emerald-50 transition-all flex flex-col items-center justify-center gap-2 text-center h-24 text-slate-400 hover:text-emerald-600"><Plus className="w-6 h-6" /><span className="text-xs font-bold">New Cat</span></button>
                     <button onClick={() => handleCategorize('Refunded', true)} className="p-3 rounded-xl border-2 border-amber-200 bg-amber-50 hover:bg-amber-100 hover:border-amber-300 transition-all flex flex-col items-center justify-center gap-2 text-center h-24 text-amber-700"><XCircle className="w-6 h-6" /><span className="text-xs font-bold">Refunded</span></button>
                   </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Wallet, Sparkles, Upload, Shield, DollarSign, Activity, Tag, CheckCircle, ArrowRight, PenTool } from 'lucide-react';
 import { collection, addDoc, serverTimestamp, doc, setDoc, getDoc } from 'firebase/firestore';
-import { db, CLOUD_RUN_URL } from '../../config/firebase.js';
+import { db, CLOUD_RUN_URL, logUserAction } from '../../config/firebase.js';
 import { CURRENCIES } from '../../config/constants.js';
 import { Button } from '../../components/UI.jsx';
 
@@ -64,6 +64,7 @@ export const IncomeNode = ({ userId, onComplete }) => {
             if (res.status === 'success' && res.data) {
                 setIncomeData({ bruto: res.data.bruto || '', neto: res.data.neto || '', taxes: res.data.taxes || '', pension: res.data.pension || '', other_deposits: res.data.other_deposits || '' });
                 setStep(2);
+                logUserAction(userId, 'INCOME_ANALYSIS', `Analyzed payslip for ${reportMonth}`);
             } else { throw new Error("AI could not extract data."); }
         } catch (err) { setError(err.message || "Failed to analyze file."); } finally { setIsLoading(false); }
     };
@@ -78,6 +79,7 @@ export const IncomeNode = ({ userId, onComplete }) => {
                 month: reportMonth, currency: currency, createdAt: serverTimestamp(), source: file ? 'ai_scan' : 'manual'
             });
             await setDoc(doc(db, 'users', userId), { preferredCurrency: currency }, { merge: true });
+            logUserAction(userId, 'INCOME_SAVE', `Saved income for ${reportMonth}`);
             setStep(3);
         } catch (err) { setError("Failed to save income data."); } finally { setIsLoading(false); }
     };
