@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Save, User, Briefcase, Heart, History, Clock, MapPin, GraduationCap, Globe, X, ChevronRight, ChevronLeft, Plus, Search, Check, Edit3, Trash2, Grid, Calendar } from 'lucide-react';
+import {
+  Save, User, Briefcase, Heart, History, Clock, MapPin,
+  GraduationCap, Globe, X, ChevronRight, ChevronLeft,
+  Plus, Search, Check, Edit3, Trash2, Grid, Calendar, Building2, Settings, ArrowRight
+} from 'lucide-react';
 import { doc, getDoc, setDoc, collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db, logUserAction } from '../../config/firebase';
 import { OCCUPATIONS_LIST, STATUS_LIST, DEFAULT_CATEGORIES } from '../../config/constants';
@@ -11,203 +15,148 @@ const ICON_OPTIONS = [
   "Home", "Ticket", "Briefcase", "Gift", "Plane", "Coffee", "Wifi", "GraduationCap", "PawPrint", "HelpCircle"
 ];
 
-// --- MODAL COMPONENTS ---
+// --- SUB-COMPONENT: LOGO RENDERER ---
+const LogoImage = ({ logo, domain, className = "w-10 h-10" }) => {
+  const [error, setError] = useState(false);
+  const logoUrl = domain && domain !== 'independent' ? `https://logo.clearbit.com/${domain}` : logo;
 
-// 1. Redesigned Card-Based Date Picker Modal
-const DatePickerModal = ({ isOpen, onClose, value, onSave }) => {
-  const [step, setStep] = useState('year'); // 'year', 'month', 'day'
-  const [selectedYear, setSelectedYear] = useState(null);
-  const [selectedMonth, setSelectedMonth] = useState(null);
+  if (error || !logoUrl) {
+    return (
+      <div className={`${className} rounded-lg bg-slate-100 flex items-center justify-center border border-slate-200`}>
+        <Building2 className="w-1/2 h-1/2 text-slate-400" />
+      </div>
+    );
+  }
+
+  return (
+    <div className={`${className} rounded-lg border border-slate-100 flex items-center justify-center bg-white overflow-hidden`}>
+      <img src={logoUrl} alt="" className="w-full h-full object-contain p-1" onError={() => setError(true)} />
+    </div>
+  );
+};
+
+// --- MODAL: WORKPLACE PICKER ---
+const WorkplacePickerModal = ({ isOpen, occupationName, onClose, onSelect }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [suggestions, setSuggestions] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const delayDebounce = setTimeout(async () => {
+      if (searchTerm.length < 2) { setSuggestions([]); return; }
+      setLoading(true);
+      try {
+        const res = await fetch(`https://autocomplete.clearbit.com/v1/companies/suggest?query=${searchTerm}`);
+        const data = await res.json();
+        setSuggestions(data);
+      } catch (err) { console.error(err); } finally { setLoading(false); }
+    }, 300);
+    return () => clearTimeout(delayDebounce);
+  }, [searchTerm]);
 
   if (!isOpen) return null;
 
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 100 }, (_, i) => currentYear - i);
-  const months = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
-  ];
-
-  // Calculate days based on selected month/year
-  const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
-  const days = selectedYear !== null && selectedMonth !== null
-    ? Array.from({ length: getDaysInMonth(selectedYear, selectedMonth) }, (_, i) => i + 1)
-    : [];
-
-  const handleSelectYear = (year) => {
-    setSelectedYear(year);
-    setStep('month');
-  };
-
-  const handleSelectMonth = (index) => {
-    setSelectedMonth(index);
-    setStep('day');
-  };
-
-  const handleSelectDay = (day) => {
-    // Use UTC to prevent timezone shifts
-    const newDate = new Date(Date.UTC(selectedYear, selectedMonth, day));
-    onSave(newDate.toISOString().split('T')[0]);
-    resetAndClose();
-  };
-
-  const resetAndClose = () => {
-    setStep('year');
-    setSelectedYear(null);
-    setSelectedMonth(null);
-    onClose();
-  };
-
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-fade-in">
-      <div className="bg-white w-full max-w-lg rounded-[32px] overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-
-        {/* Header */}
-        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-          <div className="flex items-center gap-3">
-            {step !== 'year' && (
-              <button
-                onClick={() => setStep(step === 'day' ? 'month' : 'year')}
-                className="p-2 hover:bg-white rounded-full transition-colors shadow-sm border border-slate-200"
-              >
-                <ChevronLeft className="w-5 h-5 text-slate-600" />
-              </button>
-            )}
-            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">
-              {step === 'year' && "Select Year"}
-              {step === 'month' && `Select Month (${selectedYear})`}
-              {step === 'day' && `Select Day (${months[selectedMonth]})`}
-            </h3>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[110] flex items-center justify-center p-4 animate-fade-in">
+      <div className="bg-white w-full max-w-md rounded-[32px] overflow-hidden shadow-2xl flex flex-col">
+        <div className="p-6 border-b border-slate-100 bg-emerald-50/30">
+          <h3 className="text-xl font-black text-slate-800 uppercase">Workplace</h3>
+          <p className="text-xs text-emerald-600 font-bold">Where are you a {occupationName}?</p>
+        </div>
+        <div className="p-6 space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-emerald-500"
+              placeholder="Search company..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              autoFocus
+            />
           </div>
-          <button onClick={resetAndClose} className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-full transition-all">
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
-
-          {/* STEP: YEAR */}
-          {step === 'year' && (
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-              {years.map(y => (
-                <button
-                  key={y}
-                  onClick={() => handleSelectYear(y)}
-                  className="p-4 rounded-2xl border-2 border-slate-100 font-bold text-slate-600 hover:border-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 transition-all active:scale-95"
-                >
-                  {y}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* STEP: MONTH */}
-          {step === 'month' && (
-            <div className="grid grid-cols-2 gap-3">
-              {months.map((m, i) => (
-                <button
-                  key={m}
-                  onClick={() => handleSelectMonth(i)}
-                  className="p-6 rounded-2xl border-2 border-slate-100 font-bold text-slate-600 hover:border-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 transition-all active:scale-95 text-lg"
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* STEP: DAY */}
-          {step === 'day' && (
-            <div className="grid grid-cols-5 gap-2">
-              {days.map(d => (
-                <button
-                  key={d}
-                  onClick={() => handleSelectDay(d)}
-                  className="aspect-square flex items-center justify-center rounded-xl border-2 border-slate-100 font-bold text-slate-600 hover:border-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 transition-all active:scale-95"
-                >
-                  {d}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Footer Progress */}
-        <div className="p-4 bg-slate-50 flex justify-center gap-2 border-t border-slate-100">
-          <div className={`h-1.5 w-8 rounded-full transition-all ${step === 'year' ? 'bg-emerald-500 w-12' : 'bg-slate-200'}`} />
-          <div className={`h-1.5 w-8 rounded-full transition-all ${step === 'month' ? 'bg-emerald-500 w-12' : 'bg-slate-200'}`} />
-          <div className={`h-1.5 w-8 rounded-full transition-all ${step === 'day' ? 'bg-emerald-500 w-12' : 'bg-slate-200'}`} />
+          <div className="max-h-64 overflow-y-auto space-y-2">
+            {loading && <div className="text-center py-4 animate-pulse text-slate-400 text-xs">Searching...</div>}
+            {suggestions.map(s => (
+              <button key={s.domain} onClick={() => onSelect(s)} className="w-full p-3 flex items-center justify-between hover:bg-slate-50 rounded-xl border border-transparent hover:border-slate-100 group">
+                <div className="flex items-center gap-3">
+                  <LogoImage logo={s.logo} domain={s.domain} />
+                  <div className="text-left">
+                    <div className="font-bold text-slate-700 text-sm">{s.name}</div>
+                    <div className="text-[10px] text-slate-400">{s.domain}</div>
+                  </div>
+                </div>
+                <Plus className="w-4 h-4 text-slate-300 group-hover:text-emerald-500" />
+              </button>
+            ))}
+            <button onClick={() => onSelect({ name: 'Independent', domain: 'independent', logo: '' })} className="w-full p-4 border-2 border-dashed border-slate-200 rounded-xl text-slate-500 font-bold text-sm hover:bg-emerald-50 hover:border-emerald-200 flex items-center justify-center gap-2 transition-all">
+              <Briefcase className="w-4 h-4" /> I am Independent
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-// 2. Generic Selection Modal
-const SelectionModal = ({ title, options = [], onClose, onSelect, selectedValue, isLoading, onSearchChange, allowCustom = true }) => {
+// --- MODAL: GENERIC SELECTION (For Country, City, Status, University) ---
+const SelectionModal = ({ isOpen, title, data = [], onClose, onSelect, selectedValue, isLoading, allowCustom = false }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [isCustom, setIsCustom] = useState(false);
   const [customValue, setCustomValue] = useState('');
+  const [isAddingCustom, setIsAddingCustom] = useState(false);
 
-  const safeOptions = Array.isArray(options) ? options : [];
-  const filtered = safeOptions.filter(o => String(o).toLowerCase().includes(searchTerm.toLowerCase()));
+  if (!isOpen) return null;
 
-  useEffect(() => {
-    if (onSearchChange) onSearchChange(searchTerm);
-  }, [searchTerm, onSearchChange]);
-
-  const handleCustomSelect = () => {
-    if (customValue.trim()) onSelect(customValue);
-  };
+  const filtered = data.filter(o => {
+    const name = o.name || o;
+    return String(name).toLowerCase().includes(searchTerm.toLowerCase());
+  });
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[120] flex items-center justify-center p-4 animate-fade-in">
       <div className="bg-white rounded-3xl w-full max-w-2xl h-[80vh] flex flex-col shadow-2xl">
         <div className="p-6 border-b border-slate-100 flex justify-between items-center">
           <h3 className="text-xl font-bold text-slate-800">{title}</h3>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full"><X className="w-6 h-6 text-slate-400" /></button>
         </div>
 
-        {!isCustom ? (
+        {!isAddingCustom ? (
           <>
             <div className="p-4 bg-slate-50 border-b border-slate-100">
-              <div className="relative">
-                <Search className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  className="w-full pl-12 p-3 rounded-xl border border-slate-200 outline-none focus:border-emerald-500 bg-white"
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                  autoFocus
-                />
-              </div>
+              <input
+                type="text"
+                placeholder="Search..."
+                className="w-full p-3 rounded-xl border border-slate-200 outline-none focus:border-emerald-500 bg-white"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                autoFocus
+              />
             </div>
             <div className="flex-1 overflow-y-auto p-4">
               {isLoading ? (
-                <div className="text-center py-10 text-slate-400 flex flex-col items-center gap-2">
-                  <Clock className="w-6 h-6 animate-spin text-slate-300" />
-                  <span>Loading options...</span>
-                </div>
+                <div className="text-center py-10 animate-pulse text-slate-400 font-bold">Loading options...</div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {filtered.map(opt => (
-                    <button
-                      key={opt}
-                      onClick={() => onSelect(opt)}
-                      className={`p-4 rounded-xl text-left font-bold transition-all flex items-center justify-between group ${selectedValue === opt ? 'bg-emerald-50 border-2 border-emerald-500 text-emerald-700' : 'bg-white border border-slate-200 hover:border-slate-300 hover:shadow-md'}`}
-                    >
-                      <span className="truncate">{opt}</span>
-                      {selectedValue === opt && <Check className="w-5 h-5" />}
-                    </button>
-                  ))}
+                  {filtered.map((opt, i) => {
+                    const name = opt.name || opt;
+                    const val = opt.code || name;
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => onSelect(opt)}
+                        className={`p-4 rounded-xl text-left font-bold border transition-all flex items-center justify-between group ${selectedValue === name ? 'bg-emerald-50 border-emerald-500 text-emerald-700' : 'bg-white border-slate-200 hover:border-slate-300'}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          {opt.flag && opt.flag}
+                          <span className="truncate">{name}</span>
+                        </div>
+                        {selectedValue === name && <Check className="w-5 h-5" />}
+                      </button>
+                    );
+                  })}
                   {allowCustom && (
-                    <button
-                      onClick={() => setIsCustom(true)}
-                      className="p-4 rounded-xl text-left font-bold border-2 border-dashed border-slate-300 text-slate-400 hover:border-emerald-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all flex items-center justify-center gap-2"
-                    >
-                      <Plus className="w-5 h-5" /> Other (Add New)
+                    <button onClick={() => setIsAddingCustom(true)} className="p-4 rounded-xl border-2 border-dashed border-slate-300 text-slate-400 font-bold hover:bg-emerald-50 hover:text-emerald-600 transition-all flex items-center justify-center gap-2">
+                      <Plus className="w-5 h-5" /> Add Other
                     </button>
                   )}
                 </div>
@@ -215,19 +164,18 @@ const SelectionModal = ({ title, options = [], onClose, onSelect, selectedValue,
             </div>
           </>
         ) : (
-          <div className="flex-1 p-8 flex flex-col justify-center">
-            <h4 className="text-lg font-bold text-slate-700 mb-4 text-center">Enter Custom Value</h4>
+          <div className="flex-1 p-10 flex flex-col justify-center">
+            <h4 className="text-lg font-bold text-slate-700 mb-4 text-center">Custom Value</h4>
             <input
               type="text"
-              className="w-full p-4 text-xl font-bold border-2 border-slate-200 rounded-2xl outline-none focus:border-emerald-500 mb-6 text-center"
-              placeholder={`Type ${title}...`}
+              className="w-full p-4 text-2xl font-bold border-2 border-slate-200 rounded-2xl outline-none focus:border-emerald-500 text-center mb-8"
               value={customValue}
               onChange={e => setCustomValue(e.target.value)}
-              autoFocus
+              placeholder="Type here..."
             />
             <div className="flex gap-4">
-              <Button variant="secondary" onClick={() => setIsCustom(false)} className="flex-1 justify-center">Back</Button>
-              <Button onClick={handleCustomSelect} disabled={!customValue} className="flex-1 justify-center">Confirm</Button>
+              <Button variant="secondary" onClick={() => setIsAddingCustom(false)} className="flex-1 justify-center">Back</Button>
+              <Button onClick={() => onSelect(customValue)} className="flex-1 justify-center">Confirm</Button>
             </div>
           </div>
         )}
@@ -236,429 +184,335 @@ const SelectionModal = ({ title, options = [], onClose, onSelect, selectedValue,
   );
 };
 
-// 3. Multi-Select Modal
+// --- MODAL: MULTI-SELECT (Job Titles) ---
 const MultiSelectModal = ({ options, onClose, onConfirm, selectedValues = [] }) => {
   const [selected, setSelected] = useState(selectedValues);
   const [searchTerm, setSearchTerm] = useState('');
   const [customJob, setCustomJob] = useState('');
 
-  const filtered = options.filter(o => o.toLowerCase().includes(searchTerm.toLowerCase()));
-
   const toggle = (val) => {
-    if (selected.includes(val)) {
-      setSelected(selected.filter(s => s !== val));
-    } else {
-      if (selected.length >= 3) {
-        alert("You can select up to 3 occupations.");
-        return;
-      }
-      setSelected([...selected, val]);
-    }
+    if (selected.includes(val)) setSelected(selected.filter(s => s !== val));
+    else if (selected.length < 3) setSelected([...selected, val]);
+    else alert("Max 3 occupations.");
   };
 
-  const addCustom = () => {
-    if (customJob && !selected.includes(customJob)) {
-      if (selected.length >= 3) {
-        alert("You can select up to 3 occupations.");
-        return;
-      }
-      setSelected([...selected, customJob]);
-      setCustomJob('');
+  const handleAddCustom = () => {
+    if (customJob.trim() && !selected.includes(customJob)) {
+      if (selected.length < 3) { toggle(customJob.trim()); setCustomJob(''); }
+      else alert("Max 3 occupations.");
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
-      <div className="bg-white rounded-3xl w-full max-w-2xl h-[80vh] flex flex-col shadow-2xl">
-        <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-          <h3 className="text-xl font-bold text-slate-800">Select Occupations (Max 3)</h3>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full"><X className="w-6 h-6 text-slate-400" /></button>
-        </div>
-        <div className="p-4 bg-slate-50 border-b border-slate-100 space-y-3">
-          <input
-            type="text"
-            placeholder="Search jobs..."
-            className="w-full p-3 rounded-xl border border-slate-200 outline-none focus:border-emerald-500"
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-          />
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[120] flex items-center justify-center p-4">
+      <div className="bg-white rounded-[32px] w-full max-w-2xl h-[80vh] flex flex-col shadow-2xl overflow-hidden">
+        <div className="p-6 border-b flex justify-between items-center"><h3 className="text-xl font-bold">Occupations (Max 3)</h3><button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full"><X className="w-6 h-6" /></button></div>
+        <div className="p-4 bg-slate-50 border-b space-y-3">
+          <input type="text" placeholder="Search standard jobs..." className="w-full p-3 rounded-xl border outline-none focus:border-emerald-500" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           <div className="flex gap-2">
-            <input
-              type="text"
-              placeholder="Type custom job..."
-              className="flex-1 p-2 rounded-lg border border-slate-200 text-sm"
-              value={customJob}
-              onChange={e => setCustomJob(e.target.value)}
-            />
-            <button onClick={addCustom} disabled={!customJob} className="bg-slate-900 text-white px-4 rounded-lg text-sm font-bold disabled:opacity-50">Add</button>
+            <input type="text" placeholder="Add custom job title..." className="flex-1 p-3 rounded-xl border text-sm outline-none focus:border-emerald-500" value={customJob} onChange={e => setCustomJob(e.target.value)} />
+            <button onClick={handleAddCustom} className="bg-slate-900 text-white px-6 rounded-xl font-bold text-sm">Add</button>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto p-4 grid grid-cols-1 sm:grid-cols-2 gap-2 content-start">
+        <div className="flex-1 overflow-y-auto p-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
           {selected.filter(s => !options.includes(s)).map(job => (
-            <button key={job} onClick={() => toggle(job)} className="p-3 rounded-xl text-left font-bold bg-emerald-50 border-2 border-emerald-500 text-emerald-700 flex justify-between items-center">
-              {job} <Check className="w-4 h-4" />
-            </button>
+            <button key={job} onClick={() => toggle(job)} className="p-3 rounded-xl text-left font-bold bg-emerald-50 border-2 border-emerald-500 text-emerald-700 flex justify-between items-center">{job} <Check className="w-4 h-4" /></button>
           ))}
-          {filtered.map(job => (
-            <button
-              key={job}
-              onClick={() => toggle(job)}
-              className={`p-3 rounded-xl text-left font-bold transition-all flex justify-between items-center ${selected.includes(job) ? 'bg-emerald-50 border-2 border-emerald-500 text-emerald-700' : 'bg-white border border-slate-200 hover:bg-slate-50'}`}
-            >
-              {job}
-              {selected.includes(job) && <Check className="w-4 h-4" />}
-            </button>
+          {options.filter(o => o.toLowerCase().includes(searchTerm.toLowerCase())).map(job => (
+            <button key={job} onClick={() => toggle(job)} className={`p-3 rounded-xl text-left font-bold border transition-all flex justify-between items-center ${selected.includes(job) ? 'bg-emerald-50 border-emerald-500 text-emerald-700' : 'bg-white border-slate-200 hover:bg-slate-50'}`}>{job} {selected.includes(job) && <Check className="w-4 h-4" />}</button>
           ))}
         </div>
-        <div className="p-4 border-t border-slate-100">
-          <Button onClick={() => onConfirm(selected)} className="w-full justify-center">Done ({selected.length})</Button>
-        </div>
+        <div className="p-4 border-t"><Button onClick={() => onConfirm(selected)} className="w-full justify-center">Confirm Selection</Button></div>
       </div>
     </div>
   );
 };
 
-// 4. Category Editor Modal
-const CategoryEditorModal = ({ category, onSave, onClose }) => {
-  const [data, setData] = useState({ ...category });
-
+// --- MODAL: DATE PICKER ---
+const DatePickerModal = ({ isOpen, onClose, value, onSave }) => {
+  const [step, setStep] = useState('year');
+  const [selectedYear, setSelectedYear] = useState(null);
+  const [selectedMonth, setSelectedMonth] = useState(null);
+  if (!isOpen) return null;
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 100 }, (_, i) => currentYear - i);
+  const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const handleSelectYear = (y) => { setSelectedYear(y); setStep('month'); };
+  const handleSelectMonth = (i) => { setSelectedMonth(i); setStep('day'); };
+  const handleSelectDay = (d) => {
+    const newDate = new Date(Date.UTC(selectedYear, selectedMonth, d));
+    onSave(newDate.toISOString().split('T')[0]);
+    setStep('year'); onClose();
+  };
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
-      <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl">
-        <h3 className="text-xl font-bold text-slate-800 mb-4">{category.id ? 'Edit Category' : 'New Category'}</h3>
-
-        <label className="text-xs font-bold text-slate-400 uppercase">Name</label>
-        <input
-          type="text"
-          value={data.name}
-          onChange={e => setData({ ...data, name: e.target.value })}
-          className="w-full p-3 border border-slate-200 rounded-xl mb-4 font-bold text-slate-700 outline-none focus:border-emerald-500"
-        />
-
-        <label className="text-xs font-bold text-slate-400 uppercase">Color</label>
-        <div className="flex gap-2 flex-wrap mb-4">
-          {['#f97316', '#10b981', '#3b82f6', '#8b5cf6', '#eab308', '#ef4444', '#ec4899', '#6366f1', '#0ea5e9'].map(c => (
-            <button
-              key={c}
-              onClick={() => setData({ ...data, color: c })}
-              className={`w-8 h-8 rounded-full border-2 ${data.color === c ? 'border-slate-800 scale-110' : 'border-transparent'}`}
-              style={{ backgroundColor: c }}
-            />
-          ))}
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[130] flex items-center justify-center p-4">
+      <div className="bg-white w-full max-w-lg rounded-[32px] overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+        <div className="p-6 border-b flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            {step !== 'year' && <button onClick={() => setStep(step === 'day' ? 'month' : 'year')} className="p-2 border rounded-full"><ChevronLeft className="w-4 h-4" /></button>}
+            <h3 className="font-bold uppercase tracking-tight">{step}</h3>
+          </div>
+          <button onClick={onClose}><X /></button>
         </div>
-
-        <label className="text-xs font-bold text-slate-400 uppercase">Icon</label>
-        <div className="grid grid-cols-5 gap-2 mb-6 h-32 overflow-y-auto p-1">
-          {ICON_OPTIONS.map(icon => (
-            <button
-              key={icon}
-              onClick={() => setData({ ...data, icon })}
-              className={`p-2 rounded-lg flex items-center justify-center border ${data.icon === icon ? 'bg-slate-100 border-slate-800' : 'border-transparent hover:bg-slate-50'}`}
-            >
-              <CategoryIcon iconName={icon} className="w-5 h-5 text-slate-600" />
-            </button>
-          ))}
-        </div>
-
-        <div className="flex gap-3">
-          <Button variant="secondary" onClick={onClose} className="flex-1 justify-center">Cancel</Button>
-          <Button onClick={() => onSave(data)} disabled={!data.name} className="flex-1 justify-center">Save</Button>
+        <div className="flex-1 overflow-y-auto p-6">
+          {step === 'year' && <div className="grid grid-cols-4 gap-2">{years.map(y => <button key={y} onClick={() => handleSelectYear(y)} className="p-3 border rounded-xl hover:bg-emerald-50">{y}</button>)}</div>}
+          {step === 'month' && <div className="grid grid-cols-2 gap-2">{months.map((m, i) => <button key={m} onClick={() => handleSelectMonth(i)} className="p-4 border rounded-xl hover:bg-emerald-50">{m}</button>)}</div>}
+          {step === 'day' && <div className="grid grid-cols-5 gap-2">{Array.from({ length: new Date(selectedYear, selectedMonth + 1, 0).getDate() }, (_, i) => i + 1).map(d => <button key={d} onClick={() => handleSelectDay(d)} className="p-3 border rounded-xl hover:bg-emerald-50">{d}</button>)}</div>}
         </div>
       </div>
     </div>
   );
 };
 
-// --- MAIN SETTINGS COMPONENT ---
+// --- MAIN COMPONENT ---
 export const SettingsNode = ({ userId }) => {
   const [profile, setProfile] = useState({
     name: '', birthdate: '1995-01-01', occupations: [], status: '',
-    country: '', city: '', university: '', isStudent: false, preferredCurrency: 'ILS'
+    country: '', city: '', university: '', isStudent: false, preferredCurrency: 'ILS', workplaces: []
   });
   const [customCategories, setCustomCategories] = useState([]);
   const [history, setHistory] = useState([]);
-
-  // UI State
   const [isLoading, setIsLoading] = useState(false);
   const [msg, setMsg] = useState(null);
   const [activeTab, setActiveTab] = useState('profile');
 
-  // Modals
-  const [modalConfig, setModalConfig] = useState(null);
-  const [catModal, setCatModal] = useState(null);
+  // Modal Control
+  const [modalType, setModalType] = useState(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showWorkplacePicker, setShowWorkplacePicker] = useState(null);
+  const [catModal, setCatModal] = useState(null);
 
-  // API Data
-  const [countriesList, setCountriesList] = useState([]);
-  const [citiesList, setCitiesList] = useState([]);
-  const [universitiesList, setUniversitiesList] = useState([]);
+  // API Data Lists
+  const [countries, setCountries] = useState([]);
+  const [cities, setCities] = useState([]);
+  const [universities, setUniversities] = useState([]);
   const [isApiLoading, setIsApiLoading] = useState(false);
 
   useEffect(() => {
     const init = async () => {
       if (!userId) return;
-
       const snap = await getDoc(doc(db, 'users', userId));
       if (snap.exists()) {
         const data = snap.data();
-        let occArray = data.occupations || [];
-        if (!occArray.length && data.occupation) occArray = [data.occupation];
-        setProfile(prev => ({ ...prev, ...data, occupations: occArray }));
+        const baseProfile = data.profile || data; // Handle both structures
+        setProfile(prev => ({
+          ...prev,
+          ...baseProfile,
+          occupations: baseProfile.occupations || baseProfile.occupation || [],
+          workplaces: baseProfile.workplaces || []
+        }));
         setCustomCategories(data.customCategories || []);
       }
 
-      const q = query(collection(db, 'users', userId, 'history'), orderBy('timestamp', 'desc'), limit(20));
-      const historySnap = await getDocs(q);
-      setHistory(historySnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      // Load History
+      const q = query(collection(db, 'users', userId, 'history'), orderBy('timestamp', 'desc'), limit(15));
+      const hSnap = await getDocs(q);
+      setHistory(hSnap.docs.map(d => ({ id: d.id, ...d.data() })));
 
       // Fetch Countries
-      try {
-        const res = await fetch("https://restcountries.com/v3.1/all?fields=name");
-        const data = await res.json();
-        const sorted = data.map(c => c.name.common).sort();
-        setCountriesList(sorted);
-      } catch (e) { console.error("Countries API failed", e); }
+      fetch('https://restcountries.com/v3.1/all?fields=name,cca2,flags')
+        .then(res => res.json())
+        .then(data => {
+          const formatted = data.map(c => ({
+            name: c.name.common,
+            code: c.cca2,
+            flag: c.flags.svg ? <img src={c.flags.svg} className="w-6 h-4 object-cover" /> : null
+          })).sort((a, b) => a.name.localeCompare(b.name));
+          setCountries(formatted);
+        });
     };
     init();
   }, [userId]);
 
-  // Fetch Cities & Universities when Country changes
-  useEffect(() => {
-    if (!profile.country) return;
-
-    setCitiesList([]);
-    setUniversitiesList([]);
+  const fetchCities = async (countryName) => {
+    if (!countryName) return;
+    setModalType('city');
     setIsApiLoading(true);
-
-    const fetchCities = async () => {
-      try {
-        const res = await fetch("https://countriesnow.space/api/v0.1/countries/cities", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ country: profile.country })
-        });
-        const data = await res.json();
-        if (!data.error) setCitiesList(data.data);
-        else setCitiesList(['Tel Aviv', 'Jerusalem', 'Haifa', 'New York', 'London', 'Paris', 'Other']);
-      } catch (e) {
-        setCitiesList(['Tel Aviv', 'Jerusalem', 'Haifa', 'New York', 'London', 'Paris', 'Other']);
-      }
-    };
-
-    const fetchUniversities = async () => {
-      try {
-        // Raw GitHub JSON (Super Fast)
-        const res = await fetch("https://raw.githubusercontent.com/Hipo/university-domains-list/master/world_universities_and_domains.json");
-        const data = await res.json();
-        const filtered = data
-          .filter(u => u.country.toLowerCase() === profile.country.toLowerCase())
-          .map(u => u.name)
-          .sort();
-        setUniversitiesList(filtered.length ? filtered : ['Other']);
-      } catch (e) {
-        setUniversitiesList(['Other']);
-      }
-    };
-
-    Promise.allSettled([fetchCities(), fetchUniversities()])
-      .then(() => setIsApiLoading(false));
-
-  }, [profile.country]);
-
-  const calculateAge = (birthdate) => {
-    if (!birthdate) return 0;
-    const today = new Date();
-    const birthDate = new Date(birthdate);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
-    return age;
+    try {
+      const response = await fetch("https://countriesnow.space/api/v0.1/countries/cities", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ country: countryName })
+      });
+      const data = await response.json();
+      setCities(!data.error ? data.data : ['No cities found', 'Other']);
+    } catch (err) { setCities(['Error fetching', 'Other']); } finally { setIsApiLoading(false); }
   };
 
-  const handleSaveProfile = async () => {
+  const fetchUniversities = (country) => {
+    if (!country) return;
+    setModalType('university');
+    setIsApiLoading(true);
+    fetch("https://raw.githubusercontent.com/Hipo/university-domains-list/master/world_universities_and_domains.json")
+      .then(res => res.json())
+      .then(data => {
+        const filtered = data.filter(u => u.country.toLowerCase() === country.toLowerCase()).map(u => u.name).sort();
+        setUniversities(filtered.length ? filtered : ['Other']);
+      }).finally(() => setIsApiLoading(false));
+  };
+
+  const handleSaveProfile = async (newProfile) => {
+    const p = newProfile || profile;
+    setProfile(p);
     setIsLoading(true);
     try {
-      const age = calculateAge(profile.birthdate);
-      await setDoc(doc(db, 'users', userId), { ...profile, age, customCategories }, { merge: true });
+      await setDoc(doc(db, 'users', userId), {
+        profile: p,
+        // Support top-level sync for older components
+        occupations: p.occupations,
+        workplaces: p.workplaces,
+        country: p.country,
+        city: p.city
+      }, { merge: true });
       await logUserAction(userId, 'PROFILE_UPDATE', 'Updated settings');
       setMsg("Saved Successfully!");
       setTimeout(() => setMsg(null), 3000);
-    } catch (e) { setMsg("Error saving."); }
-    finally { setIsLoading(false); }
+    } catch (e) { setMsg("Error."); } finally { setIsLoading(false); }
   };
 
-  // --- Category Handlers (with Instant Save) ---
-  const handleAddCategory = () => setCatModal({ name: '', color: '#10b981', icon: 'Star', id: null });
-  const handleEditCategory = (cat) => setCatModal({ ...cat });
-
-  const saveCategory = async (catData) => {
-    let updated;
-    if (catData.id) {
-      updated = customCategories.map(c => c.id === catData.id ? catData : c);
-    } else {
-      const newId = catData.name.toLowerCase().replace(/\s+/g, '_') + '_' + Date.now();
-      updated = [...customCategories, { ...catData, id: newId }];
-    }
-    setCustomCategories(updated);
-    setCatModal(null);
-    // Persist Immediately
-    await setDoc(doc(db, 'users', userId), { customCategories: updated }, { merge: true });
-    await logUserAction(userId, 'CATEGORY_UPDATE', `Updated/Added category ${catData.name}`);
+  const handleOccupationConfirm = (selected) => {
+    const last = selected.find(occ => !profile.occupations.includes(occ));
+    const newP = { ...profile, occupations: selected };
+    handleSaveProfile(newP);
+    setModalType(null);
+    if (last) setShowWorkplacePicker(last);
   };
 
-  const deleteCategory = async (id) => {
-    if (confirm('Delete this category?')) {
-      const updated = customCategories.filter(c => c.id !== id);
-      setCustomCategories(updated);
-      // Persist Immediately
-      await setDoc(doc(db, 'users', userId), { customCategories: updated }, { merge: true });
-      await logUserAction(userId, 'CATEGORY_DELETE', 'Deleted custom category');
-    }
+  const addWorkplace = (company) => {
+    const newW = [...profile.workplaces, { ...company, linkedOccupation: showWorkplacePicker }];
+    handleSaveProfile({ ...profile, workplaces: newW });
+    setShowWorkplacePicker(null);
   };
-
-  const allCategories = [...DEFAULT_CATEGORIES, ...customCategories];
-  const formatDate = (ts) => ts ? new Date(ts.seconds * 1000).toLocaleString() : '';
 
   return (
     <div className="p-6 max-w-4xl mx-auto animate-fade-in relative pb-20">
-      <div className="flex justify-center gap-2 mb-8 bg-slate-100 p-1 rounded-full w-fit mx-auto">
-        {['profile', 'categories', 'history'].map(tab => (
-          <button key={tab} onClick={() => setActiveTab(tab)} className={`px-6 py-2 rounded-full font-bold transition-all capitalize ${activeTab === tab ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>{tab}</button>
-        ))}
+
+      {/* 1. STICKY TOP HEADER */}
+      <div className="sticky top-0 z-40 bg-slate-50/90 backdrop-blur-md py-4 mb-8 -mx-6 px-6 border-b flex items-center justify-between">
+        <div className="flex bg-slate-100 p-1 rounded-full">
+          {['profile', 'categories', 'history'].map(tab => (
+            <button key={tab} onClick={() => setActiveTab(tab)} className={`px-6 py-1.5 rounded-full text-sm font-bold transition-all capitalize ${activeTab === tab ? 'bg-white shadow-sm' : 'text-slate-500'}`}>{tab}</button>
+          ))}
+        </div>
+        <div className="flex items-center gap-4">
+          {msg && <span className="text-emerald-600 font-bold text-sm animate-fade-in">{msg}</span>}
+          <Button onClick={() => handleSaveProfile()} disabled={isLoading} className="shadow-lg shadow-emerald-200/50 px-10">
+            {isLoading ? 'Saving...' : <><Save className="w-5 h-5 mr-2" /> Save Settings</>}
+          </Button>
+        </div>
       </div>
 
       {activeTab === 'profile' && (
-        <Card className="p-8">
-          <h2 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2"><User className="w-6 h-6 text-emerald-500" /> My Profile</h2>
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-bold text-slate-500 uppercase mb-2">Full Name</label>
-              <input type="text" value={profile.name} onChange={e => setProfile({ ...profile, name: e.target.value })} className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:border-emerald-500 font-medium" />
+        <div className="space-y-6">
+          <Card className="p-8">
+            <h2 className="text-2xl font-bold text-slate-800 mb-8 flex items-center gap-2"><User className="text-emerald-500" /> Identity</h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-6">
+                <div><label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Full Name</label><input type="text" value={profile.name} onChange={e => setProfile({ ...profile, name: e.target.value })} className="w-full p-3 border rounded-xl font-bold outline-none focus:border-emerald-500" /></div>
+                <div><label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Birthdate</label><button onClick={() => setShowDatePicker(true)} className="w-full p-4 border rounded-2xl flex justify-between items-center font-bold hover:bg-slate-50 transition-all">{profile.birthdate} <Calendar className="w-5 h-5 text-slate-400" /></button></div>
+                <div onClick={() => setModalType('status')} className="cursor-pointer"><label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Family Status</label><div className="w-full p-4 border rounded-xl bg-white font-bold flex justify-between items-center">{profile.status || "Select..."} <ChevronRight className="w-4 h-4 text-slate-300" /></div></div>
+              </div>
+
+              <div className="space-y-6">
+                <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Work & Career</label>
+                <button onClick={() => setModalType('occupation')} className="w-full p-4 border-2 border-dashed rounded-2xl text-slate-400 font-bold hover:border-emerald-400 hover:text-emerald-600 transition-all flex items-center justify-center gap-2"><Plus /> Add Title</button>
+                <div className="space-y-3">
+                  {profile.workplaces.map((w, i) => (
+                    <div key={i} className="flex items-center justify-between p-3 bg-white border rounded-2xl shadow-sm group">
+                      <div className="flex items-center gap-3">
+                        <LogoImage logo={w.logo} domain={w.domain} />
+                        <div><div className="text-sm font-black text-slate-700">{w.name}</div><div className="text-[10px] text-emerald-600 font-bold uppercase">{w.linkedOccupation}</div></div>
+                      </div>
+                      <button onClick={() => handleSaveProfile({ ...profile, workplaces: profile.workplaces.filter((_, idx) => idx !== i) })} className="p-2 opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-bold text-slate-500 uppercase mb-2">Birthdate</label>
-              <div onClick={() => setShowDatePicker(true)} className="w-full p-4 border border-slate-200 rounded-2xl bg-white flex justify-between items-center cursor-pointer hover:border-emerald-500 hover:shadow-md transition-all group">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-emerald-50 rounded-lg group-hover:bg-emerald-500 transition-colors">
-                    <Calendar className="w-5 h-5 text-emerald-600 group-hover:text-white" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-12 border-t pt-8">
+              <div onClick={() => setModalType('country')} className="cursor-pointer group">
+                <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Country</label>
+                <div className="w-full p-4 border rounded-xl bg-white font-bold group-hover:border-emerald-50 flex justify-between items-center transition-all">{profile.country || "Select..."} <Globe className="text-slate-300" /></div>
+              </div>
+              <div onClick={() => { if (!profile.country) return alert("Select country first"); fetchCities(profile.country); }} className={`cursor-pointer group ${!profile.country && 'opacity-50 pointer-events-none'}`}>
+                <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">City</label>
+                <div className="w-full p-4 border rounded-xl bg-white font-bold group-hover:border-emerald-50 flex justify-between items-center transition-all">{profile.city || "Select..."} <MapPin className="text-slate-300" /></div>
+              </div>
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 md:col-span-2">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <GraduationCap className={profile.isStudent ? 'text-blue-500' : 'text-slate-300'} />
+                    <label htmlFor="isStudent" className="font-bold text-slate-700 cursor-pointer">I am a Student</label>
                   </div>
-                  <span className="font-black text-slate-700 text-lg tracking-tight">{profile.birthdate}</span>
+                  <input type="checkbox" id="isStudent" checked={profile.isStudent} onChange={e => handleSaveProfile({ ...profile, isStudent: e.target.checked })} className="w-5 h-5 rounded text-emerald-600" />
                 </div>
-                <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-emerald-500 transition-colors" />
-              </div>
-              <div className="mt-2 text-right text-sm text-slate-400 font-medium italic">Age: <span className="text-emerald-600 font-black not-italic">{calculateAge(profile.birthdate)}</span> years old</div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div onClick={() => setModalConfig({ type: 'multi', title: 'Select Occupations', options: OCCUPATIONS_LIST, field: 'occupations' })} className="cursor-pointer">
-                <label className="block text-sm font-bold text-slate-500 uppercase mb-2 flex items-center gap-2"><Briefcase className="w-4 h-4" /> Occupations</label>
-                <div className="w-full p-3 border border-slate-200 rounded-xl bg-white font-medium hover:border-emerald-500 transition-colors min-h-[50px] flex flex-wrap gap-2">
-                  {profile.occupations.length > 0 ? profile.occupations.map(job => (
-                    <span key={job} className="bg-slate-100 text-slate-700 px-2 py-1 rounded-lg text-xs font-bold">{job}</span>
-                  )) : <span className="text-slate-300">Select...</span>}
-                </div>
-              </div>
-
-              <div onClick={() => setModalConfig({ type: 'single', title: 'Select Status', options: STATUS_LIST, field: 'status' })} className="cursor-pointer">
-                <label className="block text-sm font-bold text-slate-500 uppercase mb-2 flex items-center gap-2"><Heart className="w-4 h-4" /> Family Status</label>
-                <div className="w-full p-3 border border-slate-200 rounded-xl bg-white font-medium flex justify-between items-center hover:border-emerald-500 transition-colors">
-                  {profile.status || <span className="text-slate-300">Select...</span>}
-                  <ChevronRight className="w-4 h-4 text-slate-400" />
-                </div>
+                {profile.isStudent && (
+                  <div onClick={() => { if (!profile.country) return alert("Select country first"); fetchUniversities(profile.country); }} className="cursor-pointer p-4 bg-white border rounded-xl font-bold flex justify-between items-center">
+                    {profile.university || 'Select University...'} <ChevronRight className="text-slate-300" />
+                  </div>
+                )}
               </div>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div onClick={() => setModalConfig({ type: 'single', title: 'Select Country', options: countriesList, field: 'country' })} className="cursor-pointer">
-                <label className="block text-sm font-bold text-slate-500 uppercase mb-2 flex items-center gap-2"><Globe className="w-4 h-4" /> Country</label>
-                <div className="w-full p-3 border border-slate-200 rounded-xl bg-white font-medium hover:border-emerald-500 transition-colors truncate">{profile.country || 'Select...'}</div>
-              </div>
-              <div onClick={() => setModalConfig({ type: 'single', title: 'Select City', options: citiesList, field: 'city', isLoading: isApiLoading })} className={`cursor-pointer ${!profile.country && 'opacity-50 pointer-events-none'}`}>
-                <label className="block text-sm font-bold text-slate-500 uppercase mb-2 flex items-center gap-2"><MapPin className="w-4 h-4" /> City</label>
-                <div className="w-full p-3 border border-slate-200 rounded-xl bg-white font-medium hover:border-emerald-500 transition-colors truncate">{profile.city || 'Select...'}</div>
-              </div>
-            </div>
-
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-              <div className="flex items-center gap-3 mb-4">
-                <input type="checkbox" id="isStudent" checked={profile.isStudent} onChange={e => setProfile({ ...profile, isStudent: e.target.checked })} className="w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
-                <label htmlFor="isStudent" className="font-bold text-slate-700 cursor-pointer select-none">I am a Student</label>
-              </div>
-              {profile.isStudent && (
-                <div onClick={() => setModalConfig({ type: 'single', title: 'Select University', options: universitiesList, field: 'university', isLoading: isApiLoading })} className="cursor-pointer animate-fade-in">
-                  <label className="block text-sm font-bold text-slate-500 uppercase mb-2 flex items-center gap-2"><GraduationCap className="w-4 h-4" /> University</label>
-                  <div className="w-full p-3 border border-slate-200 rounded-xl bg-white font-medium hover:border-emerald-500 transition-colors truncate">{profile.university || 'Select...'}</div>
-                </div>
-              )}
-            </div>
-
-            <div className="pt-6 border-t border-slate-100 flex items-center justify-between">
-              <span className="text-emerald-600 font-bold animate-pulse">{msg}</span>
-              <Button onClick={handleSaveProfile} disabled={isLoading}>{isLoading ? 'Saving...' : <><Save className="w-4 h-4" /> Save Changes</>}</Button>
-            </div>
-          </div>
-        </Card>
+          </Card>
+        </div>
       )}
+
+      {/* MODALS */}
+      <SelectionModal isOpen={modalType === 'country'} title="Select Country" data={countries} selectedValue={profile.country} onSelect={(c) => { const name = c.name || c; handleSaveProfile({ ...profile, country: name, city: '' }); setModalType(null); }} onClose={() => setModalType(null)} />
+      <SelectionModal isOpen={modalType === 'city'} title={`Cities in ${profile.country}`} data={cities} isLoading={isApiLoading} selectedValue={profile.city} allowCustom={true} onSelect={(c) => { handleSaveProfile({ ...profile, city: c }); setModalType(null); }} onClose={() => setModalType(null)} />
+      <SelectionModal isOpen={modalType === 'university'} title={`Universities in ${profile.country}`} data={universities} isLoading={isApiLoading} selectedValue={profile.university} allowCustom={true} onSelect={(u) => { handleSaveProfile({ ...profile, university: u }); setModalType(null); }} onClose={() => setModalType(null)} />
+      <SelectionModal isOpen={modalType === 'status'} title="Select Status" data={STATUS_LIST} selectedValue={profile.status} onSelect={(s) => { handleSaveProfile({ ...profile, status: s }); setModalType(null); }} onClose={() => setModalType(null)} />
+      {modalType === 'occupation' && <MultiSelectModal options={OCCUPATIONS_LIST} selectedValues={profile.occupations} onClose={() => setModalType(null)} onConfirm={handleOccupationConfirm} />}
+
+      <WorkplacePickerModal isOpen={!!showWorkplacePicker} occupationName={showWorkplacePicker} onClose={() => setShowWorkplacePicker(null)} onSelect={addWorkplace} />
+      <DatePickerModal isOpen={showDatePicker} onClose={() => setShowDatePicker(false)} onSave={(v) => handleSaveProfile({ ...profile, birthdate: v })} />
 
       {activeTab === 'categories' && (
         <Card className="p-8">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2"><Grid className="w-6 h-6 text-purple-500" /> Manage Categories</h2>
-            <Button onClick={handleAddCategory} className="px-4 py-2 text-sm"><Plus className="w-4 h-4" /> New</Button>
+            <h2 className="text-2xl font-bold">Categories</h2>
+            <Button onClick={() => setCatModal({ name: '', color: '#10b981', icon: 'Star', id: null })}><Plus className="w-4 h-4 mr-2" /> New</Button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-            {allCategories.map(cat => {
-              const isCustom = customCategories.some(c => c.id === cat.id);
-              return (
-                <div key={cat.id} className="p-3 rounded-xl border border-slate-100 flex items-center justify-between bg-white shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-white shadow-sm" style={{ backgroundColor: cat.color }}>
-                      <CategoryIcon iconName={cat.icon} className="w-4 h-4" color="white" />
-                    </div>
-                    <span className="font-bold text-slate-700 text-sm">{cat.name}</span>
-                  </div>
-                  {isCustom && (
-                    <div className="flex gap-1">
-                      <button onClick={() => handleEditCategory(cat)} className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg"><Edit3 className="w-4 h-4" /></button>
-                      <button onClick={() => deleteCategory(cat.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
-                    </div>
-                  )}
+            {[...DEFAULT_CATEGORIES, ...customCategories].map(cat => (
+              <div key={cat.id} className="p-4 rounded-2xl border flex items-center justify-between bg-white shadow-sm hover:shadow-md transition-all">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white" style={{ backgroundColor: cat.color }}><CategoryIcon iconName={cat.icon} className="w-5 h-5" color="white" /></div>
+                  <span className="font-bold">{cat.name}</span>
                 </div>
-              );
-            })}
-          </div>
-        </Card>
-      )}
-
-      {activeTab === 'history' && (
-        <Card className="p-8">
-          <h2 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2"><History className="w-6 h-6 text-blue-500" /> Activity History</h2>
-          <div className="space-y-4">
-            {history.length === 0 ? <div className="text-center text-slate-400 py-8">No recent activity.</div> : history.map(item => (
-              <div key={item.id} className="flex items-start gap-4 p-4 rounded-xl bg-slate-50 border border-slate-100">
-                <div className="bg-white p-2 rounded-full border border-slate-200"><Clock className="w-4 h-4 text-slate-400" /></div>
-                <div className="flex-1"><div className="font-bold text-slate-700 text-sm">{item.description}</div><div className="text-xs text-slate-400 mt-1 uppercase tracking-wide">{item.actionType}</div></div>
-                <div className="text-xs text-slate-400 font-medium whitespace-nowrap">{formatDate(item.timestamp)}</div>
+                {customCategories.some(c => c.id === cat.id) && (
+                  <button onClick={async () => {
+                    const updated = customCategories.filter(c => c.id !== cat.id);
+                    setCustomCategories(updated);
+                    await setDoc(doc(db, 'users', userId), { customCategories: updated }, { merge: true });
+                  }} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                )}
               </div>
             ))}
           </div>
         </Card>
       )}
 
-      {modalConfig && (
-        modalConfig.type === 'single'
-          ? <SelectionModal title={modalConfig.title} options={modalConfig.options} isLoading={modalConfig.isLoading} selectedValue={profile[modalConfig.field]} onClose={() => setModalConfig(null)} onSelect={(val) => { setProfile({ ...profile, [modalConfig.field]: val }); setModalConfig(null); }} />
-          : <MultiSelectModal title={modalConfig.title} options={modalConfig.options} selectedValues={profile[modalConfig.field]} onClose={() => setModalConfig(null)} onConfirm={(vals) => { setProfile({ ...profile, [modalConfig.field]: vals }); setModalConfig(null); }} />
+      {activeTab === 'history' && (
+        <Card className="p-8">
+          <h2 className="text-2xl font-bold mb-6">Activity History</h2>
+          <div className="space-y-3">
+            {history.map(item => (
+              <div key={item.id} className="p-4 rounded-2xl bg-slate-50 border flex items-center gap-4 hover:bg-white transition-all">
+                <Clock className="text-slate-400" />
+                <div><div className="font-bold">{item.description}</div><div className="text-[10px] uppercase text-slate-400 tracking-widest">{item.actionType}</div></div>
+              </div>
+            ))}
+          </div>
+        </Card>
       )}
-
-      {catModal && <CategoryEditorModal category={catModal} onClose={() => setCatModal(null)} onSave={saveCategory} />}
-      <DatePickerModal
-        isOpen={showDatePicker}
-        value={profile.birthdate}
-        onClose={() => setShowDatePicker(false)}
-        onSave={(val) => setProfile({ ...profile, birthdate: val })}
-      />
+      {catModal && <CategoryEditorModal category={catModal} onClose={() => setCatModal(null)} onSave={async (data) => {
+        let updated = data.id ? customCategories.map(c => c.id === data.id ? data : c) : [...customCategories, { ...data, id: Date.now().toString() }];
+        setCustomCategories(updated); setCatModal(null);
+        await setDoc(doc(db, 'users', userId), { customCategories: updated }, { merge: true });
+      }} />}
     </div>
   );
 };

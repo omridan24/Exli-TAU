@@ -1,5 +1,25 @@
-import React, { useState, useMemo } from 'react';
-import { Upload, ArrowRight, Sparkles, CheckCircle, Trash2, XCircle, Plus, X, FileText, ChevronLeft, ChevronRight, CreditCard, PenTool, Edit2, Check, ArrowUp, ArrowDown, Clock, RotateCcw } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import {
+  Upload,
+  ArrowRight,
+  Sparkles,
+  CheckCircle,
+  Trash2,
+  XCircle,
+  Plus,
+  X,
+  FileText,
+  ChevronLeft,
+  ChevronRight,
+  CreditCard,
+  PenTool,
+  Edit2,
+  Check,
+  ArrowUp,
+  ArrowDown,
+  Clock,
+  RotateCcw
+} from 'lucide-react';
 import { collection, addDoc, serverTimestamp, doc, setDoc } from 'firebase/firestore';
 import { db, CLOUD_RUN_URL, logUserAction } from '../../config/firebase.js';
 import { DEFAULT_CATEGORIES, CURRENCIES } from '../../config/constants.js';
@@ -28,6 +48,18 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
     currency: 'ILS',
     category: ''
   });
+
+  // Fixed: useEffect is now properly defined via the import above
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (isLoading) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isLoading]);
 
   const sortedCategories = categories;
 
@@ -243,7 +275,9 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
     const newCat = { id: newId, name: newCatName, color: randomColor, icon: 'Star' };
     const updated = [...categories, newCat];
     onUpdateCategories(updated);
-    await setDoc(doc(db, 'users', userId), { customCategories: updated.filter(c => !DEFAULT_CATEGORIES.find(dc => dc.id === c.id)) }, { merge: true });
+    await setDoc(doc(db, 'users', userId), {
+      customCategories: updated.filter(c => !DEFAULT_CATEGORIES.find(dc => dc.id === c.id))
+    }, { merge: true });
 
     logUserAction(userId, 'CATEGORY_CREATE', `Created category: ${newCatName}`);
     handleCategorize(newCatName);
@@ -277,7 +311,7 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
   const currentFileData = processedFiles[currentFileIndex];
 
   return (
-    <div className="p-6 max-w-4xl mx-auto animate-fade-in">
+    <div className="p-6 max-w-4xl mx-auto animate-fade-in min-h-[600px]">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2"><Upload className="w-6 h-6 text-emerald-600" /> Expense Manager</h2>
@@ -394,7 +428,6 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
             <button disabled={currentFileIndex === processedFiles.length - 1} onClick={() => setCurrentFileIndex(prev => prev + 1)} className="p-2 hover:bg-slate-100 rounded-full disabled:opacity-30 disabled:cursor-not-allowed"><ChevronRight className="w-6 h-6 text-slate-600" /></button>
           </div>
 
-          {/* RESTORED COLUMN HEADERS MAPPING */}
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             {['Date', 'Description', 'Amount', 'Category', 'Currency'].map((field) => (
               <div key={field}>
