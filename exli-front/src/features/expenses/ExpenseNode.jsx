@@ -1,29 +1,15 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import {
-  Upload,
-  ArrowRight,
-  Sparkles,
-  CheckCircle,
-  Trash2,
-  XCircle,
-  Plus,
-  X,
-  FileText,
-  ChevronLeft,
-  ChevronRight,
-  CreditCard,
-  PenTool,
-  Edit2,
-  Check,
-  ArrowUp,
-  ArrowDown,
-  Clock,
-  RotateCcw
-} from 'lucide-react';
+import { Upload } from 'lucide-react';
 import { collection, addDoc, serverTimestamp, doc, setDoc } from 'firebase/firestore';
 import { db, CLOUD_RUN_URL, logUserAction } from '../../config/firebase.js';
-import { DEFAULT_CATEGORIES, CURRENCIES } from '../../config/constants.js';
-import { Button, CategoryIcon } from '../../components/UI.jsx';
+import { DEFAULT_CATEGORIES } from '../../config/constants.js';
+
+import { ExpenseMonthSelector } from './components/ExpenseMonthSelector';
+import { ExpenseUpload } from './components/ExpenseUpload';
+import { ExpenseManualForm } from './components/ExpenseManualForm';
+import { ExpenseStepVerify } from './components/ExpenseStepVerify';
+import { ExpenseStepCategorize } from './components/ExpenseStepCategorize';
+import { ExpenseSuccess } from './components/ExpenseSuccess';
 
 export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, onComplete }) => {
   const [step, setStep] = useState(0);
@@ -49,7 +35,6 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
     category: ''
   });
 
-  // Fixed: useEffect is now properly defined via the import above
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (isLoading) {
@@ -322,209 +307,82 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
       </div>
 
       {step === 0 && !isManualMode && (
-        <div className="max-w-md mx-auto bg-white p-8 rounded-2xl shadow-sm border border-slate-100 text-center">
-          <h3 className="text-lg font-bold text-slate-800 mb-2">Select Expense Month</h3>
-          <input type="month" value={reportMonth} onChange={(e) => setReportMonth(e.target.value)} className="w-full p-3 border border-slate-300 rounded-xl text-center font-bold text-lg mb-6 outline-none" />
-          <Button onClick={() => setStep(1)} className="w-full justify-center">Continue &rarr;</Button>
-        </div>
+        <ExpenseMonthSelector
+          reportMonth={reportMonth}
+          setReportMonth={setReportMonth}
+          onContinue={() => setStep(1)}
+        />
       )}
 
       {step === 1 && !isManualMode && (
-        <div className="space-y-6">
-          <div className="flex gap-4">
-            <div className="flex-1 border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center hover:bg-slate-50 transition-colors relative flex flex-col items-center justify-center min-h-[200px]">
-              <input type="file" accept=".csv, .xls, .xlsx, .pdf" multiple onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-              <Upload className="w-12 h-12 text-slate-300 mb-4" />
-              <div className="font-bold text-lg text-slate-600">Drop files here or Click</div>
-              <p className="text-sm text-slate-400 mt-1">Up to 4 files (PDF, Excel, CSV)</p>
-            </div>
-            <div onClick={() => setIsManualMode(true)} className="w-1/3 border-2 border-slate-100 rounded-2xl p-8 text-center hover:bg-emerald-50 hover:border-emerald-200 transition-all cursor-pointer flex flex-col items-center justify-center gap-2 group">
-              <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
-                <PenTool className="w-6 h-6 text-slate-400 group-hover:text-emerald-600" />
-              </div>
-              <div className="font-bold text-slate-600 group-hover:text-emerald-700">Add Manually</div>
-            </div>
-          </div>
-          {files.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {files.map((f, i) => (
-                <div key={i} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-xl shadow-sm">
-                  <div className="flex items-center gap-3 overflow-hidden">
-                    <div className="w-10 h-10 bg-emerald-50 rounded-lg flex items-center justify-center text-emerald-600 shrink-0"><FileText className="w-5 h-5" /></div>
-                    <div className="min-w-0"><div className="font-bold text-slate-700 truncate text-sm">{f.name}</div><div className="text-xs text-slate-400">{(f.size / 1024).toFixed(0)} KB</div></div>
-                  </div>
-                  <button onClick={() => removeFile(i)} className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
-                </div>
-              ))}
-            </div>
-          )}
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl flex items-start gap-3 text-sm animate-fade-in text-left">
-              <XCircle className="w-5 h-5 shrink-0 mt-0.5" />
-              <div>
-                <div className="font-bold">Analysis Failed</div>
-                <div>{error}</div>
-                <div className="text-xs text-red-400 mt-1">Please try again or use manual entry.</div>
-              </div>
-            </div>
-          )}
-          <div className="flex justify-between items-center">
-            <Button variant="secondary" onClick={() => setStep(0)}>Back</Button>
-            <div className="flex items-center gap-4">
-              {processingTimeEstimate && (
-                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-400 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 animate-fade-in">
-                  <Clock className="w-3.5 h-3.5" />
-                  <span>Est. {processingTimeEstimate}</span>
-                </div>
-              )}
-              <Button onClick={handleUploadAndAnalyze} disabled={files.length === 0 || isLoading}>
-                {isLoading ? <><Sparkles className="w-4 h-4 animate-spin text-yellow-400" /> Analyzing {files.length} files...</> : <>Analyze Files <ArrowRight className="w-4 h-4" /></>}
-              </Button>
-            </div>
-          </div>
-        </div>
+        <ExpenseUpload
+          files={files}
+          onFileChange={handleFileChange}
+          onRemoveFile={removeFile}
+          onManualConfig={() => setIsManualMode(true)}
+          error={error}
+          onBack={() => setStep(0)}
+          processingTimeEstimate={processingTimeEstimate}
+          onAnalyze={handleUploadAndAnalyze}
+          isLoading={isLoading}
+        />
       )}
 
       {isManualMode && !isCreatingCat && (
-        <div className="max-w-lg mx-auto bg-white p-6 rounded-3xl shadow-xl border border-slate-100">
-          <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2"><PenTool className="w-5 h-5 text-emerald-500" /> New Transaction</h3>
-          <div className="space-y-4 mb-8">
-            <div>
-              <label className="text-xs font-bold text-slate-400 uppercase">Amount</label>
-              <div className="flex gap-2">
-                <input type="number" className="flex-1 p-3 border border-slate-200 rounded-xl text-2xl font-bold outline-none focus:border-emerald-500" placeholder="0.00" autoFocus value={manualData.amount} onChange={e => setManualData({ ...manualData, amount: e.target.value })} />
-                <select className="w-24 p-3 border border-slate-200 rounded-xl font-bold bg-slate-50 outline-none" value={manualData.currency} onChange={e => setManualData({ ...manualData, currency: e.target.value })}>
-                  {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-            </div>
-            <div><label className="text-xs font-bold text-slate-400 uppercase">Description</label><input type="text" className="w-full p-3 border border-slate-200 rounded-xl font-medium outline-none focus:border-emerald-500" placeholder="e.g. Lunch at Aroma" value={manualData.description} onChange={e => setManualData({ ...manualData, description: e.target.value })} /></div>
-            <div><label className="text-xs font-bold text-slate-400 uppercase">Date</label><input type="date" className="w-full p-3 border border-slate-200 rounded-xl font-medium outline-none" value={manualData.date} onChange={e => setManualData({ ...manualData, date: e.target.value })} /></div>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            {sortedCategories.map(cat => (
-              <button key={cat.id} onClick={() => handleCategorize(cat.name)} className="p-2 rounded-lg border border-slate-100 hover:border-emerald-500 hover:bg-emerald-50 transition-all flex flex-col items-center gap-1 group">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center bg-white border border-slate-100 shadow-sm group-hover:scale-110 transition-transform">
-                  <CategoryIcon iconName={cat.icon} color={cat.color} className="w-4 h-4" />
-                </div>
-                <span className="text-xs font-bold text-slate-600">{cat.name}</span>
-              </button>
-            ))}
-            <button onClick={() => setIsCreatingCat(true)} className="p-2 rounded-lg border border-dashed border-slate-300 hover:border-emerald-500 hover:bg-emerald-50 text-slate-400 hover:text-emerald-600"><Plus className="w-4 h-4 mx-auto" /></button>
-          </div>
-          <div className="mt-6 pt-6 border-t border-slate-100"><Button variant="secondary" onClick={() => setIsManualMode(false)} className="w-full justify-center">Cancel</Button></div>
-        </div>
+        <ExpenseManualForm
+          manualData={manualData}
+          setManualData={setManualData}
+          categories={sortedCategories}
+          onCategorize={handleCategorize}
+          onCreateCategory={() => setIsCreatingCat(true)}
+          onCancel={() => setIsManualMode(false)}
+        />
       )}
 
       {step === 2 && currentFileData && (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-            <button disabled={currentFileIndex === 0} onClick={() => setCurrentFileIndex(prev => prev - 1)} className="p-2 hover:bg-slate-100 rounded-full disabled:opacity-30 disabled:cursor-not-allowed"><ChevronLeft className="w-6 h-6 text-slate-600" /></button>
-            <div className="text-center">
-              <div className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Verifying File {currentFileIndex + 1} of {processedFiles.length}</div>
-              <div className="font-bold text-slate-800 flex items-center justify-center gap-2"><CreditCard className="w-4 h-4 text-emerald-500" /> {currentFileData.card_info}</div>
-              <div className="text-xs text-slate-400 truncate max-w-[200px] mx-auto">{currentFileData.filename}</div>
-            </div>
-            <button disabled={currentFileIndex === processedFiles.length - 1} onClick={() => setCurrentFileIndex(prev => prev + 1)} className="p-2 hover:bg-slate-100 rounded-full disabled:opacity-30 disabled:cursor-not-allowed"><ChevronRight className="w-6 h-6 text-slate-600" /></button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            {['Date', 'Description', 'Amount', 'Category', 'Currency'].map((field) => (
-              <div key={field}>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{field}</label>
-                <select className="w-full p-2 bg-white border border-slate-300 rounded-lg outline-none text-sm" onChange={(e) => updateMapping(field.toLowerCase(), e.target.value)} value={currentFileData.columnMapping[field.toLowerCase()] ?? ""}><option value="">Select Column...</option>{currentFileData.columns.map((header, idx) => (<option key={idx} value={idx}>{header}</option>))}</select>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-6 border rounded-xl overflow-hidden shadow-sm bg-white">
-            <div className="bg-slate-50 p-3 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">Preview: {currentFileData.card_info}</div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-white text-slate-500 font-bold text-xs border-b border-slate-100">
-                  <tr>{currentFileData.columns.map((h, i) => { const isSelected = Object.values(currentFileData.columnMapping).includes(i); const mappedField = Object.keys(currentFileData.columnMapping).find(key => currentFileData.columnMapping[key] === i); return (<th key={i} className={`p-3 whitespace-nowrap border-r border-slate-50 last:border-0 ${isSelected ? 'bg-blue-50 text-blue-700' : ''}`}>{h}{mappedField && <div className="mt-1 text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded-full inline-block">{mappedField}</div>}</th>); })}</tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {currentFileData.preview_data.map((row, rIdx) => (<tr key={rIdx} className="hover:bg-slate-50/50">{currentFileData.columns.map((_, cIdx) => { const isSelected = Object.values(currentFileData.columnMapping).includes(cIdx); return (<td key={cIdx} className={`p-3 whitespace-nowrap text-slate-700 border-r border-slate-50 last:border-0 ${isSelected ? 'bg-blue-50/30 font-medium text-blue-900' : ''}`}>{row[cIdx]}</td>) })}</tr>))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <div className="flex justify-between"><Button variant="secondary" onClick={() => setStep(1)}>Back</Button><Button onClick={startSorting}>Start Categorizing ({processedFiles.length} files) &rarr;</Button></div>
-        </div>
+        <ExpenseStepVerify
+          currentFileIndex={currentFileIndex}
+          totalFiles={processedFiles.length}
+          fileData={currentFileData}
+          onPrevFile={() => setCurrentFileIndex(prev => prev - 1)}
+          onNextFile={() => setCurrentFileIndex(prev => prev + 1)}
+          onUpdateMapping={updateMapping}
+          onBack={() => setStep(1)}
+          onStartCategorizing={startSorting}
+        />
       )}
 
       {(step === 3 || (isManualMode && isCreatingCat)) && (
-        <div className="max-w-2xl mx-auto">
-          {isCreatingCat ? (
-            <div className="mb-6 p-6 bg-white rounded-3xl shadow-xl border border-slate-100">
-              <h4 className="font-bold text-slate-800 mb-4 text-lg">Create New Category</h4>
-              <div className="flex gap-2"><input type="text" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} className="flex-1 p-3 border border-slate-200 rounded-xl outline-none focus:border-emerald-500" placeholder="e.g. Pet Supplies" autoFocus /><Button onClick={handleQuickAddCategory} disabled={!newCatName}>Create</Button><Button variant="secondary" onClick={() => setIsCreatingCat(false)}><X className="w-4 h-4" /></Button></div>
-            </div>
-          ) : (
-            step === 3 && currentTx && (
-              <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden mb-8 relative">
-                <div className="absolute top-4 right-4 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-sm opacity-80"><CreditCard className="w-3 h-3" /> {currentTx.sourceCard}</div>
-                <div className="absolute top-4 left-4">
-                  {currentIndex > 0 && (
-                    <button onClick={handleUndo} className="flex items-center gap-1 text-xs font-bold text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-full transition-colors">
-                      <RotateCcw className="w-3 h-3" /> Previous
-                    </button>
-                  )}
-                </div>
-                <div className="bg-slate-50 p-6 border-b border-slate-100 flex justify-between items-start pt-12">
-                  <div>
-                    <h3 className="text-xl font-bold text-slate-800">{currentTx.description}</h3>
-                    <div className="text-sm text-slate-500 mt-1">{cleanDateDisplay(currentTx.date)}</div>
-                  </div>
-                  <div className="text-right flex flex-col items-end">
-                    {isEditingAmount ? (
-                      <div className="flex items-center gap-2">
-                        <input type="number" autoFocus value={editAmountValue} onChange={(e) => setEditAmountValue(e.target.value)} className="w-32 p-2 text-2xl font-mono font-bold text-slate-800 border border-emerald-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-200" />
-                        <button onClick={handleSaveAmountEdit} className="p-2 bg-emerald-100 text-emerald-700 rounded-full hover:bg-emerald-200"><Check className="w-5 h-5" /></button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-end gap-2 group">
-                        <div className="flex flex-col gap-1 mr-2 opacity-50 hover:opacity-100 transition-opacity">
-                          <button onClick={() => handleShiftAmount(-1)} className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-blue-500" title="Move amount to PREVIOUS transaction"><ArrowUp className="w-4 h-4" /></button>
-                          <button onClick={() => handleShiftAmount(1)} className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-blue-500" title="Move amount to NEXT transaction"><ArrowDown className="w-4 h-4" /></button>
-                        </div>
-                        <div className="text-3xl font-mono font-bold text-slate-800">
-                          {currentTx.amount} <span className="text-lg text-slate-400">{currentTx.currency}</span>
-                        </div>
-                        <button onClick={() => { setIsEditingAmount(true); setEditAmountValue(currentTx.amount); }} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-emerald-600 transition-colors opacity-0 group-hover:opacity-100" title="Edit Amount">
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    )}
-                    {currentTx.originalCategory && (<div className="inline-block mt-2 px-2 py-1 bg-slate-200 text-slate-600 text-xs rounded">File: {currentTx.originalCategory}</div>)}
-                  </div>
-                </div>
-                <div className="p-6">
-                  <div className="grid grid-cols-3 gap-3 mb-6">
-                    {sortedCategories.map(cat => {
-                      const isSuggested = suggestedCategoryId === cat.id; return (
-                        <button key={cat.id} onClick={() => handleCategorize(cat.name)} className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-2 text-center h-24 ${isSuggested ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-100 hover:border-slate-300 hover:bg-slate-50'}`}>
-                          <CategoryIcon iconName={cat.icon} color={cat.color} className={`w-6 h-6 ${isSuggested ? 'text-emerald-600' : ''}`} />
-                          <span className={`text-xs font-bold ${isSuggested ? 'text-emerald-700' : 'text-slate-600'}`}>{cat.name}</span>
-                        </button>);
-                    })}
-                    <button onClick={() => setIsCreatingCat(true)} className="p-3 rounded-xl border-2 border-dashed border-slate-300 hover:border-emerald-400 hover:bg-emerald-50 transition-all flex flex-col items-center justify-center gap-2 text-center h-24 text-slate-400 hover:text-emerald-600"><Plus className="w-6 h-6" /><span className="text-xs font-bold">New Cat</span></button>
-                    <button onClick={() => handleCategorize('Refunded', true)} className="p-3 rounded-xl border-2 border-amber-200 bg-amber-50 hover:bg-amber-100 hover:border-amber-300 transition-all flex flex-col items-center justify-center gap-2 text-center h-24 text-amber-700"><XCircle className="w-6 h-6" /><span className="text-xs font-bold">Refunded</span></button>
-                  </div>
-                  <div className="border-t border-slate-100 pt-6">
-                    <button onClick={handleSkip} className="w-full flex items-center justify-center gap-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors px-4 py-3 rounded-xl font-bold border border-transparent hover:border-slate-200">
-                      <Trash2 className="w-5 h-5" /> Skip Transaction
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )
-          )}
-        </div>
+        <ExpenseStepCategorize
+          isCreatingCat={isCreatingCat}
+          setIsCreatingCat={setIsCreatingCat}
+          newCatName={newCatName}
+          setNewCatName={setNewCatName}
+          onQuickAddCategory={handleQuickAddCategory}
+          currentTx={currentTx}
+          currentIndex={currentIndex}
+          handleUndo={handleUndo}
+          isEditingAmount={isEditingAmount}
+          editAmountValue={editAmountValue}
+          setEditAmountValue={setEditAmountValue}
+          onSaveAmountEdit={handleSaveAmountEdit}
+          onShiftAmount={handleShiftAmount}
+          onStartEditAmount={() => { setIsEditingAmount(true); setEditAmountValue(currentTx.amount); }}
+          categories={sortedCategories}
+          suggestedCategoryId={suggestedCategoryId}
+          onCategorize={handleCategorize}
+          onSkip={handleSkip}
+          cleanDateDisplay={cleanDateDisplay}
+        />
       )}
 
-      {step === 4 && (<div className="text-center py-12"><CheckCircle className="w-16 h-16 text-emerald-500 mx-auto mb-4" /><h3 className="text-xl font-bold text-slate-800 mb-2">{isManualMode ? "Expense Added!" : "Import Complete!"}</h3><div className="flex justify-center gap-4 mt-6"><Button onClick={() => { setStep(0); setFiles([]); setProcessedFiles([]); setIsManualMode(false); }}>Add More</Button><Button variant="secondary" onClick={onComplete}>Go to Dashboard</Button></div></div>)}
+      {step === 4 && (
+        <ExpenseSuccess
+          isManualMode={isManualMode}
+          onReset={() => { setStep(0); setFiles([]); setProcessedFiles([]); setIsManualMode(false); }}
+          onComplete={onComplete}
+        />
+      )}
     </div>
   );
 };
