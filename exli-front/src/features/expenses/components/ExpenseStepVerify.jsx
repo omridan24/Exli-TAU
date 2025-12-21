@@ -34,14 +34,14 @@ export const ExpenseStepVerify = ({
             </div>
 
             <div className="mt-6 border rounded-xl overflow-hidden shadow-sm bg-white">
-                <div className="bg-slate-50 p-3 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">Preview: {fileData.card_info}</div>
+                <div className="bg-slate-50 p-3 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">Preview: {fileData.card_info} — Showing {Math.min(10, fileData.preview_data.length)} of {fileData.preview_data.length} rows</div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
                         <thead className="bg-white text-slate-500 font-bold text-xs border-b border-slate-100">
                             <tr>{fileData.columns.map((h, i) => { const isSelected = Object.values(fileData.columnMapping).includes(i); const mappedField = Object.keys(fileData.columnMapping).find(key => fileData.columnMapping[key] === i); return (<th key={i} className={`p-3 whitespace-nowrap border-r border-slate-50 last:border-0 ${isSelected ? 'bg-blue-50 text-blue-700' : ''}`}>{h}{mappedField && <div className="mt-1 text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded-full inline-block">{mappedField}</div>}</th>); })}</tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
-                            {fileData.preview_data.map((row, rIdx) => (<tr key={rIdx} className="hover:bg-slate-50/50">{fileData.columns.map((_, cIdx) => { const isSelected = Object.values(fileData.columnMapping).includes(cIdx); return (<td key={cIdx} className={`p-3 whitespace-nowrap text-slate-700 border-r border-slate-50 last:border-0 ${isSelected ? 'bg-blue-50/30 font-medium text-blue-900' : ''}`}>{row[cIdx]}</td>) })}</tr>))}
+                            {fileData.preview_data.slice(0, 10).map((row, rIdx) => (<tr key={rIdx} className="hover:bg-slate-50/50">{fileData.columns.map((_, cIdx) => { const isSelected = Object.values(fileData.columnMapping).includes(cIdx); return (<td key={cIdx} className={`p-3 whitespace-nowrap text-slate-700 border-r border-slate-50 last:border-0 ${isSelected ? 'bg-blue-50/30 font-medium text-blue-900' : ''}`}>{row[cIdx]}</td>) })}</tr>))}
                         </tbody>
                     </table>
                 </div>

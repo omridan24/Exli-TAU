@@ -51,7 +51,16 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
   const processingTimeEstimate = useMemo(() => {
     if (!files.length) return null;
     const hasPdf = files.some(f => f.name.toLowerCase().endsWith('.pdf'));
-    return hasPdf ? "30s - 1 min" : "10s - 20s";
+    const baseMin = hasPdf ? 30 : 20;
+    const baseMax = hasPdf ? 60 : 30;
+
+    if (files.length === 1) {
+      return hasPdf ? "30s - 1 min" : "20s - 30s";
+    }
+
+    const min = baseMin * files.length;
+    const max = baseMax * files.length;
+    return `${min}s - ${max}s`;
   }, [files]);
 
   const parseDate = (dateStr) => {

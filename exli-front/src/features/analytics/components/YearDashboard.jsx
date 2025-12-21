@@ -191,6 +191,42 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
         }
     };
 
+    const handleMarkSuspect = async (ids) => {
+        if (!ids.length) return;
+        try {
+            await Promise.all(ids.map(id => {
+                const ref = doc(db, 'users', userId, 'expenses', id);
+                return updateDoc(ref, { isSuspect: true });
+            }));
+        } catch (e) {
+            console.error("Mark suspect failed", e);
+            alert("Failed to mark as suspect.");
+        }
+    };
+
+    const handleClearSuspect = async (ids) => {
+        if (!ids.length) return;
+        try {
+            await Promise.all(ids.map(id => {
+                const ref = doc(db, 'users', userId, 'expenses', id);
+                return updateDoc(ref, { isSuspect: false });
+            }));
+        } catch (e) {
+            console.error("Clear suspect failed", e);
+            alert("Failed to clear suspect flag.");
+        }
+    };
+
+    const handleUpdateIncome = async (id, updates) => {
+        try {
+            const ref = doc(db, 'users', userId, 'income', id);
+            await updateDoc(ref, updates);
+        } catch (e) {
+            console.error("Update income failed", e);
+            alert("Failed to update income.");
+        }
+    };
+
     const toggleSelect = (id) => {
         if (selectedIds.includes(id)) setSelectedIds(selectedIds.filter(i => i !== id));
         else setSelectedIds([...selectedIds, id]);
@@ -279,6 +315,9 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
                     handleCategoryChange={handleCategoryChange}
                     formatDate={formatDate}
                     onAddNote={handleAddNote}
+                    onMarkSuspect={handleMarkSuspect}
+                    onClearSuspect={handleClearSuspect}
+                    onUpdateIncome={handleUpdateIncome}
                 />
             ) : (
                 <AnalyticsTrendsView

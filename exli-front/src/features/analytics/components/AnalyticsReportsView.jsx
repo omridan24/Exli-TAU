@@ -8,6 +8,9 @@ import {
     Flag, Calendar, Type
 } from 'lucide-react';
 import { Card } from '../../../components/UI';
+import { MonthYearPickerModal } from '../../../components/MonthYearPickerModal';
+import { NoteModal } from '../../../components/NoteModal';
+import { IncomeEditModal } from '../../../components/IncomeEditModal';
 
 export const AnalyticsReportsView = ({
     totalIncome, totalExpenses, totalSavings, savingsRate, dominantCurrency,
@@ -17,7 +20,7 @@ export const AnalyticsReportsView = ({
     handleDelete, toggleSelect, toggleSelectAll,
     executeBulkCategory, bulkCategory, setBulkCategory, categories,
     editingId, startEditAmount, saveAmount, editAmountVal, setEditAmountVal,
-    handleCategoryChange, formatDate, onAddNote
+    handleCategoryChange, formatDate, onAddNote, onMarkSuspect, onClearSuspect, onUpdateIncome
 }) => {
     const [hoveredIncome, setHoveredIncome] = useState(null);
 
@@ -28,14 +31,37 @@ export const AnalyticsReportsView = ({
         return new Date(b.date) - new Date(a.date);
     });
 
-    const [isMoveMonthOpen, setIsMoveMonthOpen] = useState(false);
+    // Check if any selected items are suspect or non-suspect
+    const hasNonSuspectSelected = selectedIds.some(id => {
+        const item = sortedExpenses.find(exp => exp.id === id);
+        return item && !item.isSuspect;
+    });
+    const hasSuspectSelected = selectedIds.some(id => {
+        const item = sortedExpenses.find(exp => exp.id === id);
+        return item && item.isSuspect;
+    });
 
-    const handleBulkMove = (targetMonth) => {
-        if (!targetMonth || !selectedIds.length) return;
-        onMoveMonth(selectedIds, targetMonth);
-        setIsMoveMonthOpen(false);
-        // setSelectedIds([]) handled by parent likely? or should I do it? 
-        // Parent `handleMoveMonth` does alerting.
+    const [isMoveMonthOpen, setIsMoveMonthOpen] = useState(false);
+    const [selectedMoveMonth, setSelectedMoveMonth] = useState('');
+    const [noteModalOpen, setNoteModalOpen] = useState(false);
+    const [incomeEditModalOpen, setIncomeEditModalOpen] = useState(false);
+    const [selectedIncome, setSelectedIncome] = useState(null);
+
+    const handleApplyBulkActions = () => {
+        // Apply category change if selected
+        if (bulkCategory) {
+            executeBulkCategory();
+        }
+
+        // Apply move month if selected
+        if (selectedMoveMonth && selectedIds.length) {
+            onMoveMonth(selectedIds, selectedMoveMonth);
+        }
+
+        // Clear selections
+        setSelectedMoveMonth('');
+        setBulkCategory('');
+        // Don't clear selectedIds here - let parent or user do it manually
     };
 
     return (
@@ -59,7 +85,14 @@ export const AnalyticsReportsView = ({
                             {categoryStats.map(s => (
                                 <div key={s.name} className="flex items-center justify-between text-xs">
                                     <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />{s.name}</div>
-                                    <div className="font-bold">{dominantCurrency}{s.value.toFixed(0)}</div>
+                                    <div className="font-bold">
+                                        {dominantCurrency}{s.value.toFixed(0)}
+                                        {totalIncome > 0 && (
+                                            <span className="text-slate-400 ml-1.5 text-[10px]">
+                                                ({((s.value / totalIncome) * 100).toFixed(1)}%)
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -99,30 +132,32 @@ export const AnalyticsReportsView = ({
             </div>
 
             <div className="mt-8 mb-20 space-y-8">
-                {/* ... Income Table ... (omitted from replace but existing in file) */}
-                <div>
-                    <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><Briefcase className="w-4 h-4" /> Income Details ({selectedMonth})</h3>
-                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                        <table className="w-full text-sm text-left">
-                            <thead className="bg-slate-50 text-slate-500 font-medium">
-                                <tr><th className="p-4">Source</th><th className="p-4">Gross</th><th className="p-4">Taxes</th><th className="p-4">Net (Bank)</th><th className="p-4 text-right">Actions</th></tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {displayIncome.map(inc => (
-                                    <tr key={inc.id} className="hover:bg-slate-50">
-                                        <td className="p-4 font-bold text-slate-800">{inc.source_name}</td>
-                                        <td className="p-4 font-mono">{dominantCurrency}{Number(inc.bruto).toLocaleString()}</td>
-                                        <td className="p-4 font-mono text-red-400">-{dominantCurrency}{Number(inc.taxes).toLocaleString()}</td>
-                                        <td className="p-4 font-mono font-bold text-emerald-600">{dominantCurrency}{Number(inc.neto).toLocaleString()}</td>
-                                        <td className="p-4 text-right">
-                                            <button onClick={() => handleIncomeDelete(inc.id)} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                {/* Income Table - Hidden in Yearly Avg */}
+                {selectedMonth !== 'average' && (
+                    <div>
+                        <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><Briefcase className="w-4 h-4" /> Income Details ({selectedMonth})</h3>
+                        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-slate-50 text-slate-500 font-medium">
+                                    <tr><th className="p-4">Source</th><th className="p-4">Gross</th><th className="p-4">Taxes</th><th className="p-4">Net (Bank)</th><th className="p-4 text-right">Actions</th></tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {displayIncome.map(inc => (
+                                        <tr key={inc.id} onClick={() => { setSelectedIncome(inc); setIncomeEditModalOpen(true); }} className="hover:bg-emerald-50 cursor-pointer transition-colors">
+                                            <td className="p-4 font-bold text-slate-800">{inc.source_name}</td>
+                                            <td className="p-4 font-mono">{dominantCurrency}{Number(inc.bruto).toLocaleString()}</td>
+                                            <td className="p-4 font-mono text-red-400">-{dominantCurrency}{Number(inc.taxes).toLocaleString()}</td>
+                                            <td className="p-4 font-mono font-bold text-emerald-600">{dominantCurrency}{Number(inc.neto).toLocaleString()}</td>
+                                            <td className="p-4 text-right">
+                                                <button onClick={(e) => { e.stopPropagation(); handleIncomeDelete(inc.id); }} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                </div>
+                )}
 
 
                 {selectedMonth !== 'average' && (
@@ -130,33 +165,7 @@ export const AnalyticsReportsView = ({
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="font-bold text-slate-700 flex items-center gap-2"><DollarSign className="w-4 h-4" /> Expense History</h3>
                             <div className="flex gap-2">
-                                {/* Bulk Actions */}
-                                {selectedIds.length > 0 && (
-                                    <div className="flex gap-2 animate-fade-in">
-                                        <div className="relative">
-                                            <button onClick={() => setIsMoveMonthOpen(!isMoveMonthOpen)} className="flex items-center gap-1 text-xs font-bold text-blue-500 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors">
-                                                <Calendar className="w-3 h-3" /> Move Month
-                                            </button>
-                                            {isMoveMonthOpen && (
-                                                <div className="absolute top-full left-0 mt-2 bg-white rounded-xl shadow-xl border border-slate-200 p-2 z-50 w-48">
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase mb-2 px-2">Move to...</p>
-                                                    <div className="max-h-40 overflow-y-auto">
-                                                        <input type="month" className="w-full p-1 border rounded text-xs" onChange={(e) => handleBulkMove(e.target.value)} />
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                        <button onClick={() => {
-                                            const note = prompt("Enter note for selected items:");
-                                            if (note) {
-                                                onAddNote(selectedIds, note);
-                                                // setSelectedIds([]); // Let user clear manually or parent handle
-                                            }
-                                        }} className="flex items-center gap-1 text-xs font-bold text-purple-500 hover:text-purple-700 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-lg transition-colors">
-                                            <Type className="w-3 h-3" /> Add Note
-                                        </button>
-                                    </div>
-                                )}
+                                {/* Bulk actions moved to floating bar */}
 
                                 <div className="relative">
                                     <button onClick={() => setIsDeleteModalOpen(true)} className="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1 border border-red-200 px-3 py-2 rounded-lg hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /> Clear Month</button>
@@ -237,16 +246,91 @@ export const AnalyticsReportsView = ({
             </div>
 
             {selectedIds.length > 0 && (
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-4 z-50 animate-fade-in">
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 z-50 animate-fade-in max-w-5xl">
                     <span className="font-bold text-sm">{selectedIds.length} Selected</span>
                     <div className="h-4 w-px bg-slate-700"></div>
+
+                    {/* Move Month */}
+                    <button
+                        onClick={() => setIsMoveMonthOpen(true)}
+                        className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${selectedMoveMonth ? 'bg-blue-600 text-white' : 'bg-slate-800 text-blue-300 hover:bg-slate-700'}`}
+                    >
+                        <Calendar className="w-3 h-3" />
+                        {selectedMoveMonth || 'Move Month'}
+                    </button>
+
+                    {/* Mark/Clear Suspect */}
+                    {hasNonSuspectSelected && (
+                        <button
+                            onClick={() => onMarkSuspect(selectedIds)}
+                            className="flex items-center gap-1.5 text-xs font-bold bg-slate-800 text-red-400 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors"
+                        >
+                            <Flag className="w-3 h-3" /> Mark Suspect
+                        </button>
+                    )}
+                    {hasSuspectSelected && (
+                        <button
+                            onClick={() => onClearSuspect(selectedIds)}
+                            className="flex items-center gap-1.5 text-xs font-bold bg-slate-800 text-slate-400 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors"
+                        >
+                            <X className="w-3 h-3" /> Clear Suspect
+                        </button>
+                    )}
+
+                    {/* Add Note */}
+                    <button
+                        onClick={() => setNoteModalOpen(true)}
+                        className="flex items-center gap-1.5 text-xs font-bold bg-slate-800 text-purple-400 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                        <Type className="w-3 h-3" /> Add Note
+                    </button>
+
+                    <div className="h-4 w-px bg-slate-700"></div>
+
+                    {/* Category */}
                     <select value={bulkCategory} onChange={e => setBulkCategory(e.target.value)} className="bg-slate-800 border-none text-sm text-white rounded-lg px-2 py-1 outline-none cursor-pointer hover:bg-slate-700 transition-colors">
-                        <option value="">Move to...</option>
+                        <option value="">Category...</option>
                         {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                     </select>
-                    <button onClick={executeBulkCategory} disabled={!bulkCategory} className="bg-emerald-500 hover:bg-emerald-400 text-white p-1.5 rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-all"><Check className="w-4 h-4" /></button>
+                    <button onClick={handleApplyBulkActions} disabled={!bulkCategory && !selectedMoveMonth} className="bg-emerald-500 hover:bg-emerald-400 text-white p-1.5 rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-all"><Check className="w-4 h-4" /></button>
                     <button onClick={() => setSelectedIds([])} className="ml-2 text-slate-500 hover:text-white"><X className="w-4 h-4" /></button>
                 </div>
+            )}
+
+            {/* MonthYearPickerModal */}
+            <MonthYearPickerModal
+                isOpen={isMoveMonthOpen}
+                onClose={() => setIsMoveMonthOpen(false)}
+                value={selectedMoveMonth}
+                onSave={(month) => {
+                    setSelectedMoveMonth(month);
+                    setIsMoveMonthOpen(false);
+                }}
+            />
+
+            {/* NoteModal */}
+            <NoteModal
+                isOpen={noteModalOpen}
+                onClose={() => setNoteModalOpen(false)}
+                onSave={(note) => {
+                    if (note && selectedIds.length) {
+                        onAddNote(selectedIds, note);
+                    }
+                }}
+            />
+
+            {/* IncomeEditModal */}
+            {selectedIncome && (
+                <IncomeEditModal
+                    isOpen={incomeEditModalOpen}
+                    onClose={() => { setIncomeEditModalOpen(false); setSelectedIncome(null); }}
+                    income={selectedIncome}
+                    onSave={(id, updates) => {
+                        onUpdateIncome(id, updates);
+                        setIncomeEditModalOpen(false);
+                        setSelectedIncome(null);
+                    }}
+                />
             )}
         </>
     );
