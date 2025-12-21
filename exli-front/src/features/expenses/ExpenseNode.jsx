@@ -170,52 +170,28 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
     setStep(3);
   };
 
-  const handleShiftAmount = (direction) => {
-    const targetIndex = currentIndex + direction;
-    if (targetIndex < 0 || targetIndex >= allTransactions.length) return;
-    const newTransactions = [...allTransactions];
-    const currentItem = newTransactions[currentIndex];
-    const targetItem = newTransactions[targetIndex];
-    const tempAmount = currentItem.amount;
-    const tempCurrency = currentItem.currency;
-    newTransactions[currentIndex] = { ...currentItem, amount: targetItem.amount, currency: targetItem.currency };
-    newTransactions[targetIndex] = { ...targetItem, amount: tempAmount, currency: tempCurrency };
-    setAllTransactions(newTransactions);
-  };
-
-  const handleSaveAmountEdit = () => {
-    const newAmount = parseFloat(editAmountValue);
-    if (!isNaN(newAmount) && newAmount !== 0) {
-      const updatedTx = [...allTransactions];
-      updatedTx[currentIndex].amount = Math.abs(newAmount); // Keep it positive as flow relies on positive magnitudes + refund flag, BUT user asked for handling negatives. 
-      // User said: "doesn't let ... to show minus". 
-      // If I force Math.abs here, I am overriding user intent to type "-50".
-      // But if I allow -50, and also have isRefund flag...
-      // The "Refund" logic relies on POSITIVE amount + isRefund=true.
-      // If user types -50, it should probably be treated as 50 + isRefund=true?
-      // OR, simple amount = -50.
-      // Let's stick to the "isRefund" flag for refunds, and keep amount positive for consistency with "Refund" button.
-      // However, if the user explicitly types -50, they might expect it to stay -50.
-      // But my Refund Modal logic depends on `onCategorize(..., true)`.
-      // Let's just allow the negative number in state, but maybe NOT force Math.abs if they edited it?
-      // The "isRefund" flag is set during categorization.
-      // If amount is -50, and isRefund is false -> effectively a refund?
-      // Let's just remove the > 0 check and NOT apply Math.abs here. Let the user do what they want.
-      updatedTx[currentIndex].amount = newAmount;
-      setAllTransactions(updatedTx);
-    }
+  const handleUpdateTransaction = (updatedFields) => {
+    const updatedTx = [...allTransactions];
+    updatedTx[currentIndex] = {
+      ...updatedTx[currentIndex],
+      ...updatedFields
+    };
+    setAllTransactions(updatedTx);
     setIsEditingAmount(false);
   };
 
-  const handleCategorize = (categoryName, isRefund = false) => {
-    if (isEditingAmount) handleSaveAmountEdit();
+  // State for Card Popup
+  const [cardPopup, setCardPopup] = useState({ show: false, prevCard: '', nextCard: '' });
+  // State for showing previous choice on undo
+  const [lastUndoChoice, setLastUndoChoice] = useState(null);
 
+  const handleCategorize = (categoryName, isRefund = false, isSuspect = false) => {
     if (isManualMode) {
       if (!manualData.amount || !manualData.description) {
         alert("Please enter amount and description");
         return;
       }
-      saveManualTransaction(categoryName, isRefund);
+      saveManualTransaction(categoryName, isRefund, isSuspect);
       return;
     }
 
@@ -225,22 +201,44 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
       ...currentTx,
       date: currentTx.date || new Date().toISOString(),
       assignedCategory: categoryName,
-      reportMonth: reportMonth, // Use the selected report month
+      reportMonth: reportMonth,
       isRefund: isRefund,
+      isSuspect: isSuspect, // Add suspect flag
       status: 'active'
     };
+
+    // Check for card change
+    const nextIndex = currentIndex + 1;
+    if (nextIndex < allTransactions.length) {
+      const nextTx = allTransactions[nextIndex];
+      if (currentTx.sourceCard !== nextTx.sourceCard) {
+        setCardPopup({ show: true, prevCard: currentTx.sourceCard, nextCard: nextTx.sourceCard });
+        // Don't move next yet, wait for popup close
+        setProcessedTransactions(prev => [...prev, tx]);
+        return;
+      }
+    }
+
     setProcessedTransactions(prev => [...prev, tx]);
+    setLastUndoChoice(null); // Clear undo choice on new forward move
+    moveToNext();
+  };
+
+  const confirmCardSwitch = () => {
+    setCardPopup({ ...cardPopup, show: false });
     moveToNext();
   };
 
   const handleUndo = () => {
     if (currentIndex > 0) {
+      const lastTx = processedTransactions[processedTransactions.length - 1]; // Get the one we are undoing
+      setLastUndoChoice(lastTx?.assignedCategory || (lastTx?.isRefund ? 'Refunded' : null) || (lastTx?.isSuspect ? 'Suspect' : null));
       setCurrentIndex(prev => prev - 1);
       setProcessedTransactions(prev => prev.slice(0, -1));
     }
   };
 
-  const saveManualTransaction = async (categoryName, isRefund = false) => {
+  const saveManualTransaction = async (categoryName, isRefund = false, isSuspect = false) => {
     setIsLoading(true);
     try {
       const expensesRef = collection(db, 'users', userId, 'expenses');
@@ -251,8 +249,9 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
         amount: parseFloat(manualData.amount),
         currency: manualData.currency,
         assignedCategory: categoryName,
-        reportMonth: reportMonth, // Use the selected report month
+        reportMonth: reportMonth,
         isRefund: isRefund,
+        isSuspect: isSuspect,
         source: 'manual',
         status: 'active',
         createdAt: serverTimestamp()
@@ -377,18 +376,32 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
           currentTx={currentTx}
           currentIndex={currentIndex}
           handleUndo={handleUndo}
-          isEditingAmount={isEditingAmount}
-          editAmountValue={editAmountValue}
-          setEditAmountValue={setEditAmountValue}
-          onSaveAmountEdit={handleSaveAmountEdit}
-          onShiftAmount={handleShiftAmount}
-          onStartEditAmount={() => { setIsEditingAmount(true); setEditAmountValue(currentTx.amount); }}
+          lastUndoChoice={lastUndoChoice} // Pass undo choice
+          onUpdateTransaction={handleUpdateTransaction} // New generic update
           categories={sortedCategories}
           suggestedCategoryId={suggestedCategoryId}
           onCategorize={handleCategorize}
           onSkip={handleSkip}
           cleanDateDisplay={cleanDateDisplay}
         />
+      )}
+
+      {cardPopup.show && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl scale-100">
+            <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4 text-emerald-600">
+              <Upload className="w-8 h-8" />
+            </div>
+            <h3 className="text-xl font-black text-slate-800 mb-2">Card Completed!</h3>
+            <p className="text-slate-500 mb-6 font-medium">
+              You finished <span className="font-bold text-slate-700">{cardPopup.prevCard}</span>.
+              <br />Moving to <span className="font-bold text-slate-700">{cardPopup.nextCard}</span>...
+            </p>
+            <button onClick={confirmCardSwitch} className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-2xl transition-all shadow-lg shadow-emerald-200">
+              Continue
+            </button>
+          </div>
+        </div>
       )}
 
       {step === 4 && (

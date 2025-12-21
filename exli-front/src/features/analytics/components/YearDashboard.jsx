@@ -174,6 +174,23 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
         logUserAction(userId, 'CATEGORY_CHANGE', `Moved expense to ${newCat}`);
     };
 
+    const handleAddNote = async (ids, note) => {
+        if (!ids.length || !note) return;
+        try {
+            await Promise.all(ids.map(id => {
+                const ref = doc(db, 'users', userId, 'expenses', id);
+                return updateDoc(ref, { note: note });
+            }));
+            // Update local state if needed, or rely on subscription
+
+            // Optimistic update for immediate feedback if relying on props update which might be slow
+            // Actually, for now let's just rely on the subscription or parent refresh.
+        } catch (e) {
+            console.error("Add note failed", e);
+            alert("Failed to add note.");
+        }
+    };
+
     const toggleSelect = (id) => {
         if (selectedIds.includes(id)) setSelectedIds(selectedIds.filter(i => i !== id));
         else setSelectedIds([...selectedIds, id]);
@@ -261,6 +278,7 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
                     setEditAmountVal={setEditAmountVal}
                     handleCategoryChange={handleCategoryChange}
                     formatDate={formatDate}
+                    onAddNote={handleAddNote}
                 />
             ) : (
                 <AnalyticsTrendsView

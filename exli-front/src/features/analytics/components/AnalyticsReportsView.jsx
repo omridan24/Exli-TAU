@@ -4,7 +4,8 @@ import {
 } from 'recharts';
 import {
     Trash2, DollarSign, Wallet, CheckSquare, Square,
-    Check, X, Briefcase
+    Check, X, Briefcase,
+    Flag, Calendar, Type
 } from 'lucide-react';
 import { Card } from '../../../components/UI';
 
@@ -16,12 +17,30 @@ export const AnalyticsReportsView = ({
     handleDelete, toggleSelect, toggleSelectAll,
     executeBulkCategory, bulkCategory, setBulkCategory, categories,
     editingId, startEditAmount, saveAmount, editAmountVal, setEditAmountVal,
-    handleCategoryChange, formatDate
+    handleCategoryChange, formatDate, onAddNote
 }) => {
     const [hoveredIncome, setHoveredIncome] = useState(null);
 
+    // Sort expenses: Suspect first, then date desc
+    const sortedExpenses = [...displayExpenses].sort((a, b) => {
+        if (a.isSuspect && !b.isSuspect) return -1;
+        if (!a.isSuspect && b.isSuspect) return 1;
+        return new Date(b.date) - new Date(a.date);
+    });
+
+    const [isMoveMonthOpen, setIsMoveMonthOpen] = useState(false);
+
+    const handleBulkMove = (targetMonth) => {
+        if (!targetMonth || !selectedIds.length) return;
+        onMoveMonth(selectedIds, targetMonth);
+        setIsMoveMonthOpen(false);
+        // setSelectedIds([]) handled by parent likely? or should I do it? 
+        // Parent `handleMoveMonth` does alerting.
+    };
+
     return (
         <>
+            {/* ... Top Cards ... */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                 <Card className="p-4 flex flex-col justify-between"><div className="text-slate-400 text-xs font-bold uppercase">Net Income</div><div className="text-2xl font-bold text-emerald-600">{dominantCurrency} {totalIncome.toLocaleString()}</div></Card>
                 <Card className="p-4 flex flex-col justify-between"><div className="text-slate-400 text-xs font-bold uppercase">Total Expenses</div><div className="text-2xl font-bold text-slate-800">{dominantCurrency} {totalExpenses.toLocaleString()}</div></Card>
@@ -29,6 +48,7 @@ export const AnalyticsReportsView = ({
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                {/* ... Pie Charts ... */}
                 <Card className="p-6">
                     <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><DollarSign className="w-4 h-4 text-red-400" /> Expenses Breakdown</h3>
                     <div className="flex flex-col md:flex-row items-center h-64">
@@ -49,23 +69,20 @@ export const AnalyticsReportsView = ({
                 <Card className="p-6">
                     <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><Wallet className="w-4 h-4 text-emerald-500" /> Income Sources</h3>
                     <div className="flex flex-col md:flex-row items-center h-64">
+                        {/* ... Income Pie ... */}
                         <div className="h-full w-full md:w-1/2">
                             <ResponsiveContainer minWidth={0}><PieChart><Pie data={incomeStats} dataKey="value" cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={2}>{incomeStats.map((e, i) => (<Cell key={i} fill={e.color} />))}</Pie><Tooltip formatter={(v) => `${dominantCurrency} ${v.toFixed(0)}`} /></PieChart></ResponsiveContainer>
                         </div>
                         <div className="w-full md:w-1/2 overflow-y-auto h-full pr-2 space-y-3 custom-scrollbar">
+                            {/* ... Income Legend ... */}
                             {incomeStats.map((s, idx) => (
-                                <div
-                                    key={s.name}
-                                    className="relative flex items-center justify-between text-xs p-2 rounded-lg hover:bg-slate-50 transition-colors cursor-help group"
-                                    onMouseEnter={() => setHoveredIncome(s.name)}
-                                    onMouseLeave={() => setHoveredIncome(null)}
-                                >
+                                <div key={s.name} className="relative flex items-center justify-between text-xs p-2 rounded-lg hover:bg-slate-50 transition-colors cursor-help group" onMouseEnter={() => setHoveredIncome(s.name)} onMouseLeave={() => setHoveredIncome(null)}>
                                     <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />{s.name}</div>
                                     <div className="font-bold text-emerald-600">{dominantCurrency}{s.value.toFixed(0)}</div>
-
                                     {hoveredIncome === s.name && (
                                         <div className={`absolute right-0 w-48 bg-slate-900 text-white rounded-xl p-3 shadow-2xl z-50 animate-fade-in ${idx < 2 ? 'top-full mt-2' : 'bottom-full mb-2'}`}>
                                             <div className="font-bold border-b border-slate-700 pb-1 mb-2 text-emerald-400 text-[11px] truncate">{s.name}</div>
+                                            {/* ... tooltip content ... */}
                                             <div className="space-y-1 text-[10px]">
                                                 <div className="flex justify-between">Gross <span>{dominantCurrency}{s.bruto.toFixed(0)}</span></div>
                                                 <div className="flex justify-between text-red-400">Tax <span>-{dominantCurrency}{s.taxes.toFixed(0)}</span></div>
@@ -82,6 +99,7 @@ export const AnalyticsReportsView = ({
             </div>
 
             <div className="mt-8 mb-20 space-y-8">
+                {/* ... Income Table ... (omitted from replace but existing in file) */}
                 <div>
                     <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><Briefcase className="w-4 h-4" /> Income Details ({selectedMonth})</h3>
                     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
@@ -106,23 +124,54 @@ export const AnalyticsReportsView = ({
                     </div>
                 </div>
 
+
                 {selectedMonth !== 'average' && (
                     <div>
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="font-bold text-slate-700 flex items-center gap-2"><DollarSign className="w-4 h-4" /> Expense History</h3>
-                            <div className="relative">
-                                <button onClick={() => setIsDeleteModalOpen(true)} className="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1 border border-red-200 px-3 py-2 rounded-lg hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /> Clear Month</button>
-                                {isDeleteModalOpen && (
-                                    <div className="absolute bottom-full right-0 mb-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200 p-4 z-10 animate-fade-in">
-                                        <div className="flex justify-between items-center mb-3"><h4 className="font-bold text-slate-800 text-sm">Clear {selectedMonth}</h4><button onClick={() => setIsDeleteModalOpen(false)}><X className="w-4 h-4" /></button></div>
-                                        <div className="space-y-2">
-                                            <button onClick={() => executeDeleteMonth('expenses')} className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-50 text-red-600 text-sm font-medium">Expenses Only</button>
-                                            <button onClick={() => executeDeleteMonth('income')} className="w-full text-left px-3 py-2 rounded-lg hover:bg-blue-50 text-blue-600 text-sm font-medium">Income Only</button>
-                                            <div className="h-px bg-slate-100 my-1"></div>
-                                            <button onClick={() => executeDeleteMonth('both')} className="w-full text-left px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-bold">Everything</button>
+                            <div className="flex gap-2">
+                                {/* Bulk Actions */}
+                                {selectedIds.length > 0 && (
+                                    <div className="flex gap-2 animate-fade-in">
+                                        <div className="relative">
+                                            <button onClick={() => setIsMoveMonthOpen(!isMoveMonthOpen)} className="flex items-center gap-1 text-xs font-bold text-blue-500 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors">
+                                                <Calendar className="w-3 h-3" /> Move Month
+                                            </button>
+                                            {isMoveMonthOpen && (
+                                                <div className="absolute top-full left-0 mt-2 bg-white rounded-xl shadow-xl border border-slate-200 p-2 z-50 w-48">
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase mb-2 px-2">Move to...</p>
+                                                    <div className="max-h-40 overflow-y-auto">
+                                                        <input type="month" className="w-full p-1 border rounded text-xs" onChange={(e) => handleBulkMove(e.target.value)} />
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
+                                        <button onClick={() => {
+                                            const note = prompt("Enter note for selected items:");
+                                            if (note) {
+                                                onAddNote(selectedIds, note);
+                                                // setSelectedIds([]); // Let user clear manually or parent handle
+                                            }
+                                        }} className="flex items-center gap-1 text-xs font-bold text-purple-500 hover:text-purple-700 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-lg transition-colors">
+                                            <Type className="w-3 h-3" /> Add Note
+                                        </button>
                                     </div>
                                 )}
+
+                                <div className="relative">
+                                    <button onClick={() => setIsDeleteModalOpen(true)} className="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1 border border-red-200 px-3 py-2 rounded-lg hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /> Clear Month</button>
+                                    {isDeleteModalOpen && (
+                                        <div className="absolute bottom-full right-0 mb-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200 p-4 z-10 animate-fade-in">
+                                            <div className="flex justify-between items-center mb-3"><h4 className="font-bold text-slate-800 text-sm">Clear {selectedMonth}</h4><button onClick={() => setIsDeleteModalOpen(false)}><X className="w-4 h-4" /></button></div>
+                                            <div className="space-y-2">
+                                                <button onClick={() => executeDeleteMonth('expenses')} className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-50 text-red-600 text-sm font-medium">Expenses Only</button>
+                                                <button onClick={() => executeDeleteMonth('income')} className="w-full text-left px-3 py-2 rounded-lg hover:bg-blue-50 text-blue-600 text-sm font-medium">Income Only</button>
+                                                <div className="h-px bg-slate-100 my-1"></div>
+                                                <button onClick={() => executeDeleteMonth('both')} className="w-full text-left px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-bold">Everything</button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
                         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
@@ -130,7 +179,7 @@ export const AnalyticsReportsView = ({
                                 <thead className="bg-slate-50 text-slate-500 font-medium">
                                     <tr>
                                         <th className="p-4 w-10 text-center cursor-pointer" onClick={toggleSelectAll}>
-                                            {selectedIds.length > 0 && selectedIds.length === displayExpenses.length ? <CheckSquare className="w-5 h-5 text-emerald-500" /> : <Square className="w-5 h-5 text-slate-300" />}
+                                            {selectedIds.length > 0 && selectedIds.length === sortedExpenses.length ? <CheckSquare className="w-5 h-5 text-emerald-500" /> : <Square className="w-5 h-5 text-slate-300" />}
                                         </th>
                                         <th className="p-4">Date</th>
                                         <th className="p-4">Description</th>
@@ -140,18 +189,22 @@ export const AnalyticsReportsView = ({
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {displayExpenses.map(tx => {
+                                    {sortedExpenses.map(tx => {
                                         // Check if transaction is a refund (either flag or negative amount)
                                         const isRefundItem = tx.isRefund || tx.amount < 0;
+                                        const isSuspectItem = tx.isSuspect;
                                         const displayAmount = Math.abs(tx.amount); // Show positive magnitude
 
                                         return (
-                                            <tr key={tx.id} className={`hover:bg-slate-50 group ${selectedIds.includes(tx.id) ? 'bg-blue-50/50' : ''}`}>
+                                            <tr key={tx.id} className={`hover:bg-slate-50 group border-b border-slate-100 ${selectedIds.includes(tx.id) ? 'bg-blue-50/50' : ''} ${isSuspectItem ? 'bg-red-50 border-red-100 hover:bg-red-100/50' : ''}`}>
                                                 <td className="p-4 text-center cursor-pointer" onClick={() => toggleSelect(tx.id)}>
                                                     {selectedIds.includes(tx.id) ? <CheckSquare className="w-5 h-5 text-blue-500" /> : <Square className="w-5 h-5 text-slate-200" />}
                                                 </td>
                                                 <td className="p-4 text-slate-500 whitespace-nowrap">{formatDate(tx.date)}</td>
-                                                <td className="p-4 font-bold text-slate-800">{tx.description}</td>
+                                                <td className="p-4 font-bold text-slate-800">
+                                                    {tx.description}
+                                                    {tx.note && <div className="text-[10px] text-purple-600 bg-purple-50 px-1 py-0.5 rounded inline-block ml-2 border border-purple-100"><Type className="w-2 h-2 inline mr-1" />{tx.note}</div>}
+                                                </td>
                                                 <td className="p-4">
                                                     {editingId === tx.id ? (
                                                         <div className="flex items-center gap-1">
@@ -165,10 +218,12 @@ export const AnalyticsReportsView = ({
                                                     )}
                                                 </td>
                                                 <td className="p-4">
-                                                    <select className="bg-transparent border-none text-slate-600 font-medium cursor-pointer hover:text-emerald-600" value={tx.assignedCategory} onChange={(e) => handleCategoryChange(tx.id, e.target.value)}>
+                                                    <select className="bg-transparent border-none text-slate-600 font-medium cursor-pointer hover:text-emerald-600" value={tx.assignedCategory || ''} onChange={(e) => handleCategoryChange(tx.id, e.target.value)}>
+                                                        <option value="" disabled>Select...</option>
                                                         {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                                                     </select>
                                                     {isRefundItem && <span className="ml-2 text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold uppercase">Refund</span>}
+                                                    {isSuspectItem && <span className="ml-2 text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold uppercase flex inline-flex items-center gap-1"><Flag className="w-3 h-3" /> Suspect</span>}
                                                 </td>
                                                 <td className="p-4 text-right"><button onClick={() => handleDelete(tx.id)} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button></td>
                                             </tr>
