@@ -140,33 +140,40 @@ export const AnalyticsReportsView = ({
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {displayExpenses.map(tx => (
-                                        <tr key={tx.id} className={`hover:bg-slate-50 group ${selectedIds.includes(tx.id) ? 'bg-blue-50/50' : ''}`}>
-                                            <td className="p-4 text-center cursor-pointer" onClick={() => toggleSelect(tx.id)}>
-                                                {selectedIds.includes(tx.id) ? <CheckSquare className="w-5 h-5 text-blue-500" /> : <Square className="w-5 h-5 text-slate-200" />}
-                                            </td>
-                                            <td className="p-4 text-slate-500 whitespace-nowrap">{formatDate(tx.date)}</td>
-                                            <td className="p-4 font-bold text-slate-800">{tx.description}</td>
-                                            <td className="p-4">
-                                                {editingId === tx.id ? (
-                                                    <div className="flex items-center gap-1">
-                                                        <input type="number" className="w-24 p-1 border rounded" value={editAmountVal} onChange={e => setEditAmountVal(e.target.value)} autoFocus />
-                                                        <button onClick={() => saveAmount(tx.id)} className="text-emerald-500"><Check className="w-4 h-4" /></button>
-                                                    </div>
-                                                ) : (
-                                                    <div onClick={() => startEditAmount(tx)} className="font-mono font-bold text-slate-700 cursor-pointer hover:bg-slate-100 px-2 py-1 rounded inline-flex items-center gap-2 group-hover:text-blue-600 transition-colors">
-                                                        {dominantCurrency} {tx.amount}
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="p-4">
-                                                <select className="bg-transparent border-none text-slate-600 font-medium cursor-pointer hover:text-emerald-600" value={tx.assignedCategory} onChange={(e) => handleCategoryChange(tx.id, e.target.value)}>
-                                                    {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                                                </select>
-                                            </td>
-                                            <td className="p-4 text-right"><button onClick={() => handleDelete(tx.id)} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button></td>
-                                        </tr>
-                                    ))}
+                                    {displayExpenses.map(tx => {
+                                        // Check if transaction is a refund (either flag or negative amount)
+                                        const isRefundItem = tx.isRefund || tx.amount < 0;
+                                        const displayAmount = Math.abs(tx.amount); // Show positive magnitude
+
+                                        return (
+                                            <tr key={tx.id} className={`hover:bg-slate-50 group ${selectedIds.includes(tx.id) ? 'bg-blue-50/50' : ''}`}>
+                                                <td className="p-4 text-center cursor-pointer" onClick={() => toggleSelect(tx.id)}>
+                                                    {selectedIds.includes(tx.id) ? <CheckSquare className="w-5 h-5 text-blue-500" /> : <Square className="w-5 h-5 text-slate-200" />}
+                                                </td>
+                                                <td className="p-4 text-slate-500 whitespace-nowrap">{formatDate(tx.date)}</td>
+                                                <td className="p-4 font-bold text-slate-800">{tx.description}</td>
+                                                <td className="p-4">
+                                                    {editingId === tx.id ? (
+                                                        <div className="flex items-center gap-1">
+                                                            <input type="number" className="w-24 p-1 border rounded" value={editAmountVal} onChange={e => setEditAmountVal(e.target.value)} autoFocus />
+                                                            <button onClick={() => saveAmount(tx.id)} className="text-emerald-500"><Check className="w-4 h-4" /></button>
+                                                        </div>
+                                                    ) : (
+                                                        <div onClick={() => startEditAmount(tx)} className={`font-mono font-bold cursor-pointer hover:bg-slate-100 px-2 py-1 rounded inline-flex items-center gap-2 group-hover:text-blue-600 transition-colors ${isRefundItem ? 'text-emerald-500' : 'text-slate-700'}`}>
+                                                            {isRefundItem ? '+' : ''}{dominantCurrency} {displayAmount}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="p-4">
+                                                    <select className="bg-transparent border-none text-slate-600 font-medium cursor-pointer hover:text-emerald-600" value={tx.assignedCategory} onChange={(e) => handleCategoryChange(tx.id, e.target.value)}>
+                                                        {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                                                    </select>
+                                                    {isRefundItem && <span className="ml-2 text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold uppercase">Refund</span>}
+                                                </td>
+                                                <td className="p-4 text-right"><button onClick={() => handleDelete(tx.id)} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button></td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>

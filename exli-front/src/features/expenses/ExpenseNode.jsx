@@ -185,8 +185,22 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
 
   const handleSaveAmountEdit = () => {
     const newAmount = parseFloat(editAmountValue);
-    if (!isNaN(newAmount) && newAmount > 0) {
+    if (!isNaN(newAmount) && newAmount !== 0) {
       const updatedTx = [...allTransactions];
+      updatedTx[currentIndex].amount = Math.abs(newAmount); // Keep it positive as flow relies on positive magnitudes + refund flag, BUT user asked for handling negatives. 
+      // User said: "doesn't let ... to show minus". 
+      // If I force Math.abs here, I am overriding user intent to type "-50".
+      // But if I allow -50, and also have isRefund flag...
+      // The "Refund" logic relies on POSITIVE amount + isRefund=true.
+      // If user types -50, it should probably be treated as 50 + isRefund=true?
+      // OR, simple amount = -50.
+      // Let's stick to the "isRefund" flag for refunds, and keep amount positive for consistency with "Refund" button.
+      // However, if the user explicitly types -50, they might expect it to stay -50.
+      // But my Refund Modal logic depends on `onCategorize(..., true)`.
+      // Let's just allow the negative number in state, but maybe NOT force Math.abs if they edited it?
+      // The "isRefund" flag is set during categorization.
+      // If amount is -50, and isRefund is false -> effectively a refund?
+      // Let's just remove the > 0 check and NOT apply Math.abs here. Let the user do what they want.
       updatedTx[currentIndex].amount = newAmount;
       setAllTransactions(updatedTx);
     }
@@ -201,16 +215,17 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
         alert("Please enter amount and description");
         return;
       }
-      saveManualTransaction(categoryName);
+      saveManualTransaction(categoryName, isRefund);
       return;
     }
 
     const currentTx = allTransactions[currentIndex];
+
     const tx = {
       ...currentTx,
       date: currentTx.date || new Date().toISOString(),
       assignedCategory: categoryName,
-      reportMonth: reportMonth,
+      reportMonth: reportMonth, // Use the selected report month
       isRefund: isRefund,
       status: 'active'
     };
@@ -225,11 +240,10 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
     }
   };
 
-  const saveManualTransaction = async (categoryName) => {
+  const saveManualTransaction = async (categoryName, isRefund = false) => {
     setIsLoading(true);
     try {
       const expensesRef = collection(db, 'users', userId, 'expenses');
-      const manualMonth = manualData.date.slice(0, 7);
 
       await addDoc(expensesRef, {
         date: new Date(manualData.date).toISOString(),
@@ -237,7 +251,8 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
         amount: parseFloat(manualData.amount),
         currency: manualData.currency,
         assignedCategory: categoryName,
-        reportMonth: manualMonth,
+        reportMonth: reportMonth, // Use the selected report month
+        isRefund: isRefund,
         source: 'manual',
         status: 'active',
         createdAt: serverTimestamp()
@@ -379,7 +394,20 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
       {step === 4 && (
         <ExpenseSuccess
           isManualMode={isManualMode}
-          onReset={() => { setStep(0); setFiles([]); setProcessedFiles([]); setIsManualMode(false); }}
+          onReset={() => {
+            setStep(0);
+            setFiles([]);
+            setProcessedFiles([]);
+            setIsManualMode(false);
+            // Reset manual data for next entry
+            setManualData({
+              date: new Date().toISOString().slice(0, 10),
+              description: '',
+              amount: '',
+              currency: 'ILS',
+              category: ''
+            });
+          }}
           onComplete={onComplete}
         />
       )}

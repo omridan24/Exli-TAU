@@ -62,16 +62,27 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
     const categoryStats = useMemo(() => {
         const agg = {};
         displayExpenses.forEach(item => {
-            if (item.isRefund) return;
+            // Subtract if refund, add otherwise. 
+            // Note: We use Math.abs just in case, though amount should be positive + isRefund=true.
+            // If we allow negative inputs as per recent change, we should handle that too.
+            // Logic: if isRefund OR amount < 0, it reduces expense.
+            const rawAmt = Number(item.amount);
+            const isReduction = item.isRefund || rawAmt < 0;
+            const absAmt = Math.abs(rawAmt);
+
             const cat = item.assignedCategory || 'Uncategorized';
-            agg[cat] = (agg[cat] || 0) + Number(item.amount);
+            if (isReduction) {
+                agg[cat] = (agg[cat] || 0) - absAmt;
+            } else {
+                agg[cat] = (agg[cat] || 0) + absAmt;
+            }
         });
         const divider = (selectedMonth === 'average' && availableMonths.length > 0) ? availableMonths.length : 1;
         return Object.keys(agg).map(key => ({
             name: key,
-            value: agg[key] / divider,
+            value: Math.max(0, agg[key] / divider), // Clamp to 0 to prevent breaking Pie Chart
             color: categories.find(c => c.name === key)?.color || '#64748b'
-        })).sort((a, b) => b.value - a.value);
+        })).sort((a, b) => b.value - a.value).filter(i => i.value > 0); // Filter out zero/negative slices
     }, [displayExpenses, selectedMonth, availableMonths, categories]);
 
     const incomeStats = useMemo(() => {

@@ -23,6 +23,9 @@ export const ExpenseStepCategorize = ({
     onSkip,
     cleanDateDisplay
 }) => {
+    // Internal state for refund modal
+    const [isRefundModalOpen, setIsRefundModalOpen] = React.useState(false);
+
     if (isCreatingCat) {
         return (
             <div className="mb-6 p-6 bg-white rounded-3xl shadow-xl border border-slate-100">
@@ -38,6 +41,26 @@ export const ExpenseStepCategorize = ({
                     />
                     <Button onClick={onQuickAddCategory} disabled={!newCatName}>Create</Button>
                     <Button variant="secondary" onClick={() => setIsCreatingCat(false)}><X className="w-4 h-4" /></Button>
+                </div>
+            </div>
+        );
+    }
+
+    if (isRefundModalOpen) {
+        return (
+            <div className="mb-6 p-6 bg-amber-50 rounded-3xl shadow-xl border border-amber-200 animate-fade-in">
+                <div className="flex justify-between items-center mb-4">
+                    <h4 className="font-bold text-amber-800 text-lg flex items-center gap-2"><XCircle className="w-5 h-5" /> Select Refund Category</h4>
+                    <button onClick={() => setIsRefundModalOpen(false)} className="p-2 hover:bg-amber-100 rounded-full text-amber-700"><X className="w-5 h-5" /></button>
+                </div>
+                <p className="text-sm text-amber-700 mb-6 font-medium">Which category is this refund for?</p>
+                <div className="grid grid-cols-3 gap-3">
+                    {categories.map(cat => (
+                        <button key={cat.id} onClick={() => { onCategorize(cat.name, true); setIsRefundModalOpen(false); }} className="p-3 rounded-xl border-2 border-white bg-white hover:border-amber-300 transition-all flex flex-col items-center justify-center gap-2 text-center h-24 shadow-sm">
+                            <CategoryIcon iconName={cat.icon} color={cat.color} className="w-6 h-6" />
+                            <span className="text-xs font-bold text-slate-600">{cat.name}</span>
+                        </button>
+                    ))}
                 </div>
             </div>
         );
@@ -93,7 +116,7 @@ export const ExpenseStepCategorize = ({
                             </button>);
                     })}
                     <button onClick={() => setIsCreatingCat(true)} className="p-3 rounded-xl border-2 border-dashed border-slate-300 hover:border-emerald-400 hover:bg-emerald-50 transition-all flex flex-col items-center justify-center gap-2 text-center h-24 text-slate-400 hover:text-emerald-600"><Plus className="w-6 h-6" /><span className="text-xs font-bold">New Cat</span></button>
-                    <button onClick={() => onCategorize('Refunded', true)} className="p-3 rounded-xl border-2 border-amber-200 bg-amber-50 hover:bg-amber-100 hover:border-amber-300 transition-all flex flex-col items-center justify-center gap-2 text-center h-24 text-amber-700"><XCircle className="w-6 h-6" /><span className="text-xs font-bold">Refunded</span></button>
+                    <button onClick={() => setIsRefundModalOpen(true)} className="p-3 rounded-xl border-2 border-amber-200 bg-amber-50 hover:bg-amber-100 hover:border-amber-300 transition-all flex flex-col items-center justify-center gap-2 text-center h-24 text-amber-700"><XCircle className="w-6 h-6" /><span className="text-xs font-bold">Refunded</span></button>
                 </div>
                 <div className="border-t border-slate-100 pt-6">
                     <button onClick={onSkip} className="w-full flex items-center justify-center gap-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors px-4 py-3 rounded-xl font-bold border border-transparent hover:border-slate-200">
