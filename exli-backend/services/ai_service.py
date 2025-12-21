@@ -3,6 +3,7 @@ import google.generativeai as genai
 from google.cloud import documentai
 from google.api_core.client_options import ClientOptions
 from config import Config, logger
+from traceloop.sdk.decorators import workflow, task
 
 # Configure Gemini once
 if Config.GEMINI_API_KEY:
@@ -25,6 +26,7 @@ def get_model_by_tier(tier="flash"):
         return 'gemini-1.5-flash'
 
 # --- NEW HELPER: GEOMETRY SORTING ---
+@task(name="geometry_sort_text")
 def geometry_sort_text(document_object):
     try:
         full_text = ""
@@ -47,6 +49,7 @@ def geometry_sort_text(document_object):
         logger.error(f"Geometry Sort Failed: {e}", exc_info=True)
         return "" # Return empty string on failure so we don't crash
 
+@task(name="extract_text_with_google_docai")
 def extract_text_with_google_docai(file_bytes, mime_type="application/pdf"):
     try:
         if not Config.DOCAI_PROCESSOR_ID or not Config.GCP_PROJECT_ID:
@@ -65,6 +68,7 @@ def extract_text_with_google_docai(file_bytes, mime_type="application/pdf"):
         logger.error(f"Document AI Failed: {e}",exc_info=True)
         return None
 
+@workflow(name="convert_pdf_to_data")
 def convert_pdf_to_data(file_bytes):
     if not Config.GEMINI_API_KEY: return None
 

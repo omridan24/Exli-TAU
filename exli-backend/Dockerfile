@@ -6,11 +6,15 @@ WORKDIR /app
 
 # No system dependencies needed for Document AI! 
 # We just update apt to be safe, but no heavy installs.
-RUN apt-get update && rm -rf /var/lib/apt/lists/*
+# Install compilation tools (fixes slow/hanging builds for grpcio/pandas)
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .

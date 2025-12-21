@@ -36,6 +36,6 @@ jobs:
             --region ${{ env.REGION }} \
             --project ${{ env.PROJECT_ID }} \
             --allow-unauthenticated \
-            --set-env-vars "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }},DOCAI_PROCESSOR_ID=${{ secrets.DOCAI_PROCESSOR_ID }},GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }},GCP_LOCATION=eu" \
+            --set-env-vars "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }},DOCAI_PROCESSOR_ID=${{ secrets.DOCAI_PROCESSOR_ID }},GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }},GCP_LOCATION=eu,TRACELOOP_API_KEY=${{ secrets.TRACELOOP_API_KEY }}" \
             --cpu 1 \
             --memory 512Mi

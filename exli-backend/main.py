@@ -5,6 +5,19 @@ import os
 from services.data_service import process_uploaded_files
 from services.ai_service import analyze_income_statement
 from services.stock_service import search_symbol, get_stock_details
+from traceloop.sdk import Traceloop
+
+# --- TRACELOOP INIT ---
+if os.environ.get("TRACELOOP_API_KEY"):
+    try:
+        Traceloop.init(
+            disable_batch=True,
+            api_key=os.environ.get("TRACELOOP_API_KEY"),
+            app_name="exli_backend"
+        )
+        print("Traceloop Initialized successfully.", flush=True)
+    except Exception as e:
+        print(f"Failed to init Traceloop: {e}", flush=True)
 
 print("--- EXLI BACKEND v12.0 (MULTI-FILE) ---", flush=True)
 
