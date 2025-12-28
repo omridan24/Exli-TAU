@@ -18,6 +18,10 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
     const [selectedIds, setSelectedIds] = useState([]);
     const [bulkCategory, setBulkCategory] = useState('');
 
+    // Toast notifications
+    const [successMessage, setSuccessMessage] = useState(null);
+    const [errorMessage, setErrorMessage] = useState(null);
+
     // Inline Edit
     const [editingId, setEditingId] = useState(null);
     const [editAmountVal, setEditAmountVal] = useState('');
@@ -29,6 +33,19 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
     const formatDate = (dateStr) => {
         try { return new Date(dateStr).toLocaleDateString(); } catch (e) { return dateStr; }
     };
+
+    const formatMonth = (monthStr) => {
+        const date = new Date(monthStr + '-01');
+        return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    };
+
+    // Auto-dismiss success messages
+    useEffect(() => {
+        if (successMessage) {
+            const timer = setTimeout(() => setSuccessMessage(null), 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [successMessage]);
 
     const filteredData = useMemo(() => {
         return {
@@ -131,6 +148,17 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
     const totalExpenses = categoryStats.reduce((acc, curr) => acc + curr.value, 0);
     const totalIncome = incomeStats.reduce((acc, curr) => acc + curr.value, 0);
     const totalSavings = totalIncome - totalExpenses;
+
+    const categorySpending = useMemo(() => {
+        if (totalIncome === 0) return [];
+        return categoryStats
+            .map(cat => ({
+                category: cat.name,
+                amount: cat.value,
+                percentage: (cat.value / totalIncome) * 100
+            }))
+            .sort((a, b) => b.percentage - a.percentage);
+    }, [categoryStats, totalIncome]);
     const savingsRate = totalIncome > 0 ? (totalSavings / totalIncome) * 100 : 0;
 
     const jobOptions = useMemo(() => {
@@ -178,8 +206,12 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
             if (mode === 'income' || mode === 'both') displayIncome.forEach(inc => batch.delete(doc(db, 'users', userId, 'income', inc.id)));
             await batch.commit();
             logUserAction(userId, 'DELETE_MONTH', `Deleted ${mode} for ${selectedMonth}`);
+            setSuccessMessage(`✅ Deleted ${mode} for ${formatMonth(selectedMonth)}`);
             if (mode === 'both') setSelectedMonth('average');
-        } catch (error) { console.error(error); alert("Delete failed."); }
+        } catch (error) {
+            console.error(error);
+            setErrorMessage("Failed to delete month data.");
+        }
     };
 
     const handleDelete = async (docId) => {
@@ -205,9 +237,11 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
 
             // Optimistic update for immediate feedback if relying on props update which might be slow
             // Actually, for now let's just rely on the subscription or parent refresh.
+            setSuccessMessage(`✅ Added note to ${ids.length} expense(s)`);
+            setSelectedIds([]);
         } catch (e) {
             console.error("Add note failed", e);
-            alert("Failed to add note.");
+            setErrorMessage("Failed to add note.");
         }
     };
 
@@ -218,9 +252,11 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
                 const ref = doc(db, 'users', userId, 'expenses', id);
                 return updateDoc(ref, { isSuspect: true });
             }));
+            setSuccessMessage(`✅ Marked ${ids.length} expense(s) as suspect`);
+            setSelectedIds([]);
         } catch (e) {
             console.error("Mark suspect failed", e);
-            alert("Failed to mark as suspect.");
+            setErrorMessage("Failed to mark as suspect.");
         }
     };
 
@@ -231,9 +267,46 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
                 const ref = doc(db, 'users', userId, 'expenses', id);
                 return updateDoc(ref, { isSuspect: false });
             }));
+            setSuccessMessage(`✅ Cleared suspect flag from ${ids.length} expense(s)`);
+            setSelectedIds([]);
         } catch (e) {
             console.error("Clear suspect failed", e);
-            alert("Failed to clear suspect flag.");
+            setErrorMessage("Failed to clear suspect flag.");
+        }
+    };
+
+    const handleMoveMonth = async (ids, targetMonth) => {
+        if (!ids.length || !targetMonth) return;
+        try {
+            await Promise.all(ids.map(id => {
+                const ref = doc(db, 'users', userId, 'expenses', id);
+                return updateDoc(ref, {
+                    reportMonth: targetMonth,
+                    movedAt: new Date(),
+                    movedFrom: selectedMonth
+                });
+            }));
+            setSuccessMessage(`✅ Moved ${ids.length} expense(s) to ${formatMonth(targetMonth)}`);
+            setSelectedIds([]);
+        } catch (e) {
+            console.error("Move month failed", e);
+            setErrorMessage("Failed to move expenses.");
+        }
+    };
+
+    const handleRemoveNote = async (ids) => {
+        if (!ids.length) return;
+        if (!confirm(`Remove notes from ${ids.length} expense(s)?`)) return;
+        try {
+            await Promise.all(ids.map(id => {
+                const ref = doc(db, 'users', userId, 'expenses', id);
+                return updateDoc(ref, { note: null });
+            }));
+            setSuccessMessage(`✅ Removed notes from ${ids.length} expense(s)`);
+            setSelectedIds([]);
+        } catch (e) {
+            console.error("Remove note failed", e);
+            setErrorMessage("Failed to remove notes.");
         }
     };
 
@@ -241,9 +314,10 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
         try {
             const ref = doc(db, 'users', userId, 'income', id);
             await updateDoc(ref, updates);
+            setSuccessMessage(`✅ Updated income record`);
         } catch (e) {
             console.error("Update income failed", e);
-            alert("Failed to update income.");
+            setErrorMessage("Failed to update income.");
         }
     };
 
@@ -360,6 +434,21 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
                 </div>
             )}
 
+            {/* Toast Notifications */}
+            {successMessage && (
+                <div className="fixed top-4 right-4 bg-green-100 border-2 border-green-300 text-green-800 px-6 py-3 rounded-xl shadow-lg animate-fade-in z-50 max-w-md">
+                    {successMessage}
+                </div>
+            )}
+            {errorMessage && (
+                <div className="fixed top-4 right-4 bg-red-100 border-2 border-red-300 text-red-800 px-6 py-3 rounded-xl shadow-lg animate-fade-in z-50 max-w-md flex justify-between items-center gap-3">
+                    <span>{errorMessage}</span>
+                    <button onClick={() => setErrorMessage(null)} className="text-red-600 hover:text-red-800">
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
+            )}
+
             {viewMode === 'month' ? (
                 <AnalyticsReportsView
                     totalIncome={totalIncome}
@@ -395,7 +484,10 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
                     onAddNote={handleAddNote}
                     onMarkSuspect={handleMarkSuspect}
                     onClearSuspect={handleClearSuspect}
+                    onMoveMonth={handleMoveMonth}
+                    onRemoveNote={handleRemoveNote}
                     onUpdateIncome={handleUpdateIncome}
+                    setSelectedIds={setSelectedIds}
                 />
             ) : (
                 <AnalyticsTrendsView
@@ -412,6 +504,8 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
                     trendOverview={trendOverview}
                     dominantCurrency={dominantCurrency}
                     activeTrendData={activeTrendData}
+                    totalIncome={totalIncome}
+                    categorySpending={categorySpending}
                 />
             )}
         </div>

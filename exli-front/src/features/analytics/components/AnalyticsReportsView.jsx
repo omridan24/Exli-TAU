@@ -5,7 +5,7 @@ import {
 import {
     Trash2, DollarSign, Wallet, CheckSquare, Square,
     Check, X, Briefcase,
-    Flag, Calendar, Type, Repeat
+    Flag, Calendar, Type, Repeat, HelpCircle
 } from 'lucide-react';
 import { Card } from '../../../components/UI';
 import { MonthYearPickerModal } from '../../../components/MonthYearPickerModal';
@@ -20,7 +20,8 @@ export const AnalyticsReportsView = ({
     handleDelete, toggleSelect, toggleSelectAll,
     executeBulkCategory, bulkCategory, setBulkCategory, categories,
     editingId, startEditAmount, saveAmount, editAmountVal, setEditAmountVal,
-    handleCategoryChange, formatDate, onAddNote, onMarkSuspect, onClearSuspect, onUpdateIncome
+    handleCategoryChange, formatDate, onAddNote, onMarkSuspect, onClearSuspect,
+    onMoveMonth, onRemoveNote, onUpdateIncome, setSelectedIds
 }) => {
     const [hoveredIncome, setHoveredIncome] = useState(null);
 
@@ -53,6 +54,10 @@ export const AnalyticsReportsView = ({
         const item = sortedExpenses.find(exp => exp.id === id);
         return item && item.isSuspect;
     });
+    const hasNotesSelected = selectedIds.some(id => {
+        const item = sortedExpenses.find(exp => exp.id === id);
+        return item && item.note;
+    });
 
     const [isMoveMonthOpen, setIsMoveMonthOpen] = useState(false);
     const [selectedMoveMonth, setSelectedMoveMonth] = useState('');
@@ -67,14 +72,13 @@ export const AnalyticsReportsView = ({
         }
 
         // Apply move month if selected
-        if (selectedMoveMonth && selectedIds.length) {
+        if (selectedMoveMonth && selectedIds.length && onMoveMonth) {
             onMoveMonth(selectedIds, selectedMoveMonth);
         }
 
         // Clear selections
         setSelectedMoveMonth('');
         setBulkCategory('');
-        // Don't clear selectedIds here - let parent or user do it manually
     };
 
     return (
@@ -132,6 +136,14 @@ export const AnalyticsReportsView = ({
                             <ResponsiveContainer minWidth={0}><PieChart><Pie data={categoryStats} dataKey="value" cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={2}>{categoryStats.map((e, i) => (<Cell key={i} fill={e.color} />))}</Pie><Tooltip formatter={(v) => `${dominantCurrency} ${v.toFixed(0)}`} /></PieChart></ResponsiveContainer>
                         </div>
                         <div className="w-full md:w-1/2 overflow-y-auto h-full pr-2 space-y-2 custom-scrollbar">
+                            {totalIncome > 0 && (
+                                <div className="mb-3 px-2 py-2 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-2">
+                                    <HelpCircle className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                                    <p className="text-[10px] text-blue-700 leading-relaxed">
+                                        <strong>Percentages</strong> show spending as % of total income for this month
+                                    </p>
+                                </div>
+                            )}
                             {categoryStats.map(s => (
                                 <div key={s.name} className="flex items-center justify-between text-xs">
                                     <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />{s.name}</div>
@@ -340,6 +352,16 @@ export const AnalyticsReportsView = ({
                         <Type className="w-3 h-3" /> Add Note
                     </button>
 
+                    {/* Remove Note - only show if selected expenses have notes */}
+                    {hasNotesSelected && onRemoveNote && (
+                        <button
+                            onClick={() => onRemoveNote(selectedIds)}
+                            className="flex items-center gap-1.5 text-xs font-bold bg-slate-800 text-slate-400 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors"
+                        >
+                            <X className="w-3 h-3" /> Remove Note
+                        </button>
+                    )}
+
                     <div className="h-4 w-px bg-slate-700"></div>
 
                     {/* Category */}
@@ -348,7 +370,7 @@ export const AnalyticsReportsView = ({
                         {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                     </select>
                     <button onClick={handleApplyBulkActions} disabled={!bulkCategory && !selectedMoveMonth} className="bg-emerald-500 hover:bg-emerald-400 text-white p-1.5 rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-all"><Check className="w-4 h-4" /></button>
-                    <button onClick={() => setSelectedIds([])} className="ml-2 text-slate-500 hover:text-white"><X className="w-4 h-4" /></button>
+                    <button onClick={() => setSelectedIds && setSelectedIds([])} className="ml-2 text-slate-500 hover:text-white"><X className="w-4 h-4" /></button>
                 </div>
             )}
 

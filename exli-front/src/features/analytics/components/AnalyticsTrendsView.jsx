@@ -18,7 +18,9 @@ export const AnalyticsTrendsView = ({
     jobOptions,
     trendOverview,
     dominantCurrency,
-    activeTrendData
+    activeTrendData,
+    totalIncome,
+    categorySpending
 }) => {
     return (
         <div className="animate-fade-in">
@@ -50,10 +52,57 @@ export const AnalyticsTrendsView = ({
                 )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            {/* Over Budget Alert - Separate responsive banner */}
+            {trendType === 'expense' && totalIncome > 0 && categorySpending && categorySpending.length > 0 &&
+                categorySpending.reduce((sum, c) => sum + c.percentage, 0) > 100 && (
+                    <div className="mb-6 px-6 py-4 bg-red-50 border-2 border-red-300 rounded-xl flex items-center gap-3 animate-fade-in">
+                        <div className="text-3xl">⚠️</div>
+                        <div className="flex-1">
+                            <div className="font-bold text-red-800 text-lg">Spending Exceeds Income</div>
+                            <div className="text-sm text-red-600 mt-1">
+                                Total spending is {categorySpending.reduce((sum, c) => sum + c.percentage, 0).toFixed(1)}% of income this year. Consider reducing expenses or increasing income.
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 <Card className="p-4 flex flex-col justify-between"><div className="text-slate-400 text-xs font-bold uppercase">Total {trendType === 'expense' ? 'Spent' : 'Earned'}</div><div className="text-2xl font-bold text-slate-800">{dominantCurrency} {trendOverview.total.toLocaleString()}</div></Card>
                 <Card className="p-4 flex flex-col justify-between"><div className="text-slate-400 text-xs font-bold uppercase">Monthly Average</div><div className="text-2xl font-bold text-blue-600">{dominantCurrency} {trendOverview.avg.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div></Card>
                 <Card className="p-4 flex flex-col justify-between"><div className="text-slate-400 text-xs font-bold uppercase">Highest Month</div><div className="text-2xl font-bold text-orange-500">{dominantCurrency} {trendOverview.max.toLocaleString()}</div></Card>
+
+                {/* Category % of Income Card - Shows SELECTED category only */}
+                {trendType === 'expense' && totalIncome > 0 && categorySpending && categorySpending.length > 0 && (
+                    <Card className="p-4 col-span-1 md:col-span-2 lg:col-span-1">
+                        <div className="text-slate-400 text-xs font-bold uppercase mb-3">📊 % of Income</div>
+                        {(() => {
+                            const selectedCatData = categorySpending.find(c => c.category === selectedCategory);
+                            if (!selectedCatData) {
+                                return <div className="text-xs text-slate-500 text-center py-4">No data for {selectedCategory}</div>;
+                            }
+                            return (
+                                <div>
+                                    <div className="mb-4">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-sm font-medium text-slate-700">{selectedCatData.category}</span>
+                                            <span className="text-3xl font-bold text-emerald-600">{selectedCatData.percentage.toFixed(1)}%</span>
+                                        </div>
+                                        <div className="w-full bg-slate-200 rounded-full h-3">
+                                            <div
+                                                className="bg-emerald-500 h-3 rounded-full transition-all duration-500"
+                                                style={{ width: `${Math.min(selectedCatData.percentage, 100)}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="text-xs text-slate-500 mt-3">
+                                        {dominantCurrency} {selectedCatData.amount.toLocaleString()} of {dominantCurrency} {totalIncome.toLocaleString()} income
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                    </Card>
+                )}
             </div>
 
             <div className="h-72 mb-8">
