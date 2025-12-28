@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Upload } from 'lucide-react';
-import { collection, addDoc, serverTimestamp, doc, setDoc } from 'firebase/firestore';
+import { Upload, Receipt, X } from 'lucide-react';
+import { collection, addDoc, serverTimestamp, doc, setDoc, getDocs } from 'firebase/firestore';
 import { db, CLOUD_RUN_URL, logUserAction } from '../../config/firebase.js';
 import { DEFAULT_CATEGORIES } from '../../config/constants.js';
 
@@ -10,6 +10,9 @@ import { ExpenseManualForm } from './components/ExpenseManualForm';
 import { ExpenseStepVerify } from './components/ExpenseStepVerify';
 import { ExpenseStepCategorize } from './components/ExpenseStepCategorize';
 import { ExpenseSuccess } from './components/ExpenseSuccess';
+import { ProgressBar } from './components/ProgressBar';
+import { RecurringCard } from './components/RecurringCard';
+import { RecurringForm } from './components/RecurringForm';
 
 export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, onComplete }) => {
   const [step, setStep] = useState(0);
@@ -34,6 +37,12 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
     currency: 'ILS',
     category: ''
   });
+  const [uploadProgress, setUploadProgress] = useState(null); // { progress_percent, current_step, etc }
+  const [editingExpense, setEditingExpense] = useState(null);
+  const [showManualTypeSelector, setShowManualTypeSelector] = useState(false);
+  const [showRecurringForm, setShowRecurringForm] = useState(false);
+  const [pollingInterval, setPollingInterval] = useState(null);
+  const [recurringExpenses, setRecurringExpenses] = useState([]);
 
   useEffect(() => {
     const handleBeforeUnload = (e) => {
@@ -45,6 +54,32 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isLoading]);
+
+  // Cleanup polling interval on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
+    };
+  }, [pollingInterval]);
+
+  // Fetch recurring expenses
+  useEffect(() => {
+    if (!userId) return;
+    fetchRecurringExpenses();
+  }, [userId]);
+
+  const fetchRecurringExpenses = async () => {
+    try {
+      const recurringRef = collection(db, 'users', userId, 'recurring_expenses');
+      const snapshot = await getDocs(recurringRef);
+      const recurring = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      setRecurringExpenses(recurring);
+    } catch (err) {
+      console.error('Failed to fetch recurring expenses:', err);
+    }
+  };
 
   const sortedCategories = categories;
 
@@ -102,20 +137,104 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
     setFiles(files.filter((_, i) => i !== idx));
   };
 
+  const pollUploadStatus = async (jobId) => {
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch(`${CLOUD_RUN_URL}/upload-status?job_id=${jobId}`);
+        if (!response.ok) {
+          clearInterval(interval);
+          throw new Error(`Polling failed: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        // Update progress
+        if (data.progress) {
+          setUploadProgress(data.progress);
+        }
+
+        // Check if completed
+        if (data.status === 'completed' && data.result) {
+          clearInterval(interval);
+          setPollingInterval(null);
+          setUploadProgress(null);
+
+          // Process result same as sync
+          const initProcessed = data.result.files.map(f => ({
+            ...f,
+            columnMapping: mapBackendToIndices(f.suggested_mapping, f.columns)
+          }));
+
+          setProcessedFiles(initProcessed);
+          setIsLoading(false);
+          setStep(2);
+          logUserAction(userId, 'FILE_ANALYSIS', `Analyzed ${files.length} files (async)`);
+        } else if (data.status === 'failed') {
+          clearInterval(interval);
+          setPollingInterval(null);
+          setUploadProgress(null);
+          setIsLoading(false);
+          setError(data.progress?.current_step || "Processing failed");
+          logUserAction(userId, 'ANALYSIS_ERROR', `Async job failed`);
+        }
+      } catch (err) {
+        clearInterval(interval);
+        setPollingInterval(null);
+        setUploadProgress(null);
+        setIsLoading(false);
+        setError(err.message || "Failed to poll status");
+      }
+    }, 1500); // Poll every 1.5 seconds
+
+    setPollingInterval(interval);
+  };
+
   const handleUploadAndAnalyze = async () => {
     if (files.length === 0) return;
+
     setIsLoading(true);
     setError(null);
+    setUploadProgress(null);
+
+    // Start estimated progress animation
+    const hasPdf = files.some(f => f.name.toLowerCase().endsWith('.pdf'));
+    const estimatedSeconds = hasPdf ? files.length * 60 : files.length * 15;
+
+    let elapsed = 0;
+    const progressInterval = setInterval(() => {
+      elapsed += 3;  // Update every 3 seconds
+      const percent = Math.min(95, Math.floor((elapsed / estimatedSeconds) * 100));
+
+      setUploadProgress({
+        progress_percent: percent,
+        current_step: hasPdf ? `Processing ${files.length} file(s)... Est. ${estimatedSeconds}s` : `Analyzing ${files.length} file(s)...`,
+        estimated_seconds_remaining: Math.max(0, estimatedSeconds - elapsed),
+        completed_files: Math.floor((percent / 100) * files.length),
+        total_files: files.length
+      });
+    }, 3000);  // Update every 3 seconds instead of 1 second
+
+    setPollingInterval(progressInterval);
+
     const formData = new FormData();
     files.forEach(f => formData.append('files', f));
 
     try {
       if (!CLOUD_RUN_URL || CLOUD_RUN_URL.includes("YOUR_CLOUD_RUN")) throw new Error("Backend URL not configured.");
+
       const response = await fetch(`${CLOUD_RUN_URL}/analyze-file`, { method: 'POST', body: formData });
       if (!response.ok) throw new Error(`Server Error: ${response.statusText}`);
 
       const data = await response.json();
       if (data.status === 'error') throw new Error(data.message);
+
+      // Stop progress animation
+      clearInterval(progressInterval);
+      setPollingInterval(null);
+      setUploadProgress({ progress_percent: 100, current_step: "Complete!" });
+
+      // Small delay to show 100%
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       const initProcessed = data.files.map(f => ({
         ...f,
@@ -123,9 +242,13 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
       }));
 
       setProcessedFiles(initProcessed);
+      setUploadProgress(null);
       setStep(2);
       logUserAction(userId, 'FILE_ANALYSIS', `Analyzed ${files.length} files`);
     } catch (err) {
+      clearInterval(progressInterval);
+      setPollingInterval(null);
+      setUploadProgress(null);
       setError(err.message || "Failed to analyze files.");
       logUserAction(userId, 'ANALYSIS_ERROR', `Error: ${err.message}`);
     } finally {
@@ -194,7 +317,10 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
   // State for showing previous choice on undo
   const [lastUndoChoice, setLastUndoChoice] = useState(null);
 
-  const handleCategorize = (categoryName, isRefund = false, isSuspect = false) => {
+  const handleCategorize = (categoryName, isRefund = false, isSuspect = false, recurringId = null) => {
+    // Guard: Prevent race condition double-submission
+    if (isLoading) return;
+
     if (isManualMode) {
       if (!manualData.amount || !manualData.description) {
         alert("Please enter amount and description");
@@ -213,6 +339,8 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
       reportMonth: reportMonth,
       isRefund: isRefund,
       isSuspect: isSuspect, // Add suspect flag
+      isRecurring: !!recurringId, // NEW: mark as recurring
+      recurringExpenseId: recurringId || null, // NEW: link to recurring
       status: 'active'
     };
 
@@ -293,18 +421,51 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
     setIsCreatingCat(false);
   };
 
-  const handleSkip = () => moveToNext();
+  const handleSkip = () => {
+    if (isLoading) return;
+    moveToNext();
+  };
   const moveToNext = () => currentIndex < allTransactions.length - 1 ? setCurrentIndex(prev => prev + 1) : finishImport();
 
   const finishImport = async () => {
     setIsLoading(true);
     try {
       const expensesRef = collection(db, 'users', userId, 'expenses');
-      await Promise.all(processedTransactions.map(tx => addDoc(expensesRef, { ...tx, source: "smart_import", createdAt: serverTimestamp() })));
+
+      // Group transactions by signature to handle legitimate duplicates (e.g., 2 coffees same day)
+      const transactionGroups = {};
+      processedTransactions.forEach(tx => {
+        const sig = `${tx.date.split('T')[0]}_${tx.amount}_${tx.description.replace(/[^a-zA-Z0-9]/g, '')}`;
+        if (!transactionGroups[sig]) transactionGroups[sig] = [];
+        transactionGroups[sig].push(tx);
+      });
+
+      // Save with deterministic IDs + counter for same-day duplicates
+      const savePromises = [];
+      Object.entries(transactionGroups).forEach(([sig, txList]) => {
+        txList.forEach((tx, index) => {
+          const txDate = tx.date.split('T')[0];
+          const safeDesc = tx.description.replace(/[^a-zA-Z0-9]/g, '').substring(0, 30);
+          const safeCard = tx.sourceCard ? tx.sourceCard.replace(/[^a-zA-Z0-9]/g, '').substring(0, 20) : 'unknown';
+          const uniqueId = `${txDate}_${tx.amount}_${safeDesc}_${safeCard}_${index}`;
+
+          savePromises.push(setDoc(doc(expensesRef, uniqueId), {
+            ...tx,
+            source: "smart_import",
+            createdAt: serverTimestamp()
+          }));
+        });
+      });
+
+      await Promise.all(savePromises);
       logUserAction(userId, 'IMPORT_COMPLETE', `Imported ${processedTransactions.length} transactions`);
       setStep(4);
-    } catch (err) { setError("Failed to save transactions."); }
-    finally { setIsLoading(false); }
+    } catch (err) {
+      console.error('Save error:', err);
+      setError("Failed to save transactions.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const currentTx = allTransactions[currentIndex];
@@ -338,17 +499,44 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
       )}
 
       {step === 1 && !isManualMode && (
-        <ExpenseUpload
-          files={files}
-          onFileChange={handleFileChange}
-          onRemoveFile={removeFile}
-          onManualConfig={() => setIsManualMode(true)}
-          error={error}
-          onBack={() => setStep(0)}
-          processingTimeEstimate={processingTimeEstimate}
-          onAnalyze={handleUploadAndAnalyze}
-          isLoading={isLoading}
-        />
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left: Upload Files (2 columns on large screens) */}
+            <div className="lg:col-span-2">
+              <ExpenseUpload
+                files={files}
+                onFileChange={handleFileChange}
+                onRemoveFile={removeFile}
+                onManualConfig={() => setShowManualTypeSelector(true)}
+                error={error}
+                onBack={() => setStep(0)}
+                processingTimeEstimate={processingTimeEstimate}
+                onAnalyze={handleUploadAndAnalyze}
+                isLoading={isLoading}
+              />
+            </div>
+
+            {/* Right: Recurring Expenses (1 column) */}
+            <div className="lg:col-span-1">
+              <RecurringCard
+                userId={userId}
+                categories={sortedCategories}
+                recurringExpenses={recurringExpenses}
+                onUpdate={fetchRecurringExpenses}
+              />
+            </div>
+          </div>
+
+          {/* Progress Bar for Async Processing */}
+          {isLoading && uploadProgress && (
+            <div className="mt-6">
+              <ProgressBar
+                progress={uploadProgress}
+                processingTimeEstimate={processingTimeEstimate}
+              />
+            </div>
+          )}
+        </div>
       )}
 
       {isManualMode && !isCreatingCat && (
@@ -392,6 +580,7 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
           onCategorize={handleCategorize}
           onSkip={handleSkip}
           cleanDateDisplay={cleanDateDisplay}
+          recurringExpenses={recurringExpenses}
         />
       )}
 
@@ -433,6 +622,86 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
           onComplete={onComplete}
         />
       )}
-    </div>
+
+      {/* Manual Entry Type Selector Modal */}
+      {showManualTypeSelector && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-bold text-xl text-slate-800">Add Expense Manually</h3>
+              <button onClick={() => setShowManualTypeSelector(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-sm text-slate-600 mb-4">Choose the type of expense you want to add:</p>
+
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                onClick={() => {
+                  setShowManualTypeSelector(false);
+                  setIsManualMode(true);
+                }}
+                className="p-6 rounded-xl border-2 border-slate-200 hover:border-blue-500 hover:bg-blue-50 transition-all flex flex-col items-center text-center group"
+              >
+                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                  <Receipt className="w-6 h-6 text-blue-600" />
+                </div>
+                <div className="font-bold text-slate-800">One-Time</div>
+                <div className="text-xs text-slate-500 mt-1">One-time expense</div>
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowManualTypeSelector(false);
+                  setShowRecurringForm(true);
+                }}
+                className="p-6 rounded-xl border-2 border-slate-200 hover:border-purple-500 hover:bg-purple-50 transition-all flex flex-col items-center text-center group"
+              >
+                <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                  <Upload className="w-6 h-6 text-purple-600" />
+                </div>
+                <div className="font-bold text-slate-800">Recurring</div>
+                <div className="text-xs text-slate-500 mt-1">Monthly/Quarterly/Yearly</div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recurring Form Modal */}
+      {showRecurringForm && (
+        <RecurringForm
+          userId={userId}
+          categories={sortedCategories}
+          editData={editingExpense}
+          onAddCategory={async (categoryData) => {
+            const newId = categoryData.name.toLowerCase().replace(/\s+/g, '_');
+            const newCat = {
+              id: newId,
+              name: categoryData.name,
+              icon: categoryData.icon || 'Star',
+              color: categoryData.color || '#10b981'
+            };
+            const updated = [...categories, newCat];
+            onUpdateCategories(updated);
+
+            // Save to Firestore
+            await setDoc(doc(db, 'users', userId), {
+              customCategories: updated.filter(c => !DEFAULT_CATEGORIES.find(dc => dc.id === c.id))
+            }, { merge: true });
+          }}
+          onSave={() => {
+            setShowRecurringForm(false);
+            setEditingExpense(null);
+            fetchRecurringExpenses();
+          }}
+          onCancel={() => {
+            setShowRecurringForm(false);
+            setEditingExpense(null);
+          }}
+        />
+      )}
+    </div >
   );
 };

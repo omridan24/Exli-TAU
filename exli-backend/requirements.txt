@@ -6,6 +6,8 @@ gunicorn>=21.2.0
 google-generativeai>=0.8.3
 python-dotenv>=1.0.0
 yfinance>=0.2.36
-# NEW: Google Document AI
+# Google Document AI
 google-cloud-documentai>=2.24.0
+google-cloud-firestore>=2.14.0
+# Observability
 traceloop-sdk

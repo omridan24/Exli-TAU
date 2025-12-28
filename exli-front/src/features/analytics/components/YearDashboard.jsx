@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
     PieChart as PieIcon, BarChart3, ArrowLeft
 } from 'lucide-react';
@@ -11,6 +11,7 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
     const [viewMode, setViewMode] = useState('month');
     const [trendType, setTrendType] = useState('expense');
     const [selectedMonth, setSelectedMonth] = useState('average');
+    const [hoveredMonth, setHoveredMonth] = useState(null);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
     // Selection & Bulk Action
@@ -55,6 +56,25 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
         ].filter(Boolean));
         return Array.from(months).sort().reverse();
     }, [filteredData]);
+
+    // Detect forecast-only months
+    const forecastMonths = useMemo(() => {
+        const forecast = new Set();
+        availableMonths.forEach(month => {
+            const monthExpenses = filteredData.expenses.filter(exp => exp.reportMonth === month);
+            const monthIncome = filteredData.income.filter(inc => inc.month === month);
+
+            // A month is forecast-only if it has expenses and ALL expenses are forecasted, and no income
+            const hasExpenses = monthExpenses.length > 0;
+            const allForecast = monthExpenses.every(exp => exp.isForecast);
+            const hasIncome = monthIncome.length > 0;
+
+            if (hasExpenses && allForecast && !hasIncome) {
+                forecast.add(month);
+            }
+        });
+        return forecast;
+    }, [availableMonths, filteredData]);
 
     const displayExpenses = useMemo(() => selectedMonth === 'average' ? filteredData.expenses : filteredData.expenses.filter(d => d.reportMonth === selectedMonth), [filteredData.expenses, selectedMonth]);
     const displayIncome = useMemo(() => selectedMonth === 'average' ? filteredData.income : filteredData.income.filter(d => d.month === selectedMonth), [filteredData.income, selectedMonth]);
@@ -261,6 +281,32 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
         setEditingId(null);
     };
 
+    // Auto-convert forecasted expenses to regular when month becomes current/past
+    useEffect(() => {
+        const convertForecastedExpenses = async () => {
+            const currentMonth = new Date().toISOString().slice(0, 7);
+            const forecastedExpenses = filteredData.expenses.filter(
+                exp => exp.isForecast && exp.reportMonth <= currentMonth
+            );
+
+            if (forecastedExpenses.length > 0) {
+                try {
+                    const batch = writeBatch(db);
+                    forecastedExpenses.forEach(exp => {
+                        const ref = doc(db, 'users', userId, 'expenses', exp.id);
+                        batch.update(ref, { isForecast: false });
+                    });
+                    await batch.commit();
+                    console.log(`Converted ${forecastedExpenses.length} forecasted expenses to regular`);
+                } catch (error) {
+                    console.error('Failed to convert forecasted expenses:', error);
+                }
+            }
+        };
+
+        convertForecastedExpenses();
+    }, [filteredData.expenses, userId]);
+
     return (
         <div className="animate-fade-in relative pb-20">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -277,9 +323,40 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
             {viewMode === 'month' && (
                 <div className="flex items-center gap-2 overflow-x-auto pb-4 mb-4 border-b border-slate-100">
                     <button onClick={() => setSelectedMonth('average')} className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${selectedMonth === 'average' ? 'bg-blue-600 text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>📊 Yearly Avg</button>
-                    {availableMonths.map(m => (
-                        <button key={m} onClick={() => setSelectedMonth(m)} className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${selectedMonth === m ? 'bg-emerald-600 text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>{m}</button>
-                    ))}
+                    {availableMonths.map(m => {
+                        const currentMonth = new Date().toISOString().slice(0, 7);
+                        const isForecast = forecastMonths.has(m);
+                        const isFuture = m > currentMonth;
+                        return (
+                            <div key={m} className="relative">
+                                <button
+                                    onClick={() => setSelectedMonth(m)}
+                                    onMouseEnter={() => setHoveredMonth(m)}
+                                    onMouseLeave={() => setHoveredMonth(null)}
+                                    className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${selectedMonth === m
+                                        ? isForecast
+                                            ? 'bg-purple-600 text-white shadow-md'
+                                            : 'bg-emerald-600 text-white shadow-md'
+                                        : isForecast
+                                            ? 'bg-purple-50 text-purple-700 border-2 border-dashed border-purple-300 hover:bg-purple-100'
+                                            : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                                        }`}
+                                >
+                                    {isForecast && '🔮 '}{m}
+                                </button>
+                                {hoveredMonth === m && isForecast && (
+                                    <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-slate-900 text-white rounded-xl p-3 shadow-2xl z-50 animate-fade-in w-64 text-left">
+                                        <div className="font-bold text-purple-400 text-xs mb-1 flex items-center gap-1">
+                                            🔮 Forecast Month
+                                        </div>
+                                        <div className="text-[11px] text-slate-300">
+                                            Contains projected recurring expenses. Upload actual expenses to convert to a real report.
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
                 </div>
             )}
 
@@ -296,6 +373,7 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
                     displayExpenses={displayExpenses}
                     selectedMonth={selectedMonth}
                     selectedIds={selectedIds}
+                    isForecastMonth={forecastMonths.has(selectedMonth)}
                     handleIncomeDelete={handleIncomeDelete}
                     executeDeleteMonth={executeDeleteMonth}
                     isDeleteModalOpen={isDeleteModalOpen}

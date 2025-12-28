@@ -33,6 +33,21 @@ export const AnalyticsNode = ({ data, income, categories, userId }) => {
         return { exp, incNet, wealth };
     }, [data, income]);
 
+    // Check if a year is fully forecasted
+    const getYearStatus = (year) => {
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        const currentYear = currentMonth.split('-')[0];
+
+        if (year > currentYear) {
+            return 'forecasted';
+        } else if (year === currentYear) {
+            const yearExpenses = data.filter(d => d.reportMonth?.startsWith(year));
+            const hasRealExpenses = yearExpenses.some(exp => !exp.isForecast && exp.source !== 'recurring_auto');
+            return hasRealExpenses ? 'partial' : 'forecasted';
+        }
+        return 'real';
+    };
+
     if (selectedYear) return <YearDashboard year={selectedYear} data={data} income={income} categories={categories} userId={userId} onBack={() => setSelectedYear(null)} />;
 
     return (
@@ -41,15 +56,33 @@ export const AnalyticsNode = ({ data, income, categories, userId }) => {
             <StatsOverview totals={lifetimeTotals} currency={dominantCurrency} />
             <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2"><Calendar className="w-5 h-5 text-slate-500" /> Select Fiscal Year</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                {years.map(year => (
-                    <button key={year} onClick={() => setSelectedYear(year)} className="bg-white p-10 rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:border-emerald-200 transition-all text-left group relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                            <Calendar className="w-24 h-24 text-emerald-600" />
-                        </div>
-                        <div className="text-4xl font-black text-slate-800 group-hover:text-emerald-700 transition-colors">{year}</div>
-                        <div className="mt-4 text-slate-400 font-bold flex items-center gap-2">Full Report <ArrowRight className="w-4 h-4" /></div>
-                    </button>
-                ))}
+                {years.map(year => {
+                    const status = getYearStatus(year);
+                    const isForecast = status === 'forecasted';
+                    return (
+                        <button
+                            key={year}
+                            onClick={() => setSelectedYear(year)}
+                            className={`bg-white p-10 rounded-3xl border shadow-sm hover:shadow-xl transition-all text-left group relative overflow-hidden ${isForecast ? 'border-purple-300 hover:border-purple-400' : 'border-slate-100 hover:border-emerald-200'
+                                }`}
+                            title={isForecast ? '🔮 Forecasted Year - Contains only predicted recurring expenses' : ''}
+                        >
+                            <div className={`absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity`}>
+                                <Calendar className={`w-24 h-24 ${isForecast ? 'text-purple-600' : 'text-emerald-600'}`} />
+                            </div>
+                            {isForecast && (
+                                <div className="absolute top-4 left-4 bg-purple-100 border-2 border-purple-300 text-purple-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+                                    <span>🔮</span> FORECASTED
+                                </div>
+                            )}
+                            <div className={`text-4xl font-black transition-colors ${isForecast ? 'text-purple-700 group-hover:text-purple-800' : 'text-slate-800 group-hover:text-emerald-700'
+                                }`}>{year}</div>
+                            <div className="mt-4 text-slate-400 font-bold flex items-center gap-2">
+                                Full Report <ArrowRight className="w-4 h-4" />
+                            </div>
+                        </button>
+                    );
+                })}
                 {years.length === 0 && (
                     <div className="col-span-full text-center py-12 text-slate-400 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
                         No data found. Upload expenses to start.

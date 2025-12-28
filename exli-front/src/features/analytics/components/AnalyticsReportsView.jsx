@@ -5,7 +5,7 @@ import {
 import {
     Trash2, DollarSign, Wallet, CheckSquare, Square,
     Check, X, Briefcase,
-    Flag, Calendar, Type
+    Flag, Calendar, Type, Repeat
 } from 'lucide-react';
 import { Card } from '../../../components/UI';
 import { MonthYearPickerModal } from '../../../components/MonthYearPickerModal';
@@ -15,7 +15,7 @@ import { IncomeEditModal } from '../../../components/IncomeEditModal';
 export const AnalyticsReportsView = ({
     totalIncome, totalExpenses, totalSavings, savingsRate, dominantCurrency,
     categoryStats, incomeStats, displayIncome, displayExpenses,
-    selectedMonth, selectedIds,
+    selectedMonth, selectedIds, isForecastMonth,
     handleIncomeDelete, executeDeleteMonth, isDeleteModalOpen, setIsDeleteModalOpen,
     handleDelete, toggleSelect, toggleSelectAll,
     executeBulkCategory, bulkCategory, setBulkCategory, categories,
@@ -24,12 +24,25 @@ export const AnalyticsReportsView = ({
 }) => {
     const [hoveredIncome, setHoveredIncome] = useState(null);
 
-    // Sort expenses: Suspect first, then date desc
+    // Sort expenses: Suspect first, then Recurring, then date desc
     const sortedExpenses = [...displayExpenses].sort((a, b) => {
+        // Suspect first
         if (a.isSuspect && !b.isSuspect) return -1;
         if (!a.isSuspect && b.isSuspect) return 1;
+
+        // Then recurring
+        if (a.isRecurring && !b.isRecurring) return -1;
+        if (!a.isRecurring && b.isRecurring) return 1;
+
+        // Then by date
         return new Date(b.date) - new Date(a.date);
     });
+
+    // Calculate recurring vs one-time stats
+    const recurringTotal = displayExpenses
+        .filter(exp => exp.isRecurring && !exp.isRefund)
+        .reduce((sum, exp) => sum + Math.abs(exp.amount), 0);
+    const oneTimeTotal = totalExpenses - recurringTotal;
 
     // Check if any selected items are suspect or non-suspect
     const hasNonSuspectSelected = selectedIds.some(id => {
@@ -66,6 +79,43 @@ export const AnalyticsReportsView = ({
 
     return (
         <>
+            {/* Recurring vs One-Time Breakdown */}
+            {selectedMonth !== 'average' && recurringTotal > 0 && (
+                <div className="mb-4 flex gap-3">
+                    <div className="flex-1 bg-purple-50 border border-purple-200 rounded-xl p-3 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <Repeat className="w-4 h-4 text-purple-600" />
+                            <span className="text-xs font-bold text-purple-900">Recurring</span>
+                        </div>
+                        <span className="text-sm font-bold text-purple-600">
+                            {dominantCurrency} {recurringTotal.toLocaleString()}
+                        </span>
+                    </div>
+                    <div className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <DollarSign className="w-4 h-4 text-slate-600" />
+                            <span className="text-xs font-bold text-slate-700">One-Time</span>
+                        </div>
+                        <span className="text-sm font-bold text-slate-600">
+                            {dominantCurrency} {oneTimeTotal.toLocaleString()}
+                        </span>
+                    </div>
+                </div>
+            )}
+
+            {/* Forecast Month Notice */}
+            {selectedMonth !== 'average' && isForecastMonth && (
+                <div className="mb-6 bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-200 rounded-2xl p-4 flex items-start gap-4 shadow-sm">
+                    <div className="text-3xl">🔮</div>
+                    <div className="flex-1">
+                        <div className="font-bold text-purple-900 text-sm mb-1">Forecast Month</div>
+                        <div className="text-xs text-purple-700 leading-relaxed">
+                            This month contains only projected recurring expenses. These are predictions based on your recurring expense settings. Upload actual expenses to convert this to a real report with accurate data.
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* ... Top Cards ... */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                 <Card className="p-4 flex flex-col justify-between"><div className="text-slate-400 text-xs font-bold uppercase">Net Income</div><div className="text-2xl font-bold text-emerald-600">{dominantCurrency} {totalIncome.toLocaleString()}</div></Card>
@@ -202,10 +252,14 @@ export const AnalyticsReportsView = ({
                                         // Check if transaction is a refund (either flag or negative amount)
                                         const isRefundItem = tx.isRefund || tx.amount < 0;
                                         const isSuspectItem = tx.isSuspect;
+                                        const isRecurringItem = tx.isRecurring;
                                         const displayAmount = Math.abs(tx.amount); // Show positive magnitude
 
                                         return (
-                                            <tr key={tx.id} className={`hover:bg-slate-50 group border-b border-slate-100 ${selectedIds.includes(tx.id) ? 'bg-blue-50/50' : ''} ${isSuspectItem ? 'bg-red-50 border-red-100 hover:bg-red-100/50' : ''}`}>
+                                            <tr key={tx.id} className={`hover:bg-slate-50 group border-b border-slate-100 ${selectedIds.includes(tx.id) ? 'bg-blue-50/50' : ''
+                                                } ${isSuspectItem ? 'bg-red-50 border-red-100 hover:bg-red-100/50' :
+                                                    isRecurringItem ? 'bg-purple-50/30 border-l-4 border-l-purple-400' : ''
+                                                }`}>
                                                 <td className="p-4 text-center cursor-pointer" onClick={() => toggleSelect(tx.id)}>
                                                     {selectedIds.includes(tx.id) ? <CheckSquare className="w-5 h-5 text-blue-500" /> : <Square className="w-5 h-5 text-slate-200" />}
                                                 </td>
@@ -233,6 +287,7 @@ export const AnalyticsReportsView = ({
                                                     </select>
                                                     {isRefundItem && <span className="ml-2 text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold uppercase">Refund</span>}
                                                     {isSuspectItem && <span className="ml-2 text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold uppercase flex inline-flex items-center gap-1"><Flag className="w-3 h-3" /> Suspect</span>}
+                                                    {isRecurringItem && <span className="ml-2 text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-bold uppercase flex inline-flex items-center gap-1"><Repeat className="w-3 h-3" /> Recurring</span>}
                                                 </td>
                                                 <td className="p-4 text-right"><button onClick={() => handleDelete(tx.id)} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button></td>
                                             </tr>

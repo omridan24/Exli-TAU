@@ -52,19 +52,24 @@ export const ExpenseUpload = ({
                     </div>
                 </div>
             )}
-            <div className="flex justify-between items-center">
-                <Button variant="secondary" onClick={onBack}>Back</Button>
-                <div className="flex items-center gap-4">
+
+            {/* Analyze Files button - moved here from bottom */}
+            {files.length > 0 && (
+                <div className="mt-4 flex justify-between items-center">
                     {processingTimeEstimate && (
                         <div className="flex items-center gap-1.5 text-xs font-medium text-slate-400 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 animate-fade-in">
                             <Clock className="w-3.5 h-3.5" />
                             <span>Est. {processingTimeEstimate}</span>
                         </div>
                     )}
-                    <Button onClick={onAnalyze} disabled={files.length === 0 || isLoading}>
+                    <Button onClick={onAnalyze} disabled={isLoading} className="ml-auto">
                         {isLoading ? <><Sparkles className="w-4 h-4 animate-spin text-yellow-400" /> Analyzing {files.length} files...</> : <>Analyze Files <ArrowRight className="w-4 h-4" /></>}
                     </Button>
                 </div>
+            )}
+            {/* Back button only */}
+            <div className="flex justify-start">
+                <Button variant="secondary" onClick={onBack}>Back</Button>
             </div>
         </div>
     );

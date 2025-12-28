@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { CreditCard, RotateCcw, ArrowUp, ArrowDown, Edit2, Check, Plus, XCircle, Trash2, X, Flag, AlertTriangle, Calendar, Type } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { CreditCard, RotateCcw, ArrowUp, ArrowDown, Edit2, Check, Plus, XCircle, Trash2, X, Flag, AlertTriangle, Calendar, Type, Repeat } from 'lucide-react';
 import { Button, CategoryIcon } from '../../../components/UI';
 
 export const ExpenseStepCategorize = ({
@@ -19,7 +19,8 @@ export const ExpenseStepCategorize = ({
     onCategorize,
     onSkip,
     cleanDateDisplay,
-    onUpdateTransaction // Added prop for editing transaction
+    onUpdateTransaction, // Added prop for editing transaction
+    recurringExpenses // NEW: for recurring detection
 }) => {
     // Internal state
     const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
@@ -46,6 +47,24 @@ export const ExpenseStepCategorize = ({
         });
         setIsEditModalOpen(false);
     };
+
+    // Check if current transaction matches a recurring expense
+    const matchingRecurring = useMemo(() => {
+        if (!recurringExpenses || !currentTx) return null;
+
+        return recurringExpenses.find(rec => {
+            // Match by description pattern
+            const descMatch = currentTx.description
+                .toLowerCase()
+                .includes(rec.matchPattern?.toLowerCase() || '');
+
+            // Match by amount (±5%)
+            const amountDiff = Math.abs(currentTx.amount - rec.amount);
+            const amountMatch = amountDiff / rec.amount < 0.05;
+
+            return descMatch && amountMatch;
+        });
+    }, [currentTx, recurringExpenses]);
 
     if (isCreatingCat) {
         return (
@@ -163,6 +182,27 @@ export const ExpenseStepCategorize = ({
                         )}
                     </div>
                 </div>
+
+                {/* Recurring Hint Box */}
+                {matchingRecurring && (
+                    <div className="bg-purple-50 border-2 border-purple-200 rounded-2xl p-4 animate-fade-in shadow-sm">
+                        <div className="flex items-center gap-2 mb-2">
+                            <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center">
+                                <Repeat className="w-4 h-4 text-white" />
+                            </div>
+                            <span className="font-bold text-purple-900">Recurring Expense Detected</span>
+                        </div>
+                        <p className="text-sm text-purple-700 mb-3">
+                            This matches: <strong>{matchingRecurring.name}</strong> ({matchingRecurring.frequency})
+                        </p>
+                        <Button
+                            onClick={() => onCategorize(matchingRecurring.category, false, false, matchingRecurring.id)}
+                            className="bg-purple-600 hover:bg-purple-700 w-full"
+                        >
+                            ✓ {matchingRecurring.category}
+                        </Button>
+                    </div>
+                )}
 
                 {/* Categories Grid */}
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">

@@ -124,6 +124,7 @@ def convert_pdf_to_data(file_bytes):
         logger.error(f"AI Cleaning Failed: {e}")
         return None
 
+@task(name="analyze_multiple_files_structure")
 def analyze_multiple_files_structure(file_samples):
     """
     Analyzes CSV/Excel structure to map headers by INDEX (Integer).

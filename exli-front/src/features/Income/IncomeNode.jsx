@@ -20,6 +20,8 @@ export const IncomeNode = ({ userId, onComplete }) => {
     const [incomeData, setIncomeData] = useState({
         source_name: '', bruto: '', neto: '', taxes: '', pension: '', other_deposits: ''
     });
+    const [uploadProgress, setUploadProgress] = useState(null);
+    const [pollingInterval, setPollingInterval] = useState(null);
 
     useEffect(() => {
         const handleBeforeUnload = (e) => {
@@ -48,6 +50,12 @@ export const IncomeNode = ({ userId, onComplete }) => {
         loadUserData();
     }, [userId]);
 
+    useEffect(() => {
+        return () => {
+            if (pollingInterval) clearInterval(pollingInterval);
+        };
+    }, [pollingInterval]);
+
     const handleFileChange = (e) => {
         if (e.target.files[0]) {
             setFile(e.target.files[0]);
@@ -60,25 +68,68 @@ export const IncomeNode = ({ userId, onComplete }) => {
     const handleAnalyzeIncome = async (uploadedFile) => {
         const f = uploadedFile || file;
         if (!f) return;
+
         setIsLoading(true);
         setError(null);
+        setUploadProgress(null);
+
+        // Start progress estimation
+        const estimatedSeconds = 20;
+        let elapsed = 0;
+        const progressInterval = setInterval(() => {
+            elapsed += 1;
+            const percent = Math.min(95, Math.floor((elapsed / estimatedSeconds) * 100));
+            setUploadProgress({
+                progress_percent: percent,
+                current_step: "Analyzing payslip...",
+                estimated_seconds_remaining: Math.max(0, estimatedSeconds - elapsed)
+            });
+        }, 1000);
+
+        setPollingInterval(progressInterval);
+
         const formData = new FormData();
         formData.append('file', f);
+
         try {
-            if (!CLOUD_RUN_URL || CLOUD_RUN_URL.includes("YOUR_CLOUD_RUN")) throw new Error("Backend URL not configured.");
+            if (!CLOUD_RUN_URL || CLOUD_RUN_URL.includes("YOUR_CLOUD_RUN")) {
+                throw new Error("Backend URL not configured.");
+            }
+
             const response = await fetch(`${CLOUD_RUN_URL}/analyze-income`, { method: 'POST', body: formData });
             if (!response.ok) throw new Error(`Server Error: ${response.statusText}`);
+
             const res = await response.json();
+
+            // Stop progress
+            clearInterval(progressInterval);
+            setPollingInterval(null);
+            setUploadProgress({ progress_percent: 100, current_step: "Complete!" });
+
+            await new Promise(resolve => setTimeout(resolve, 500));
+
             if (res.status === 'success' && res.data) {
                 setIncomeData(prev => ({
                     ...prev,
-                    bruto: res.data.bruto || '', neto: res.data.neto || '',
-                    taxes: res.data.taxes || '', pension: res.data.pension || '',
+                    bruto: res.data.bruto || '',
+                    neto: res.data.neto || '',
+                    taxes: res.data.taxes || '',
+                    pension: res.data.pension || '',
                     other_deposits: res.data.other_deposits || ''
                 }));
+                setUploadProgress(null);
                 setStep(2);
-            } else { throw new Error("AI could not extract data."); }
-        } catch (err) { setError(err.message || "Failed to analyze file."); } finally { setIsLoading(false); }
+            } else {
+                throw new Error("AI could not extract data.");
+            }
+        } catch (err) {
+            clearInterval(progressInterval);
+            setPollingInterval(null);
+            setUploadProgress(null);
+            setError(err.message || "Failed to analyze file.");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const handleSave = async () => {
@@ -128,9 +179,13 @@ export const IncomeNode = ({ userId, onComplete }) => {
 
             {step === 1 && (
                 <IncomeUpload
+                    file={file}
+                    onFileChange={handleFileChange}
+                    onRemoveFile={() => setFile(null)}
+                    onManualConfig={() => setStep(2)}
                     isLoading={isLoading}
-                    handleFileChange={handleFileChange}
-                    setStep={setStep}
+                    uploadProgress={uploadProgress}
+                    onAnalyze={() => handleAnalyzeIncome(file)}
                     error={error}
                     onBack={() => setStep(0)}
                 />

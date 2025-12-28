@@ -4,6 +4,7 @@ import re
 import json
 from config import logger
 from services.ai_service import analyze_multiple_files_structure, convert_pdf_to_data
+from services.currency_codes import normalize_currency
 
 def sanitize_dataframe(df):
     """
@@ -12,16 +13,9 @@ def sanitize_dataframe(df):
     # 1. Normalize headers (lowercase)
     df.columns = [str(c).lower().strip() for c in df.columns]
     
-    # 2. Fix Currency
+    # 2. Validate and normalize currency using ISO 4217 whitelist
     if 'currency' in df.columns:
-        def clean_currency_value(val):
-            val_str = str(val).strip()
-            # If Hebrew/Garbage, force ILS
-            if re.search(r'[\u0590-\u05FF]', val_str) or len(val_str) > 4:
-                return 'ILS'
-            return val_str.upper()
-            
-        df['currency'] = df['currency'].apply(clean_currency_value)
+        df['currency'] = df['currency'].apply(lambda x: normalize_currency(x, default='ILS'))
     
     return df
 
