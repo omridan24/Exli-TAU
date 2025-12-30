@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { CreditCard, RotateCcw, ArrowUp, ArrowDown, Edit2, Check, Plus, XCircle, Trash2, X, Flag, AlertTriangle, Calendar, Type, Repeat } from 'lucide-react';
+import { CreditCard, RotateCcw, ArrowUp, ArrowDown, Edit2, Check, Plus, XCircle, Trash2, X, Flag, AlertTriangle, Calendar, Type, Repeat, HelpCircle, FileWarning, ShieldAlert, Link } from 'lucide-react';
 import { Button, CategoryIcon } from '../../../components/UI';
 
 export const ExpenseStepCategorize = ({
@@ -29,6 +29,14 @@ export const ExpenseStepCategorize = ({
 
     // Edit Modal State
     const [editForm, setEditForm] = useState({ description: '', amount: '', date: '' });
+
+    // Suspect Reason Options
+    const suspectOptions = [
+        { id: 'unrecognized', label: "I don't recognize this", icon: HelpCircle, note: "Unrecognized Merchant" },
+        { id: 'duplicate', label: "Duplicate Charge", icon: FileWarning, note: "Possible Duplicate" },
+        { id: 'amount', label: "Wrong Amount", icon: AlertTriangle, note: "Amount Discrepancy" },
+        { id: 'fraud', label: "Potential Fraud", icon: ShieldAlert, note: "Potential Fraud" }
+    ];
 
     const openEditModal = () => {
         setEditForm({
@@ -103,15 +111,24 @@ export const ExpenseStepCategorize = ({
         return (
             <div className="p-6 bg-red-50 rounded-3xl shadow-xl border border-red-200 animate-fade-in mb-8">
                 <div className="flex justify-between items-center mb-4">
-                    <h4 className="font-bold text-red-800 text-lg flex items-center gap-2"><Flag className="w-5 h-5" /> Select Suspect Category</h4>
+                    <h4 className="font-bold text-red-800 text-lg flex items-center gap-2"><Flag className="w-5 h-5" /> Why is this suspicious?</h4>
                     <button onClick={() => setIsSuspectModalOpen(false)} className="p-2 hover:bg-red-100 rounded-full text-red-700"><X className="w-5 h-5" /></button>
                 </div>
-                <p className="text-sm text-red-700 mb-6 font-medium">Which category do you suspect this belongs to?</p>
-                <div className="grid grid-cols-3 gap-3">
-                    {categories.map(cat => (
-                        <button key={cat.id} onClick={() => { onCategorize(cat.name, false, true); setIsSuspectModalOpen(false); }} className="p-3 rounded-xl border-2 border-white bg-white hover:border-red-300 transition-all flex flex-col items-center justify-center gap-2 text-center h-24 shadow-sm">
-                            <CategoryIcon iconName={cat.icon} color={cat.color} className="w-6 h-6" />
-                            <span className="text-xs font-bold text-slate-600">{cat.name}</span>
+                <p className="text-sm text-red-700 mb-6 font-medium">Select the reason that best describes the issue:</p>
+                <div className="grid grid-cols-2 gap-3">
+                    {suspectOptions.map((option) => (
+                        <button
+                            key={option.id}
+                            onClick={() => {
+                                onCategorize("Uncategorized", false, true, null, option.note);
+                                setIsSuspectModalOpen(false);
+                            }}
+                            className="p-4 rounded-xl border-2 border-white bg-white hover:border-red-300 hover:shadow-md transition-all flex flex-col items-center justify-center gap-3 text-center h-28 group"
+                        >
+                            <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <option.icon className="w-5 h-5 text-red-600" />
+                            </div>
+                            <span className="text-sm font-bold text-slate-700 leading-tight">{option.label}</span>
                         </button>
                     ))}
                 </div>
@@ -197,9 +214,9 @@ export const ExpenseStepCategorize = ({
                         </p>
                         <Button
                             onClick={() => onCategorize(matchingRecurring.category, false, false, matchingRecurring.id)}
-                            className="bg-purple-600 hover:bg-purple-700 w-full"
+                            className="bg-purple-600 hover:bg-purple-700 w-full flex items-center justify-center gap-2"
                         >
-                            ✓ {matchingRecurring.category}
+                            <Link className="w-4 h-4" /> Link & Merge
                         </Button>
                     </div>
                 )}

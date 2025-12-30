@@ -317,7 +317,7 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
   // State for showing previous choice on undo
   const [lastUndoChoice, setLastUndoChoice] = useState(null);
 
-  const handleCategorize = (categoryName, isRefund = false, isSuspect = false, recurringId = null) => {
+  const handleCategorize = (categoryName, isRefund = false, isSuspect = false, recurringId = null, note = null) => {
     // Guard: Prevent race condition double-submission
     if (isLoading) return;
 
@@ -341,6 +341,7 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
       isSuspect: isSuspect, // Add suspect flag
       isRecurring: !!recurringId, // NEW: mark as recurring
       recurringExpenseId: recurringId || null, // NEW: link to recurring
+      note: note || currentTx.note || null, // Save the note (e.g., suspect reason)
       status: 'active'
     };
 
