@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Wallet } from 'lucide-react';
-import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
+import { Wallet, Receipt, Repeat, X } from 'lucide-react';
+import { collection, addDoc, serverTimestamp, doc, getDoc, getDocs } from 'firebase/firestore';
 import { db, CLOUD_RUN_URL } from '../../config/firebase.js';
 import { CURRENCIES } from '../../config/constants.js';
 
@@ -8,6 +8,9 @@ import { IncomeMonthSelector } from './components/IncomeMonthSelector';
 import { IncomeUpload } from './components/IncomeUpload';
 import { IncomeForm } from './components/IncomeForm';
 import { IncomeSuccess } from './components/IncomeSuccess';
+import { RecurringIncomeCard } from './components/RecurringIncomeCard';
+import { RecurringIncomeForm } from './components/RecurringIncomeForm';
+import { OneTimeIncomeForm } from './components/OneTimeIncomeForm';
 
 export const IncomeNode = ({ userId, onComplete }) => {
     const [step, setStep] = useState(0);
@@ -22,6 +25,12 @@ export const IncomeNode = ({ userId, onComplete }) => {
     });
     const [uploadProgress, setUploadProgress] = useState(null);
     const [pollingInterval, setPollingInterval] = useState(null);
+    const [recurringIncomes, setRecurringIncomes] = useState([]);
+    const [showManualSelector, setShowManualSelector] = useState(false);
+    const [showRecurringForm, setShowRecurringForm] = useState(false);
+    const [showOneTimeForm, setShowOneTimeForm] = useState(false);
+    const [isManualMode, setIsManualMode] = useState(false);
+    const [extractedData, setExtractedData] = useState(null);
 
     useEffect(() => {
         const handleBeforeUnload = (e) => {
@@ -33,6 +42,18 @@ export const IncomeNode = ({ userId, onComplete }) => {
         window.addEventListener('beforeunload', handleBeforeUnload);
         return () => window.removeEventListener('beforeunload', handleBeforeUnload);
     }, [isLoading]);
+
+    // Fetch recurring income
+    const fetchRecurringIncome = async () => {
+        try {
+            const incomeRef = collection(db, 'users', userId, 'recurring_income');
+            const snapshot = await getDocs(incomeRef);
+            const incomes = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+            setRecurringIncomes(incomes);
+        } catch (err) {
+            console.error('Failed to fetch recurring income:', err);
+        }
+    };
 
     useEffect(() => {
         const loadUserData = async () => {
@@ -46,6 +67,7 @@ export const IncomeNode = ({ userId, onComplete }) => {
                 const savedWorkplaces = data.profile?.workplaces || data.workplaces || [];
                 setWorkplaces(savedWorkplaces);
             }
+            fetchRecurringIncome();
         }
         loadUserData();
     }, [userId]);
@@ -59,13 +81,13 @@ export const IncomeNode = ({ userId, onComplete }) => {
     const handleFileChange = (e) => {
         if (e.target.files[0]) {
             setFile(e.target.files[0]);
-            handleAnalyzeIncome(e.target.files[0]);
+            setShowManualSelector(true);
         }
     };
 
     const handleInputChange = (field, val) => setIncomeData(prev => ({ ...prev, [field]: val }));
 
-    const handleAnalyzeIncome = async (uploadedFile) => {
+    const handleAnalyzeIncome = async (uploadedFile, type = 'one-time') => {
         const f = uploadedFile || file;
         if (!f) return;
 
@@ -74,14 +96,14 @@ export const IncomeNode = ({ userId, onComplete }) => {
         setUploadProgress(null);
 
         // Start progress estimation
-        const estimatedSeconds = 20;
+        const estimatedSeconds = 25;
         let elapsed = 0;
         const progressInterval = setInterval(() => {
             elapsed += 1;
             const percent = Math.min(95, Math.floor((elapsed / estimatedSeconds) * 100));
             setUploadProgress({
                 progress_percent: percent,
-                current_step: "Analyzing payslip...",
+                current_step: "Analyzing payslip detailed data...",
                 estimated_seconds_remaining: Math.max(0, estimatedSeconds - elapsed)
             });
         }, 1000);
@@ -96,7 +118,8 @@ export const IncomeNode = ({ userId, onComplete }) => {
                 throw new Error("Backend URL not configured.");
             }
 
-            const response = await fetch(`${CLOUD_RUN_URL}/analyze-income`, { method: 'POST', body: formData });
+            // Using the new analyze-payslip endpoint for detailed extraction
+            const response = await fetch(`${CLOUD_RUN_URL}/analyze-payslip`, { method: 'POST', body: formData });
             if (!response.ok) throw new Error(`Server Error: ${response.statusText}`);
 
             const res = await response.json();
@@ -104,29 +127,28 @@ export const IncomeNode = ({ userId, onComplete }) => {
             // Stop progress
             clearInterval(progressInterval);
             setPollingInterval(null);
-            setUploadProgress({ progress_percent: 100, current_step: "Complete!" });
+            setUploadProgress({ progress_percent: 100, current_step: "Analysis Complete!" });
 
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise(resolve => setTimeout(resolve, 800));
 
             if (res.status === 'success' && res.data) {
-                setIncomeData(prev => ({
-                    ...prev,
-                    bruto: res.data.bruto || '',
-                    neto: res.data.neto || '',
-                    taxes: res.data.taxes || '',
-                    pension: res.data.pension || '',
-                    other_deposits: res.data.other_deposits || ''
-                }));
+                setExtractedData(res.data);
                 setUploadProgress(null);
-                setStep(2);
+
+                // Open the correct form based on selection
+                if (type === 'recurring') {
+                    setShowRecurringForm(true);
+                } else {
+                    setShowOneTimeForm(true);
+                }
             } else {
-                throw new Error("AI could not extract data.");
+                throw new Error("AI could not extract detailed data from this payslip.");
             }
         } catch (err) {
             clearInterval(progressInterval);
             setPollingInterval(null);
             setUploadProgress(null);
-            setError(err.message || "Failed to analyze file.");
+            setError(err.message || "Failed to analyze payslip.");
         } finally {
             setIsLoading(false);
         }
@@ -164,9 +186,7 @@ export const IncomeNode = ({ userId, onComplete }) => {
                     </h2>
                     <p className="text-slate-500 mt-1">Track monthly earnings.</p>
                 </div>
-                <select value={currency} onChange={e => setCurrency(e.target.value)} className="p-2 rounded-lg border border-slate-200 bg-white font-bold text-slate-700 outline-none focus:border-emerald-500">
-                    {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
+
             </div>
 
             {step === 0 && (
@@ -178,17 +198,32 @@ export const IncomeNode = ({ userId, onComplete }) => {
             )}
 
             {step === 1 && (
-                <IncomeUpload
-                    file={file}
-                    onFileChange={handleFileChange}
-                    onRemoveFile={() => setFile(null)}
-                    onManualConfig={() => setStep(2)}
-                    isLoading={isLoading}
-                    uploadProgress={uploadProgress}
-                    onAnalyze={() => handleAnalyzeIncome(file)}
-                    error={error}
-                    onBack={() => setStep(0)}
-                />
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Left: Upload & Manual Entry */}
+                    <div className="lg:col-span-2">
+                        <IncomeUpload
+                            file={file}
+                            onFileChange={handleFileChange}
+                            onRemoveFile={() => { setFile(null); setExtractedData(null); }}
+                            onManualConfig={() => setShowManualSelector(true)}
+                            isLoading={isLoading}
+                            uploadProgress={uploadProgress}
+                            onAnalyze={() => setShowManualSelector(true)}
+                            error={error}
+                            onBack={() => setStep(0)}
+                        />
+                    </div>
+
+                    {/* Right: Recurring Income Dashboard */}
+                    <div className="lg:col-span-1">
+                        <RecurringIncomeCard
+                            userId={userId}
+                            workplaces={workplaces}
+                            recurringIncomes={recurringIncomes}
+                            onUpdate={fetchRecurringIncome}
+                        />
+                    </div>
+                </div>
             )}
 
             {step === 2 && (
@@ -200,7 +235,7 @@ export const IncomeNode = ({ userId, onComplete }) => {
                     handleSave={handleSave}
                     isLoading={isLoading}
                     error={error}
-                    onBack={() => setStep(1)}
+                    onBack={() => { setStep(1); setIsManualMode(false); }}
                 />
             )}
 
@@ -209,6 +244,99 @@ export const IncomeNode = ({ userId, onComplete }) => {
                     reportMonth={reportMonth}
                     onReset={resetForAnother}
                     onComplete={onComplete}
+                />
+            )}
+
+            {/* Manual Entry Type Selector Modal */}
+            {showManualSelector && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fade-in">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-8">
+                        <div className="flex items-center justify-between mb-6">
+                            <h2 className="text-2xl font-bold text-slate-800">Choose Income Type</h2>
+                            <button onClick={() => setShowManualSelector(false)} className="text-slate-400 hover:text-slate-600">
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-6">
+                            {/* LEFT: One-Time Income */}
+                            <button
+                                onClick={() => {
+                                    setShowManualSelector(false);
+                                    if (file) {
+                                        handleAnalyzeIncome(file, 'one-time');
+                                    } else {
+                                        setShowOneTimeForm(true);
+                                    }
+                                }}
+                                className="p-6 rounded-xl border-2 border-slate-200 hover:border-blue-500 hover:bg-blue-50 transition-all text-left group"
+                            >
+                                <div className="text-4xl mb-3 group-hover:scale-110 transition-transform">📅</div>
+                                <div className="font-bold text-lg text-slate-800 mb-2">
+                                    One-Time Income
+                                </div>
+                                <div className="text-sm text-slate-600">
+                                    {file ? 'Analyze and pre-fill as one-time income' : 'For part-time, hourly, bonuses, or unplanned incomes'}
+                                </div>
+                            </button>
+
+                            {/* RIGHT: Recurring Income */}
+                            <button
+                                onClick={() => {
+                                    setShowManualSelector(false);
+                                    if (file) {
+                                        handleAnalyzeIncome(file, 'recurring');
+                                    } else {
+                                        setShowRecurringForm(true);
+                                    }
+                                }}
+                                className="p-6 rounded-xl border-2 border-slate-200 hover:border-teal-500 hover:bg-teal-50 transition-all text-left group"
+                            >
+                                <div className="text-4xl mb-3 group-hover:scale-110 transition-transform">🔄</div>
+                                <div className="font-bold text-lg text-slate-800 mb-2">
+                                    Recurring Income
+                                </div>
+                                <div className="text-sm text-slate-600">
+                                    {file ? 'Analyze and pre-fill as recurring income' : 'For employees with constant monthly salary'}
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Recurring Form Modal */}
+            {showRecurringForm && (
+                <RecurringIncomeForm
+                    userId={userId}
+                    workplaces={workplaces}
+                    currency={currency}
+                    extractedData={extractedData}
+                    onSave={() => {
+                        setShowRecurringForm(false);
+                        setExtractedData(null);
+                        setFile(null);
+                        fetchRecurringIncome();
+                    }}
+                    onCancel={() => { setShowRecurringForm(false); setExtractedData(null); }}
+                />
+            )}
+
+            {/* One-Time Income Form Modal */}
+            {showOneTimeForm && (
+                <OneTimeIncomeForm
+                    userId={userId}
+                    workplaces={workplaces}
+                    currency={currency}
+                    reportMonth={reportMonth}
+                    extractedData={extractedData}
+                    onSave={() => {
+                        setShowOneTimeForm(false);
+                        setExtractedData(null);
+                        setFile(null);
+                        setStep(3); // Go to success screen
+                    }}
+                    onCancel={() => { setShowOneTimeForm(false); setExtractedData(null); }}
                 />
             )}
         </div>

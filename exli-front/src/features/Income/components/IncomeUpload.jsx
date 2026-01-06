@@ -83,19 +83,25 @@ export const IncomeUpload = ({
                 </div>
             )}
 
-            {/* Action buttons */}
-            <div className="flex justify-between items-center">
+            {/* Analyze button - only show when file is selected */}
+            {file && (
+                <div className="flex justify-end">
+                    <Button
+                        onClick={onAnalyze}
+                        disabled={isLoading}
+                    >
+                        {isLoading ? (
+                            <><Sparkles className="w-4 h-4 animate-spin text-yellow-400" /> Analyzing...</>
+                        ) : (
+                            <>Analyze Payslip <ArrowRight className="w-4 h-4" /></>
+                        )}
+                    </Button>
+                </div>
+            )}
+
+            {/* Back button always visible */}
+            <div className="flex justify-start">
                 <Button variant="secondary" onClick={onBack} disabled={isLoading}>Back</Button>
-                <Button
-                    onClick={onAnalyze}
-                    disabled={!file || isLoading}
-                >
-                    {isLoading ? (
-                        <><Sparkles className="w-4 h-4 animate-spin text-yellow-400" /> Analyzing...</>
-                    ) : (
-                        <>Analyze Payslip <ArrowRight className="w-4 h-4" /></>
-                    )}
-                </Button>
             </div>
         </div>
     );

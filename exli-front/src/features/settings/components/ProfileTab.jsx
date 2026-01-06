@@ -1,7 +1,9 @@
 import React from 'react';
-import { User, Calendar, ChevronRight, Plus, Trash2, Globe, MapPin, GraduationCap } from 'lucide-react';
+import { User, Calendar, ChevronRight, Plus, Trash2, Globe, MapPin, GraduationCap, Receipt } from 'lucide-react';
 import { Card } from '../../../components/UI';
 import { LogoImage } from './LogoImage';
+import { ISRAEL_TAX_CREDIT_PRESETS } from '../../../config/taxBrackets';
+import { TaxCreditCalculator } from './TaxCreditCalculator';
 
 export const ProfileTab = ({
     profile,
@@ -66,6 +68,52 @@ export const ProfileTab = ({
                             </div>
                         )}
                     </div>
+
+                    {/* Tax Credit Points - Israel Only */}
+                    {profile.country === 'Israel' && (
+                        <div className="bg-gradient-to-br from-orange-50 to-amber-50 p-6 rounded-2xl border-2 border-orange-200 md:col-span-2">
+                            <div className="flex items-center gap-3 mb-6">
+                                <Receipt className="w-8 h-8 text-orange-600" />
+                                <div>
+                                    <h3 className="font-bold text-2xl text-orange-900">Tax Credit Calculator</h3>
+                                    <p className="text-sm text-orange-700">Calculate your exact credit points (נקודות זיכוי)</p>
+                                </div>
+                            </div>
+
+                            <TaxCreditCalculator
+                                data={profile.taxCreditData || {}}
+                                onUpdate={(points, data) => {
+                                    // Only update if changed to prevent infinite loops if strict equality fails
+                                    // But simpler: just pass new object.
+                                    // We need to be careful not to trigger save on every keypress if it causes re-renders.
+                                    // The parent SettingsNode handles debouncing or manual save? 
+                                    // Code says: "handleSaveProfile... save to DB immediately". 
+                                    // If I update DB on every keypress in calculator, that's bad.
+                                    // Ideally, TaxCreditCalculator shouldn't trigger onUpdate on every keystroke, but it does.
+                                    // I should probably debounce it inside TaxCreditCalculator or here.
+                                    // However, for now, let's just assume local state in SettingsNode is cheap, and DB save happens?
+                                    // "handleSaveProfile" calls updateDoc?
+                                    // Yes. "handleSaveProfile" in SettingsNode updates DB. 
+                                    // I SHOULD update `onUpdateProfile` (local state) instead, and only `handleSaveProfile` when leaving/explicitly? 
+                                    // ProfileTab uses `handleSaveProfile` for button clicks (checkboxes). 
+                                    // For text inputs it uses `onUpdateProfile`.
+                                    // Since Calculator is complex, I should use `onUpdateProfile` (local state) and maybe a "Save" button? 
+                                    // OR, just let it update local state, and rely on the main "Save Changes" button in SettingsNode if it exists?
+                                    // SettingsNode usually has a Save button? Let's check.
+                                    // There is no visible Save button in the snippet I saw of ProfileTab (it has onUpdateProfile).
+                                    // The parent `SettingsNode` likely has the Save Logic.
+                                    // Let's use `onUpdateProfile` to update the local 'profile' state, 
+                                    // expecting the user to click a main "Save" button elsewhere, OR if ProfileTab is "Live Save", it might be an issue.
+                                    // The `ProfileTab` snippet passed `handleSaveProfile` which does `await updateDoc`.
+                                    // Inputs use `onUpdateProfile`.
+                                    // I will use `onUpdateProfile` for the calculator data to avoid spamming DB.
+
+                                    onUpdateProfile('taxCreditPoints', points);
+                                    onUpdateProfile('taxCreditData', data);
+                                }}
+                            />
+                        </div>
+                    )}
                 </div>
             </Card>
         </div>

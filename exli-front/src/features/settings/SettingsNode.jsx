@@ -17,7 +17,8 @@ import { HistoryTab } from './components/HistoryTab';
 export const SettingsNode = ({ userId }) => {
   const [profile, setProfile] = useState({
     name: '', birthdate: '1995-01-01', occupations: [], status: '',
-    country: '', city: '', university: '', isStudent: false, preferredCurrency: 'ILS', workplaces: []
+    country: '', city: '', university: '', isStudent: false, preferredCurrency: 'ILS', workplaces: [],
+    taxCreditPoints: 2.25
   });
   const [customCategories, setCustomCategories] = useState([]);
   const [history, setHistory] = useState([]);

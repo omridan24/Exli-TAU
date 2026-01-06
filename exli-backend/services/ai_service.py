@@ -202,3 +202,100 @@ def analyze_income_statement(file_bytes, mime_type):
     except Exception as e:
         logger.error(f"AI Income Analysis Failed: {e}", exc_info=True)
         return None
+
+@workflow(name="extract_payslip_data")
+def extract_payslip_data(file_bytes, mime_type="application/pdf"):
+    """
+    Extracts detailed payslip data using Document AI and Gemini.
+    """
+    if not Config.GEMINI_API_KEY: return None
+
+    # Step 1: Get Document Object
+    doc_object = extract_text_with_google_docai(file_bytes, mime_type)
+    
+    if not doc_object:
+        logger.warning("DocAI failed for payslip. Falling back.")
+        return None
+
+    # Step 2: Reconstruct Text using Geometry
+    sorted_text = geometry_sort_text(doc_object)
+    
+    # DEBUG LOGGING
+    logger.info(f"--- DEBUG: Extract Payslip ---")
+    logger.info(f"Sorted Text Length: {len(sorted_text)} chars")
+    # Log first 500 chars to check for gibberish/encoding issues
+    logger.info(f"Sorted Text Preview: {sorted_text[:500]}...")
+
+    # Step 3: Send Sorted Text to Gemini
+    model_name = get_model_by_tier("flash") 
+    logger.info(f"AI Service: Extracting structured payslip data with {model_name}")
+
+    prompt = f"""
+    You are a financial expert specializing in Israeli payslips (Tlush Sahar).
+    Extract the following fields from the provided text.
+    
+    ### RAW TEXT:
+    '''
+    {sorted_text[:50000]} 
+    '''
+    
+    ### TASK:
+    Extract these exact fields into a valid JSON object.
+    
+    ### FIELDS TO EXTRACT:
+    - "bruto": Gross Salary (Sahar Bruto / Sahar LeMis / Sahar Hoshva). ONLY THE MONTHLY GROSS.
+    - "neto": Net Salary (Neto LeTashlum / Sahar Neto).
+    - "pension_employee": Employee's pension deposit (Tagmulim Oved / Kupat Gemel Oved).
+    - "pension_employer": Employer's pension deposit (Tagmulim Maavid / Kupat Gemel Maavid).
+    - "tax_income": Income Tax (Mas Hachnasa) ONLY. Do NOT include Health or National Insurance here. If 0, return 0.
+    - "tax_health": Health Insurance (Mas Briut) ONLY.
+    - "tax_national": National Insurance (Bituach Leumi) ONLY.
+    - "credit_points": Number of credit points (Nekudot Zichuy) - usually a number like 2.25 or 2.75.
+    - "marginal_rate": Marginal tax rate (Mas Shuli) - e.g. 0.14, 0.20.
+    
+    ### RULES:
+    1. If a value is not found, use null. **Do NOT guess or hallucinate values.** If you are uncertain, return null.
+    2. All amounts should be numbers (floats).
+    3. **CRITICAL**: Do NOT sum different tax types together. Keep them separate.
+    4. **CRITICAL**: If multiple values are found for a field (e.g. multiple "Income Tax" lines), do NOT sum them. Choose the single most likely "Total" value.
+    5. Return ONLY the JSON object.
+
+    ### FIELD MAPPING & HEBREW EXAMPLES:
+    - **bruto**: "שכר יסוד", "משכורת", "סהכ תשלומים", "ברוטו למס"
+    - **neto**: "נטו לתשלום", "לפירעון", "סכום לתשלום"
+    - **tax_income**: "מס הכנסה", "מ.הכנסה"
+    - **tax_health**: "מס בריאות", "ביטוח בריאות", "בריאות"
+    - **tax_national**: "ביטוח לאומי", "בטוח לאומי", "ב.לאומי"
+    - **pension_employee**: "תגמולים", "גמל", "קופת גמל", "פנסיה", "הפרשה לפנסיה" (Note: Only extract the *Employee* deduction)
+    - **pension_employer**: "תגמולי מעביד", "פיצויים" (Look in "Simulated" or "Employer Info" sections, not deductions)
+    - **credit_points**: "נקודות זיכוי", "נק' זיכוי", "זיכוי תקופתי" (e.g., 2.25)
+    
+    ### OUTPUT:
+    {{ 
+      "bruto": null, 
+      "neto": null, 
+      "pension_employee": null, 
+      "pension_employer": null, 
+      "tax_income": null, 
+      "tax_health": null, 
+      "tax_national": null, 
+      "credit_points": null, 
+      "marginal_rate": null 
+    }}
+    """
+
+    try:
+        model = genai.GenerativeModel(
+            model_name,
+            generation_config={"response_mime_type": "application/json", "temperature": 0.0}
+        )
+        
+        response = model.generate_content(prompt)
+        logger.info(f"--- DEBUG: Raw AI Response ---")
+        logger.info(response.text)
+        
+        return json.loads(response.text)
+        
+    except Exception as e:
+        logger.error(f"Payslip Extraction Failed: {e}", exc_info=True)
+        return None

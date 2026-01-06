@@ -3,7 +3,7 @@ from flask_cors import CORS
 from config import logger, Config
 import os
 from services.data_service import process_uploaded_files
-from services.ai_service import analyze_income_statement
+from services.ai_service import analyze_income_statement, extract_payslip_data
 from services.stock_service import search_symbol, get_stock_details
 from traceloop.sdk import Traceloop
 
@@ -121,6 +121,43 @@ def analyze_income():
             return jsonify({"error": "AI could not extract data."}), 500
     except Exception as e:
         logger.error(f"Income API Error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/analyze-payslip', methods=['POST'])
+def analyze_payslip():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part"}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+    
+    # Validate file size BEFORE processing
+    try:
+        validate_uploaded_files([file])
+    except ValueError as e:
+        logger.warning(f"Payslip file size validation failed: {e}")
+        return jsonify({"error": str(e)}), 413
+
+    mime_type = file.content_type
+    allowed_types = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
+    
+    if mime_type not in allowed_types:
+        if file.filename.lower().endswith('.pdf'): mime_type = 'application/pdf'
+        elif file.filename.lower().endswith(('.jpg', '.jpeg')): mime_type = 'image/jpeg'
+        elif file.filename.lower().endswith('.png'): mime_type = 'image/png'
+        else:
+            return jsonify({"error": "Unsupported file type."}), 400
+
+    try:
+        file_bytes = file.read()
+        result = extract_payslip_data(file_bytes, mime_type)
+        if result:
+            return jsonify({"status": "success", "data": result})
+        else:
+            return jsonify({"error": "AI could not extract payslip data."}), 500
+    except Exception as e:
+        logger.error(f"Payslip API Error: {e}")
         return jsonify({"error": str(e)}), 500
 
 # --- Investment Endpoints ---
