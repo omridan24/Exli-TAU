@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Upload, Receipt, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { collection, addDoc, serverTimestamp, doc, setDoc, getDocs } from 'firebase/firestore';
 import { db, CLOUD_RUN_URL, logUserAction } from '../../config/firebase.js';
 import { DEFAULT_CATEGORIES } from '../../config/constants.js';
@@ -15,6 +16,7 @@ import { RecurringCard } from './components/RecurringCard';
 import { RecurringForm } from './components/RecurringForm';
 
 export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, onComplete }) => {
+  const { t } = useTranslation();
   const [step, setStep] = useState(0);
   const [reportMonth, setReportMonth] = useState(new Date().toISOString().slice(0, 7));
   const [isLoading, setIsLoading] = useState(false);
@@ -127,7 +129,7 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
   const handleFileChange = (e) => {
     const selected = Array.from(e.target.files);
     if (selected.length + files.length > 4) {
-      alert("Maximum 4 files allowed.");
+      alert(t('expenses.maxFilesError'));
       return;
     }
     setFiles(prev => [...prev, ...selected]);
@@ -323,7 +325,7 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
 
     if (isManualMode) {
       if (!manualData.amount || !manualData.description) {
-        alert("Please enter amount and description");
+        alert(t('expenses.manual.enterAmountAndDescription'));
         return;
       }
       saveManualTransaction(categoryName, isRefund, isSuspect);
@@ -484,9 +486,9 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
     <div className="p-6 max-w-4xl mx-auto animate-fade-in min-h-[600px]">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2"><Upload className="w-6 h-6 text-emerald-600" /> Expense Manager</h2>
+          <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2"><Upload className="w-6 h-6 text-emerald-600" /> {t('expenses.title')}</h2>
           <p className="text-slate-500 mt-1">
-            {isManualMode ? "Add single expense." : step === 3 ? `Item ${currentIndex + 1} of ${allTransactions.length}` : "Upload & Merge."}
+            {isManualMode ? t('expenses.addSingleExpense') : step === 3 ? t('expenses.itemCount', { current: currentIndex + 1, total: allTransactions.length }) : t('expenses.uploadAndMerge')}
           </p>
         </div>
       </div>
@@ -591,13 +593,13 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
             <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4 text-emerald-600">
               <Upload className="w-8 h-8" />
             </div>
-            <h3 className="text-xl font-black text-slate-800 mb-2">Card Completed!</h3>
+            <h3 className="text-xl font-black text-slate-800 mb-2">{t('expenses.cardPopup.cardCompleted')}</h3>
             <p className="text-slate-500 mb-6 font-medium">
-              You finished <span className="font-bold text-slate-700">{cardPopup.prevCard}</span>.
-              <br />Moving to <span className="font-bold text-slate-700">{cardPopup.nextCard}</span>...
+              {t('expenses.cardPopup.youFinished', { prevCard: cardPopup.prevCard })}
+              <br />{t('expenses.cardPopup.movingTo', { nextCard: cardPopup.nextCard })}
             </p>
             <button onClick={confirmCardSwitch} className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-2xl transition-all shadow-lg shadow-emerald-200">
-              Continue
+              {t('expenses.cardPopup.continue')}
             </button>
           </div>
         </div>
@@ -629,13 +631,13 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fade-in">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="font-bold text-xl text-slate-800">Add Expense Manually</h3>
+              <h3 className="font-bold text-xl text-slate-800">{t('expenses.manualTypeSelector.title')}</h3>
               <button onClick={() => setShowManualTypeSelector(false)} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <p className="text-sm text-slate-600 mb-4">Choose the type of expense you want to add:</p>
+            <p className="text-sm text-slate-600 mb-4">{t('expenses.manualTypeSelector.chooseType')}</p>
 
             <div className="grid grid-cols-2 gap-4">
               <button
@@ -648,8 +650,8 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
                 <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                   <Receipt className="w-6 h-6 text-blue-600" />
                 </div>
-                <div className="font-bold text-slate-800">One-Time</div>
-                <div className="text-xs text-slate-500 mt-1">One-time expense</div>
+                <div className="font-bold text-slate-800">{t('expenses.manualTypeSelector.oneTime')}</div>
+                <div className="text-xs text-slate-500 mt-1">{t('expenses.manualTypeSelector.oneTimeDesc')}</div>
               </button>
 
               <button
@@ -662,8 +664,8 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
                 <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                   <Upload className="w-6 h-6 text-purple-600" />
                 </div>
-                <div className="font-bold text-slate-800">Recurring</div>
-                <div className="text-xs text-slate-500 mt-1">Monthly/Quarterly/Yearly</div>
+                <div className="font-bold text-slate-800">{t('expenses.manualTypeSelector.recurring')}</div>
+                <div className="text-xs text-slate-500 mt-1">{t('expenses.manualTypeSelector.recurringDesc')}</div>
               </button>
             </div>
           </div>

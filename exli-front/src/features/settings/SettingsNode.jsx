@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Save } from 'lucide-react';
+import { Save, Globe, Languages } from 'lucide-react';
 import { doc, getDoc, setDoc, collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db, logUserAction } from '../../config/firebase';
 import { OCCUPATIONS_LIST, STATUS_LIST } from '../../config/constants';
 import { Button } from '../../components/UI';
+import { useTranslation } from 'react-i18next';
+import { useLanguage } from '../../hooks/useLanguage';
 
 import { WorkplacePickerModal } from './components/WorkplacePickerModal';
 import { SelectionModal } from './components/SelectionModal';
@@ -15,6 +17,9 @@ import { CategoriesTab } from './components/CategoriesTab';
 import { HistoryTab } from './components/HistoryTab';
 
 export const SettingsNode = ({ userId }) => {
+  const { t } = useTranslation();
+  const { language, setLanguage, isRTL } = useLanguage(userId);
+
   const [profile, setProfile] = useState({
     name: '', birthdate: '1995-01-01', occupations: [], status: '',
     country: '', city: '', university: '', isStudent: false, preferredCurrency: 'ILS', workplaces: [],
@@ -115,9 +120,9 @@ export const SettingsNode = ({ userId }) => {
         city: p.city
       }, { merge: true });
       await logUserAction(userId, 'PROFILE_UPDATE', 'Updated settings');
-      setMsg("Saved Successfully!");
+      setMsg(t('settings.savedSuccess'));
       setTimeout(() => setMsg(null), 3000);
-    } catch (e) { setMsg("Error."); } finally { setIsLoading(false); }
+    } catch (e) { setMsg(t('settings.error')); } finally { setIsLoading(false); }
   };
 
   const handleOccupationConfirm = (selected) => {
@@ -141,13 +146,28 @@ export const SettingsNode = ({ userId }) => {
       <div className="sticky top-0 z-40 bg-slate-50/90 backdrop-blur-md py-4 mb-8 -mx-6 px-6 border-b flex items-center justify-between">
         <div className="flex bg-slate-100 p-1 rounded-full">
           {['profile', 'categories', 'history'].map(tab => (
-            <button key={tab} onClick={() => setActiveTab(tab)} className={`px-6 py-1.5 rounded-full text-sm font-bold transition-all capitalize ${activeTab === tab ? 'bg-white shadow-sm' : 'text-slate-500'}`}>{tab}</button>
+            <button key={tab} onClick={() => setActiveTab(tab)} className={`px-6 py-1.5 rounded-full text-sm font-bold transition-all ${activeTab === tab ? 'bg-white shadow-sm' : 'text-slate-500'}`}>{t(`settings.tabs.${tab}`)}</button>
           ))}
         </div>
         <div className="flex items-center gap-4">
+          {/* Language Toggle */}
+          <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-full p-1">
+            <button
+              onClick={() => setLanguage('en')}
+              className={`px-3 py-1.5 rounded-full text-sm font-bold transition-all ${language === 'en' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
+            >
+              EN
+            </button>
+            <button
+              onClick={() => setLanguage('he')}
+              className={`px-3 py-1.5 rounded-full text-sm font-bold transition-all ${language === 'he' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
+            >
+              עב
+            </button>
+          </div>
           {msg && <span className="text-emerald-600 font-bold text-sm animate-fade-in">{msg}</span>}
           <Button onClick={() => handleSaveProfile()} disabled={isLoading} className="shadow-lg shadow-emerald-200/50 px-10">
-            {isLoading ? 'Saving...' : <><Save className="w-5 h-5 mr-2" /> Save Settings</>}
+            {isLoading ? t('settings.saving') : <><Save className={`w-5 h-5 ${isRTL ? 'ml-2' : 'mr-2'}`} /> {t('settings.save')}</>}
           </Button>
         </div>
       </div>
@@ -158,8 +178,8 @@ export const SettingsNode = ({ userId }) => {
           onUpdateProfile={(key, val) => setProfile(prev => ({ ...prev, [key]: val }))}
           handleSaveProfile={handleSaveProfile}
           onOpenModal={(type) => {
-            if (type === 'city') { if (!profile.country) return alert("Select country first"); fetchCities(profile.country); }
-            else if (type === 'university') { if (!profile.country) return alert("Select country first"); fetchUniversities(profile.country); }
+            if (type === 'city') { if (!profile.country) return alert(t('settings.profile.selectCountryFirst')); fetchCities(profile.country); }
+            else if (type === 'university') { if (!profile.country) return alert(t('settings.profile.selectCountryFirst')); fetchUniversities(profile.country); }
             else setModalType(type);
           }}
           onOpenWorkplacePicker={(occ) => setShowWorkplacePicker(occ)}
@@ -168,10 +188,10 @@ export const SettingsNode = ({ userId }) => {
       )}
 
       {/* MODALS */}
-      <SelectionModal isOpen={modalType === 'country'} title="Select Country" data={countries} selectedValue={profile.country} onSelect={(c) => { const name = c.name || c; handleSaveProfile({ ...profile, country: name, city: '' }); setModalType(null); }} onClose={() => setModalType(null)} />
-      <SelectionModal isOpen={modalType === 'city'} title={`Cities in ${profile.country}`} data={cities} isLoading={isApiLoading} selectedValue={profile.city} allowCustom={true} onSelect={(c) => { handleSaveProfile({ ...profile, city: c }); setModalType(null); }} onClose={() => setModalType(null)} />
-      <SelectionModal isOpen={modalType === 'university'} title={`Universities in ${profile.country}`} data={universities} isLoading={isApiLoading} selectedValue={profile.university} allowCustom={true} onSelect={(u) => { handleSaveProfile({ ...profile, university: u }); setModalType(null); }} onClose={() => setModalType(null)} />
-      <SelectionModal isOpen={modalType === 'status'} title="Select Status" data={STATUS_LIST} selectedValue={profile.status} onSelect={(s) => { handleSaveProfile({ ...profile, status: s }); setModalType(null); }} onClose={() => setModalType(null)} />
+      <SelectionModal isOpen={modalType === 'country'} title={t('settings.modals.selectCountry')} data={countries} selectedValue={profile.country} onSelect={(c) => { const name = c.name || c; handleSaveProfile({ ...profile, country: name, city: '' }); setModalType(null); }} onClose={() => setModalType(null)} />
+      <SelectionModal isOpen={modalType === 'city'} title={t('settings.modals.citiesIn', { country: profile.country })} data={cities} isLoading={isApiLoading} selectedValue={profile.city} allowCustom={true} onSelect={(c) => { handleSaveProfile({ ...profile, city: c }); setModalType(null); }} onClose={() => setModalType(null)} />
+      <SelectionModal isOpen={modalType === 'university'} title={t('settings.modals.universitiesIn', { country: profile.country })} data={universities} isLoading={isApiLoading} selectedValue={profile.university} allowCustom={true} onSelect={(u) => { handleSaveProfile({ ...profile, university: u }); setModalType(null); }} onClose={() => setModalType(null)} />
+      <SelectionModal isOpen={modalType === 'status'} title={t('settings.modals.selectStatus')} data={STATUS_LIST} selectedValue={profile.status} onSelect={(s) => { handleSaveProfile({ ...profile, status: s }); setModalType(null); }} onClose={() => setModalType(null)} />
 
       {modalType === 'occupation' && <MultiSelectModal options={OCCUPATIONS_LIST} selectedValues={profile.occupations} onClose={() => setModalType(null)} onConfirm={handleOccupationConfirm} />}
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Sparkles, Upload, PenTool, FileText, Trash2, XCircle, ArrowRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '../../../components/UI.jsx';
 import { ProgressBar } from '../../expenses/components/ProgressBar.jsx';
 
@@ -14,6 +15,8 @@ export const IncomeUpload = ({
     error,
     onBack
 }) => {
+    const { t } = useTranslation();
+
     return (
         <div className="space-y-6">
             {/* File drop area */}
@@ -27,8 +30,8 @@ export const IncomeUpload = ({
                         disabled={isLoading}
                     />
                     <Upload className="w-12 h-12 text-slate-300 mb-4" />
-                    <div className="font-bold text-lg text-slate-600">Drop payslip here or Click</div>
-                    <p className="text-sm text-slate-400 mt-1">PDF or Image (max 20MB)</p>
+                    <div className="font-bold text-lg text-slate-600">{t('income.upload.dropPayslip')}</div>
+                    <p className="text-sm text-slate-400 mt-1">{t('income.upload.fileLimit')}</p>
                 </div>
 
                 {/* Manual entry option */}
@@ -40,7 +43,7 @@ export const IncomeUpload = ({
                     <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
                         <PenTool className="w-6 h-6 text-slate-400 group-hover:text-emerald-600" />
                     </div>
-                    <div className="font-bold text-slate-600 group-hover:text-emerald-700">Fill Manually</div>
+                    <div className="font-bold text-slate-600 group-hover:text-emerald-700">{t('income.upload.fillManually')}</div>
                 </div>
             </div>
 
@@ -76,9 +79,9 @@ export const IncomeUpload = ({
                 <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl flex items-start gap-3 text-sm animate-fade-in text-left">
                     <XCircle className="w-5 h-5 shrink-0 mt-0.5" />
                     <div>
-                        <div className="font-bold">Analysis Failed</div>
+                        <div className="font-bold">{t('income.upload.analysisFailed')}</div>
                         <div>{error}</div>
-                        <div className="text-xs text-red-400 mt-1">Please try again or use manual entry.</div>
+                        <div className="text-xs text-red-400 mt-1">{t('income.upload.tryAgainOrManual')}</div>
                     </div>
                 </div>
             )}
@@ -91,9 +94,9 @@ export const IncomeUpload = ({
                         disabled={isLoading}
                     >
                         {isLoading ? (
-                            <><Sparkles className="w-4 h-4 animate-spin text-yellow-400" /> Analyzing...</>
+                            <><Sparkles className="w-4 h-4 animate-spin text-yellow-400" /> {t('income.upload.analyzing')}</>
                         ) : (
-                            <>Analyze Payslip <ArrowRight className="w-4 h-4" /></>
+                            <>{t('income.upload.analyzePayslip')} <ArrowRight className="w-4 h-4" /></>
                         )}
                     </Button>
                 </div>
@@ -101,7 +104,7 @@ export const IncomeUpload = ({
 
             {/* Back button always visible */}
             <div className="flex justify-start">
-                <Button variant="secondary" onClick={onBack} disabled={isLoading}>Back</Button>
+                <Button variant="secondary" onClick={onBack} disabled={isLoading}>{t('common.back')}</Button>
             </div>
         </div>
     );

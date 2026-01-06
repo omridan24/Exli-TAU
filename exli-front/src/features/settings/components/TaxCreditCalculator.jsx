@@ -1,57 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { User, Baby, GraduationCap, Medal, Plane, Plus, Trash2, Check, X } from 'lucide-react';
+import { User, Baby, GraduationCap, Medal, Plane, Plus, Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Card } from '../../../components/UI';
 
 export const TaxCreditCalculator = ({ data, onUpdate }) => {
-    // Local state for calculator details (persisted via onUpdate callback if needed, 
-    // but typically we just calculate 'points' and save that. 
-    // Ideally, we should save these details to the user profile too so they can edit later.
-    // For now, I'll assume we can pass a 'calculatorData' object to/from profile or just manage local state for the calculation session.)
-
-    // We'll manage internal state assuming we receive "calculatorData" or default to empty.
-    // However, the user request implies we just want to output the POINTS. 
-    // But to allow "re-selection", we really should persist the inputs. 
-    // I'll stick to a pure calculator for now that outputs a number, but ideally, the parent should store the 'data'.
-
-    // Let's implement it as a "Smart Component" that takes generic 'data' and 'onUpdateData'.
-    // If usage is too complex, I'll fallback to just local state -> one way output.
-    // Given the prompt "saved to their profile", I will try to structure it so we can eventually save the inputs.
+    const { t } = useTranslation();
 
     const [localData, setLocalData] = useState({
-        children: [], // { id, birthYear }
-        degrees: [], // { id, type: 'ba'|'ma', endYear }
+        children: [],
+        degrees: [],
         military: { served: false, endYear: null, months: 0 },
         aliyah: { isOleh: false, date: null },
-        gender: 'male', // Default gender if not provided in data
-        ...data // Merge passed data
+        combatReservist: { isCombat: false, days: 0 },
+        gender: 'male',
+        ...data
     });
 
     const [calculatedPoints, setCalculatedPoints] = useState(2.25);
     const [currentYear] = useState(new Date().getFullYear());
 
-    // --- LOGIC ---
-
     useEffect(() => {
-        let points = 2.25; // Basic resident
-
-        // 1. Gender
-        if (localData.gender === 'female') points += 0.5;
-
-        // 2. Children
-        localData.children.forEach(child => {
-            if (!child.birthYear) return;
-            const age = currentYear - parseInt(child.birthYear);
-
-            // 2024/2025 Rules
-            if (age === 0) { // Born this year
-                points += 1.5; // Traditional value, though some sources say 2.5. Sticking to conservative/standard or implementing specific 2025 check?
-                // Source [1][7] says 2.5 for Year of Birth. Let's use 2.5 as it's the "New" rule.
-                points += 1.0; // Adding extra 1.0 to make 2.5 (1.5 + 1.0) or just logic:
-            }
-            // Let's rewrite cleanly:
-        });
-
-        // Re-calculate strictly
         let p = 2.25;
         if (localData.gender === 'female') p += 0.5;
 
@@ -62,42 +30,31 @@ export const TaxCreditCalculator = ({ data, onUpdate }) => {
 
             if (age < 0) return;
 
-            // Updated 2024/2025 Rules
-            if (age === 0) p += 2.5; // Year of birth
-            else if (age >= 1 && age <= 5) p += 2.5; // Ages 1-5
+            if (age === 0) p += 2.5;
+            else if (age >= 1 && age <= 5) p += 2.5;
             else if (age >= 6 && age <= 17) {
-                // Ages 6-17: Father +1, Mother +2
                 p += (localData.gender === 'female' ? 2 : 1);
             }
             else if (age === 18) {
-                // Age 18: Father +0, Mother +0.5?
                 if (localData.gender === 'female') p += 0.5;
             }
-            // 19+ no points usually
         });
 
-        // 3. Academics
         localData.degrees.forEach(deg => {
             const end = parseInt(deg.endYear);
             if (isNaN(end)) return;
-            const yearsSince = currentYear - end; // 1 means "year after graduation"
+            const yearsSince = currentYear - end;
 
-            // Benefit starts year *after* graduation
             if (yearsSince >= 1) {
                 if (deg.type === 'ba' && yearsSince <= 3) p += 1.0;
                 if (deg.type === 'ma' && yearsSince <= 2) p += 0.5;
-                // PhD usually same as MA or specific
             }
         });
 
-        // 4. Military
         if (localData.military.served && localData.military.endYear) {
             const end = parseInt(localData.military.endYear);
-            const monthsSinceRelease = (currentYear - end) * 12; // Approx. Need accurate date for accuracy but Year is simpler
-            // Rule is "36 months from release".
-            // If released in [CurrentYear - 3] or later.
             const yearsSince = currentYear - end;
-            if (yearsSince >= 0 && yearsSince <= 3) { // Rough check
+            if (yearsSince >= 0 && yearsSince <= 3) {
                 const m = localData.military.months;
                 if (localData.gender === 'female') {
                     if (m >= 22) p += 2;
@@ -109,27 +66,36 @@ export const TaxCreditCalculator = ({ data, onUpdate }) => {
             }
         }
 
-        // 5. Aliyah
         if (localData.aliyah.isOleh && localData.aliyah.date) {
             const aliyahDate = new Date(localData.aliyah.date);
             const diffTime = Math.abs(new Date() - aliyahDate);
             const monthsSince = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 30));
 
-            if (monthsSince <= 12) p += 1; // 1/12 point worth? No, it's +1 point value. 
-            else if (monthsSince <= 30) p += 3; // Next 18 months
-            else if (monthsSince <= 42) p += 2; // Next 12 months
-            else if (monthsSince <= 54) p += 1; // Last 12 months
+            if (monthsSince <= 12) p += 1;
+            else if (monthsSince <= 30) p += 3;
+            else if (monthsSince <= 42) p += 2;
+            else if (monthsSince <= 42) p += 2;
+            else if (monthsSince <= 54) p += 1;
+        }
+
+        // Iron Swords Combat Reservist
+        if (localData.combatReservist?.isCombat) {
+            const days = parseInt(localData.combatReservist.days) || 0;
+            if (days >= 50) {
+                const extra = Math.floor((days - 50) / 5) * 0.25;
+                p += Math.min(4, 1 + extra);
+            } else if (days >= 40) {
+                p += 0.75;
+            } else if (days >= 30) {
+                p += 0.5;
+            }
         }
 
         setCalculatedPoints(p);
-
-        // Notify parent of the score AND the data
         onUpdate(p, localData);
 
     }, [localData, currentYear]);
 
-
-    // --- HANDLERS ---
     const update = (field, val) => setLocalData(prev => ({ ...prev, [field]: val }));
 
     const addChild = () => update('children', [...localData.children, { id: Date.now(), birthYear: currentYear }]);
@@ -144,8 +110,8 @@ export const TaxCreditCalculator = ({ data, onUpdate }) => {
         <div className="space-y-6">
             <div className="flex items-center justify-between bg-emerald-50 p-4 rounded-xl border border-emerald-100 mb-6">
                 <div>
-                    <h3 className="text-emerald-900 font-bold text-lg">Total Tax Credits</h3>
-                    <p className="text-emerald-600 text-xs">Based on selected criteria</p>
+                    <h3 className="text-emerald-900 font-bold text-lg">{t('settings.taxCredit.totalCredits')}</h3>
+                    <p className="text-emerald-600 text-xs">{t('settings.taxCredit.basedOn')}</p>
                 </div>
                 <div className="text-4xl font-black text-emerald-600">
                     {calculatedPoints.toFixed(2)}
@@ -157,23 +123,23 @@ export const TaxCreditCalculator = ({ data, onUpdate }) => {
                 <Card className={`p-4 border-2 transition-all cursor-pointer ${localData.gender ? 'border-indigo-100 bg-indigo-50/50' : 'border-slate-100'}`}>
                     <div className="flex items-center gap-2 mb-3">
                         <User className="text-indigo-500 w-5 h-5" />
-                        <h4 className="font-bold text-slate-700">Gender</h4>
+                        <h4 className="font-bold text-slate-700">{t('settings.taxCredit.gender')}</h4>
                     </div>
                     <div className="flex bg-white rounded-lg p-1 border border-slate-200">
                         {['male', 'female'].map(g => (
                             <button
                                 key={g}
                                 onClick={() => update('gender', g)}
-                                className={`flex-1 py-2 text-sm font-bold rounded-md capitalize transition-all ${localData.gender === g
+                                className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${localData.gender === g
                                     ? 'bg-indigo-500 text-white shadow-sm'
                                     : 'text-slate-400 hover:text-indigo-500'}`}
                             >
-                                {g}
+                                {t(`settings.taxCredit.${g}`)}
                             </button>
                         ))}
                     </div>
                     <p className="text-[10px] text-slate-400 mt-2 text-center">
-                        {localData.gender === 'female' ? '+0.5 Points for women' : 'Base rate for men'}
+                        {localData.gender === 'female' ? t('settings.taxCredit.femaleNote') : t('settings.taxCredit.maleNote')}
                     </p>
                 </Card>
 
@@ -182,23 +148,29 @@ export const TaxCreditCalculator = ({ data, onUpdate }) => {
                     <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                             <Baby className="text-pink-500 w-5 h-5" />
-                            <h4 className="font-bold text-slate-700">Children</h4>
+                            <h4 className="font-bold text-slate-700">{t('settings.taxCredit.children')}</h4>
                         </div>
-                        <button onClick={addChild} className="p-1 bg-pink-100 text-pink-600 rounded-full hover:bg-pink-200"><Plus className="w-4 h-4" /></button>
+                        <button onClick={addChild} className="p-1 bg-pink-100 text-pink-600 rounded-full hover:bg-pink-200">
+                            <Plus className="w-4 h-4" />
+                        </button>
                     </div>
 
-                    <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
-                        {localData.children.length === 0 && <div className="text-xs text-slate-400 italic">No children added</div>}
+                    <div className="space-y-2 max-h-32 overflow-y-auto pe-1">
+                        {localData.children.length === 0 && (
+                            <div className="text-xs text-slate-400 italic">{t('settings.taxCredit.noChildren')}</div>
+                        )}
                         {localData.children.map(child => (
                             <div key={child.id} className="flex items-center gap-2 bg-white p-2 rounded-lg border border-pink-100">
-                                <span className="text-xs font-bold text-slate-500">Born:</span>
+                                <span className="text-xs font-bold text-slate-500">{t('settings.taxCredit.born')}</span>
                                 <input
                                     type="number"
                                     value={child.birthYear}
                                     onChange={(e) => updateChild(child.id, e.target.value)}
                                     className="w-20 p-1 text-sm font-bold border rounded"
                                 />
-                                <button onClick={() => removeChild(child.id)} className="ml-auto text-slate-300 hover:text-red-500"><Trash2 className="w-3 h-3" /></button>
+                                <button onClick={() => removeChild(child.id)} className="ms-auto text-slate-300 hover:text-red-500">
+                                    <Trash2 className="w-3 h-3" />
+                                </button>
                             </div>
                         ))}
                     </div>
@@ -209,13 +181,17 @@ export const TaxCreditCalculator = ({ data, onUpdate }) => {
                     <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                             <GraduationCap className="text-cyan-500 w-5 h-5" />
-                            <h4 className="font-bold text-slate-700">Degrees</h4>
+                            <h4 className="font-bold text-slate-700">{t('settings.taxCredit.degrees')}</h4>
                         </div>
-                        <button onClick={addDegree} className="p-1 bg-cyan-100 text-cyan-600 rounded-full hover:bg-cyan-200"><Plus className="w-4 h-4" /></button>
+                        <button onClick={addDegree} className="p-1 bg-cyan-100 text-cyan-600 rounded-full hover:bg-cyan-200">
+                            <Plus className="w-4 h-4" />
+                        </button>
                     </div>
 
-                    <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
-                        {localData.degrees.length === 0 && <div className="text-xs text-slate-400 italic">No degrees added</div>}
+                    <div className="space-y-2 max-h-32 overflow-y-auto pe-1">
+                        {localData.degrees.length === 0 && (
+                            <div className="text-xs text-slate-400 italic">{t('settings.taxCredit.noDegrees')}</div>
+                        )}
                         {localData.degrees.map(deg => (
                             <div key={deg.id} className="bg-white p-2 rounded-lg border border-cyan-100 text-xs">
                                 <div className="flex justify-between mb-2">
@@ -224,13 +200,15 @@ export const TaxCreditCalculator = ({ data, onUpdate }) => {
                                         onChange={(e) => updateDegree(deg.id, 'type', e.target.value)}
                                         className="font-bold border rounded p-1"
                                     >
-                                        <option value="ba">Bachelor's</option>
-                                        <option value="ma">Master's</option>
+                                        <option value="ba">{t('settings.taxCredit.bachelor')}</option>
+                                        <option value="ma">{t('settings.taxCredit.master')}</option>
                                     </select>
-                                    <button onClick={() => removeDegree(deg.id)} className="text-slate-300 hover:text-red-500 ml-2"><Trash2 className="w-3 h-3" /></button>
+                                    <button onClick={() => removeDegree(deg.id)} className="text-slate-300 hover:text-red-500 ms-2">
+                                        <Trash2 className="w-3 h-3" />
+                                    </button>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <span>End Year:</span>
+                                    <span>{t('settings.taxCredit.endYear')}</span>
                                     <input
                                         type="number"
                                         value={deg.endYear}
@@ -248,7 +226,7 @@ export const TaxCreditCalculator = ({ data, onUpdate }) => {
                     <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                             <Medal className="text-green-600 w-5 h-5" />
-                            <h4 className="font-bold text-slate-700">Military</h4>
+                            <h4 className="font-bold text-slate-700">{t('settings.taxCredit.military')}</h4>
                         </div>
                         <input
                             type="checkbox"
@@ -260,7 +238,9 @@ export const TaxCreditCalculator = ({ data, onUpdate }) => {
                     {localData.military.served ? (
                         <div className="space-y-3 bg-white p-3 rounded-lg border border-green-100">
                             <div>
-                                <label className="text-[10px] font-bold text-slate-400 block mb-1">RELEASE YEAR</label>
+                                <label className="text-[10px] font-bold text-slate-400 block mb-1">
+                                    {t('settings.taxCredit.releaseYear')}
+                                </label>
                                 <input
                                     type="number"
                                     value={localData.military.endYear || ''}
@@ -270,7 +250,9 @@ export const TaxCreditCalculator = ({ data, onUpdate }) => {
                                 />
                             </div>
                             <div>
-                                <label className="text-[10px] font-bold text-slate-400 block mb-1">MONTHS SERVED</label>
+                                <label className="text-[10px] font-bold text-slate-400 block mb-1">
+                                    {t('settings.taxCredit.monthsServed')}
+                                </label>
                                 <input
                                     type="number"
                                     value={localData.military.months}
@@ -280,7 +262,9 @@ export const TaxCreditCalculator = ({ data, onUpdate }) => {
                                 />
                             </div>
                         </div>
-                    ) : <div className="text-xs text-slate-400 italic">No military service selected</div>}
+                    ) : (
+                        <div className="text-xs text-slate-400 italic">{t('settings.taxCredit.noMilitary')}</div>
+                    )}
                 </Card>
 
                 {/* 5. ALIYAH CARD */}
@@ -288,7 +272,7 @@ export const TaxCreditCalculator = ({ data, onUpdate }) => {
                     <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                             <Plane className="text-orange-500 w-5 h-5" />
-                            <h4 className="font-bold text-slate-700">Aliyah</h4>
+                            <h4 className="font-bold text-slate-700">{t('settings.taxCredit.aliyah')}</h4>
                         </div>
                         <input
                             type="checkbox"
@@ -299,7 +283,9 @@ export const TaxCreditCalculator = ({ data, onUpdate }) => {
                     </div>
                     {localData.aliyah.isOleh ? (
                         <div className="bg-white p-3 rounded-lg border border-orange-100">
-                            <label className="text-[10px] font-bold text-slate-400 block mb-1">DATE OF ALIYAH</label>
+                            <label className="text-[10px] font-bold text-slate-400 block mb-1">
+                                {t('settings.taxCredit.dateOfAliyah')}
+                            </label>
                             <input
                                 type="date"
                                 value={localData.aliyah.date || ''}
@@ -307,7 +293,41 @@ export const TaxCreditCalculator = ({ data, onUpdate }) => {
                                 className="w-full p-2 border rounded font-bold text-sm"
                             />
                         </div>
-                    ) : <div className="text-xs text-slate-400 italic">Not a new immigrant</div>}
+                    ) : (
+                        <div className="text-xs text-slate-400 italic">{t('settings.taxCredit.notNewImmigrant')}</div>
+                    )}
+                </Card>
+
+                {/* 6. COMBAT RESERVIST (IRON SWORDS) */}
+                <Card className={`p-4 border-2 transition-all ${localData.combatReservist?.isCombat ? 'border-red-100 bg-red-50/50' : 'border-slate-100'}`}>
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                            <Medal className="text-red-500 w-5 h-5" />
+                            <h4 className="font-bold text-slate-700">{t('settings.taxCredit.combatReservist')}</h4>
+                        </div>
+                        <input
+                            type="checkbox"
+                            checked={localData.combatReservist?.isCombat}
+                            onChange={(e) => update('combatReservist', { ...localData.combatReservist, isCombat: e.target.checked })}
+                            className="w-4 h-4 text-red-600"
+                        />
+                    </div>
+                    {localData.combatReservist?.isCombat ? (
+                        <div className="bg-white p-3 rounded-lg border border-red-100">
+                            <label className="text-[10px] font-bold text-slate-400 block mb-1">
+                                {t('settings.taxCredit.daysServed')}
+                            </label>
+                            <input
+                                type="number"
+                                value={localData.combatReservist.days}
+                                onChange={(e) => update('combatReservist', { ...localData.combatReservist, days: parseInt(e.target.value) })}
+                                className="w-full p-2 border rounded font-bold text-sm"
+                                placeholder="e.g. 60"
+                            />
+                        </div>
+                    ) : (
+                        <div className="text-xs text-slate-400 italic">{t('settings.taxCredit.notCombatReservist')}</div>
+                    )}
                 </Card>
             </div>
         </div>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Wallet, Plus, Edit2, Trash2, X, Sparkles } from 'lucide-react';
+import { useTranslation, Trans } from 'react-i18next';
 import { collection, getDocs, deleteDoc, doc, query, where } from 'firebase/firestore';
 import { db, CLOUD_RUN_URL } from '../../../config/firebase.js';
 import { Button } from '../../../components/UI.jsx';
@@ -7,6 +8,7 @@ import { LogoImage } from './LogoImage.jsx';
 import { RecurringIncomeForm } from './RecurringIncomeForm.jsx';
 
 export const RecurringIncomeCard = ({ userId, workplaces, recurringIncomes, onUpdate }) => {
+    const { t } = useTranslation();
     const [showForm, setShowForm] = useState(false);
     const [editingIncome, setEditingIncome] = useState(null);
     const [deleteModal, setDeleteModal] = useState({ show: false, income: null });
@@ -301,33 +303,37 @@ export const RecurringIncomeCard = ({ userId, workplaces, recurringIncomes, onUp
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fade-in">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6">
                         <div className="flex items-center justify-between mb-6">
-                            <h3 className="font-bold text-xl text-slate-800">Remove Recurring Income</h3>
+                            <h3 className="font-bold text-xl text-slate-800">{t('income.recurringCard.deleteModal.title')}</h3>
                             <button onClick={() => setDeleteModal({ show: false, income: null })} className="text-slate-400 hover:text-slate-600">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
 
                         <p className="text-sm text-slate-600 mb-4">
-                            Choose how to remove <strong>{deleteModal.income?.workplaceName}</strong>:
+                            <Trans
+                                i18nKey="income.recurringCard.deleteModal.chooseHow"
+                                values={{ name: deleteModal.income?.workplaceName }}
+                                components={{ strong: <strong /> }}
+                            />
                         </p>
 
-                        <div className="grid grid-cols-3 gap-4">
-                            <button
-                                onClick={() => handleDeleteOption('this_month')}
-                                className="p-6 rounded-xl border-2 border-slate-200 hover:border-blue-500 hover:bg-blue-50 transition-all flex flex-col items-center text-center group"
-                            >
-                                <div className="text-3xl mb-2">📅</div>
-                                <div className="font-bold text-sm text-slate-800">This Month Only</div>
-                                <div className="text-xs text-slate-500 mt-1">Skip this month</div>
-                            </button>
-
+                        <div className="grid grid-cols-3 gap-4" dir="ltr">
                             <button
                                 onClick={() => handleDeleteOption('past')}
                                 className="p-6 rounded-xl border-2 border-slate-200 hover:border-orange-500 hover:bg-orange-50 transition-all flex flex-col items-center text-center group"
                             >
                                 <div className="text-3xl mb-2">⏮️</div>
-                                <div className="font-bold text-sm text-slate-800">All Past Months</div>
-                                <div className="text-xs text-slate-500 mt-1">Remove from history</div>
+                                <div className="font-bold text-sm text-slate-800">{t('income.recurringCard.deleteModal.allPastMonths')}</div>
+                                <div className="text-xs text-slate-500 mt-1">{t('income.recurringCard.deleteModal.removeFromHistory')}</div>
+                            </button>
+
+                            <button
+                                onClick={() => handleDeleteOption('this_month')}
+                                className="p-6 rounded-xl border-2 border-slate-200 hover:border-blue-500 hover:bg-blue-50 transition-all flex flex-col items-center text-center group"
+                            >
+                                <div className="text-3xl mb-2">📅</div>
+                                <div className="font-bold text-sm text-slate-800">{t('income.recurringCard.deleteModal.thisMonthOnly')}</div>
+                                <div className="text-xs text-slate-500 mt-1">{t('income.recurringCard.deleteModal.skipThisMonth')}</div>
                             </button>
 
                             <button
@@ -335,8 +341,8 @@ export const RecurringIncomeCard = ({ userId, workplaces, recurringIncomes, onUp
                                 className="p-6 rounded-xl border-2 border-slate-200 hover:border-red-500 hover:bg-red-50 transition-all flex flex-col items-center text-center group"
                             >
                                 <div className="text-3xl mb-2">⏭️</div>
-                                <div className="font-bold text-sm text-slate-800">Stop Future</div>
-                                <div className="text-xs text-slate-500 mt-1">End contract</div>
+                                <div className="font-bold text-sm text-slate-800">{t('income.recurringCard.deleteModal.stopFuture')}</div>
+                                <div className="text-xs text-slate-500 mt-1">{t('income.recurringCard.deleteModal.endContract')}</div>
                             </button>
                         </div>
 
@@ -345,7 +351,7 @@ export const RecurringIncomeCard = ({ userId, workplaces, recurringIncomes, onUp
                                 onClick={() => deleteRecurringCompletely(deleteModal.income.id, deleteModal.income.workplaceName)}
                                 className="w-full p-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors"
                             >
-                                🗑️ Delete Completely (Recurring + All Months)
+                                {t('income.recurringCard.deleteModal.deleteCompletely')}
                             </button>
                         </div>
                     </div>

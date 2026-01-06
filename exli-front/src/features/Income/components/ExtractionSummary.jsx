@@ -1,21 +1,23 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, FileText, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export const ExtractionSummary = ({ extractedData }) => {
+    const { t } = useTranslation();
     const [isOpen, setIsOpen] = useState(false);
 
     if (!extractedData) return null;
 
     const fields = [
-        { key: 'bruto', label: 'Gross Salary' },
-        { key: 'neto', label: 'Net Salary' },
-        { key: 'tax_income', label: 'Income Tax' },
-        { key: 'tax_health', label: 'Health Insurance' },
-        { key: 'tax_national', label: 'National Insurance' },
-        { key: 'pension_employee', label: 'Pension (Employee)' },
-        { key: 'pension_employer', label: 'Pension (Employer)' },
-        { key: 'credit_points', label: 'Credit Points' },
-        { key: 'marginal_rate', label: 'Marginal Rate' },
+        { key: 'bruto', label: t('income.extraction.fields.grossSalary') },
+        { key: 'neto', label: t('income.extraction.fields.netSalary') },
+        { key: 'tax_income', label: t('income.extraction.fields.incomeTax') },
+        { key: 'tax_health', label: t('income.extraction.fields.healthInsurance') },
+        { key: 'tax_national', label: t('income.extraction.fields.nationalInsurance') },
+        { key: 'pension_employee', label: t('income.extraction.fields.pensionEmployee') },
+        { key: 'pension_employer', label: t('income.extraction.fields.pensionEmployer') },
+        { key: 'credit_points', label: t('income.extraction.fields.creditPoints') },
+        { key: 'marginal_rate', label: t('income.extraction.fields.marginalRate') },
     ];
 
     const foundCount = fields.filter(f => extractedData[f.key] !== null).length;
@@ -32,9 +34,9 @@ export const ExtractionSummary = ({ extractedData }) => {
                         <FileText className="w-5 h-5" />
                     </div>
                     <div>
-                        <div className="font-bold text-slate-800 text-sm">Payslip Data Extracted</div>
+                        <div className="font-bold text-slate-800 text-sm">{t('income.extraction.payslipDataExtracted')}</div>
                         <div className="text-xs text-slate-500">
-                            Found {foundCount}/{totalCount} fields
+                            {t('income.extraction.foundFields', { found: foundCount, total: totalCount })}
                         </div>
                     </div>
                 </div>
@@ -61,7 +63,7 @@ export const ExtractionSummary = ({ extractedData }) => {
                                             </>
                                         ) : (
                                             <>
-                                                <span className="text-xs text-red-400 italic">Not found</span>
+                                                <span className="text-xs text-red-400 italic">{t('income.extraction.notFound')}</span>
                                                 <XCircle className="w-4 h-4 text-red-300" />
                                             </>
                                         )}
@@ -71,7 +73,7 @@ export const ExtractionSummary = ({ extractedData }) => {
                         })}
                     </div>
                     <div className="mt-3 text-xs text-slate-400 text-center italic">
-                        * Verify these values against your actual payslip file.
+                        {t('income.extraction.verifyNote')}
                     </div>
                 </div>
             )}

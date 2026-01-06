@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, Info, CheckCircle, Edit2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export const MismatchAlert = ({
     actual,
@@ -10,6 +11,10 @@ export const MismatchAlert = ({
     onResolve,
     resolvedValue
 }) => {
+    const { t } = useTranslation();
+    const [customMode, setCustomMode] = useState(false);
+    const [customInput, setCustomInput] = useState(resolvedValue || '');
+
     // If either value is missing, don't show mismatch
     if (actual === null || actual === undefined || expected === null || expected === undefined) return null;
 
@@ -18,9 +23,6 @@ export const MismatchAlert = ({
 
     // If difference is within tolerance, returned null (no alert)
     if (diff <= tolerance) return null;
-
-    const [customMode, setCustomMode] = useState(false);
-    const [customInput, setCustomInput] = useState(resolvedValue || '');
 
     // Determine currently selected source based on value match
     // Priority: Custom if mode active, otherwise check exact value matches
@@ -53,7 +55,7 @@ export const MismatchAlert = ({
                     <AlertTriangle className="w-5 h-5 text-amber-600" />
                 )}
                 <div className={`font-bold text-sm ${activeSource ? 'text-emerald-800' : 'text-amber-900'}`}>
-                    {label} Mismatch {activeSource && '(Resolved)'}
+                    {label} {t('income.mismatch.title')} {activeSource && t('income.mismatch.resolved')}
                 </div>
             </div>
 
@@ -62,12 +64,12 @@ export const MismatchAlert = ({
                 <button
                     type="button"
                     onClick={() => handleSelect('system', expected)}
-                    className={`relative p-3 rounded-xl border-2 text-left transition-all hover:shadow-md ${activeSource === 'system'
+                    className={`relative p-3 rounded-xl border-2 text-start transition-all hover:shadow-md ${activeSource === 'system'
                         ? 'bg-white border-emerald-500 shadow-sm'
                         : 'bg-white/60 border-slate-200 hover:border-emerald-300 hover:bg-white'
                         }`}
                 >
-                    <div className="text-[10px] uppercase font-extrabold text-slate-400 mb-1">Expected (System)</div>
+                    <div className="text-xs uppercase font-extrabold text-slate-400 mb-1">{t('income.mismatch.expectedSystem')}</div>
                     <div className="font-mono font-black text-slate-700 text-lg">
                         {expected.toLocaleString()}
                         <span className="text-xs ml-1 font-bold text-slate-400">{currency}</span>
@@ -83,12 +85,12 @@ export const MismatchAlert = ({
                 <button
                     type="button"
                     onClick={() => handleSelect('file', actual)}
-                    className={`relative p-3 rounded-xl border-2 text-left transition-all hover:shadow-md ${activeSource === 'file'
+                    className={`relative p-3 rounded-xl border-2 text-start transition-all hover:shadow-md ${activeSource === 'file'
                         ? 'bg-white border-emerald-500 shadow-sm'
                         : 'bg-white/60 border-slate-200 hover:border-blue-300 hover:bg-white'
                         }`}
                 >
-                    <div className="text-[10px] uppercase font-extrabold text-blue-500 mb-1">Found in Payslip</div>
+                    <div className="text-xs uppercase font-extrabold text-blue-500 mb-1">{t('income.mismatch.foundInPayslip')}</div>
                     <div className="font-mono font-black text-slate-700 text-lg">
                         {actual.toLocaleString()}
                         <span className="text-xs ml-1 font-bold text-slate-400">{currency}</span>
@@ -110,12 +112,12 @@ export const MismatchAlert = ({
                             setCustomInput(resolvedValue && activeSource === 'custom' ? resolvedValue : '');
                         }
                     }}
-                    className={`relative p-3 rounded-xl border-2 text-left transition-all hover:shadow-md group ${activeSource === 'custom'
+                    className={`relative p-3 rounded-xl border-2 text-start transition-all hover:shadow-md group ${activeSource === 'custom'
                         ? 'bg-white border-emerald-500 shadow-sm'
                         : 'bg-white/60 border-dashed border-slate-300 hover:border-slate-400 hover:bg-white'
                         }`}
                 >
-                    <div className="text-[10px] uppercase font-extrabold text-amber-600 mb-1">Custom Value</div>
+                    <div className="text-xs uppercase font-extrabold text-amber-600 mb-1">{t('income.mismatch.customValue')}</div>
 
                     {customMode || activeSource === 'custom' ? (
                         <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
@@ -142,7 +144,7 @@ export const MismatchAlert = ({
                     ) : (
                         <div className="flex items-center gap-2 text-slate-400 group-hover:text-amber-600 transition-colors">
                             <Edit2 className="w-4 h-4" />
-                            <span className="text-sm font-bold">Set Custom</span>
+                            <span className="text-sm font-bold">{t('income.mismatch.setCustom')}</span>
                         </div>
                     )}
 
@@ -157,7 +159,7 @@ export const MismatchAlert = ({
             {!activeSource && (
                 <div className="text-amber-700/70 mt-3 text-[10px] font-medium flex items-center gap-1.5 ml-1">
                     <Info className="w-3 h-3" />
-                    Please select the value to use in your report.
+                    {t('income.mismatch.selectValueNote')}
                 </div>
             )}
         </div>

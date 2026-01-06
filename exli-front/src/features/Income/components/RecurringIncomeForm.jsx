@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, AlertCircle, Repeat } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { collection, addDoc, updateDoc, doc, serverTimestamp, setDoc, getDocs, getDoc } from 'firebase/firestore';
 import { db } from '../../../config/firebase.js';
 import { Button } from '../../../components/UI.jsx';
@@ -10,18 +11,12 @@ import { TaxBracketGraph } from './TaxBracketGraph.jsx';
 import { MismatchAlert } from './MismatchAlert.jsx';
 import { ExtractionSummary } from './ExtractionSummary.jsx';
 
-const PERIOD_PRESETS = [
-    { label: '3 Months', count: 3, unit: 'months' },
-    { label: '6 Months', count: 6, unit: 'months' },
-    { label: '1 Year', count: 1, unit: 'years' },
-    { label: '2 Years', count: 2, unit: 'years' }
-];
-
 
 const PENSION_PERCENTAGES = [6.0, 6.5, 7.0, 7.5, 8.0, 8.33, 8.5];
 
 // Helper Component for Editing Values
-const EditValuePopover = ({ initialValue, onSave, onCancel, title }) => {
+const EditValuePopover = ({ initialValue, onSave, onCancel, title, saveLabel, cancelLabel }) => {
+    const { t } = useTranslation();
     const [val, setVal] = useState(initialValue);
 
     // Auto-select text on mount
@@ -51,14 +46,14 @@ const EditValuePopover = ({ initialValue, onSave, onCancel, title }) => {
                     onClick={() => onSave(parseFloat(val))}
                     className="flex-1 bg-teal-600 hover:bg-teal-700 text-white py-2 rounded-lg font-bold text-sm transition-colors"
                 >
-                    Save
+                    {saveLabel || t('income.recurringForm.save')}
                 </button>
                 <button
                     type="button"
                     onClick={onCancel}
                     className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 py-2 rounded-lg font-bold text-sm transition-colors"
                 >
-                    Cancel
+                    {cancelLabel || t('common.cancel')}
                 </button>
             </div>
             {/* Arrow */}
@@ -68,6 +63,14 @@ const EditValuePopover = ({ initialValue, onSave, onCancel, title }) => {
 };
 
 export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCancel, editData = null, extractedData }) => {
+    const { t, i18n } = useTranslation();
+
+    const PERIOD_PRESETS = [
+        { label: t('income.recurringForm.periodPresets.3months'), count: 3, unit: 'months' },
+        { label: t('income.recurringForm.periodPresets.6months'), count: 6, unit: 'months' },
+        { label: t('income.recurringForm.periodPresets.1year'), count: 1, unit: 'years' },
+        { label: t('income.recurringForm.periodPresets.2years'), count: 2, unit: 'years' }
+    ];
     const [formData, setFormData] = useState({
         workplaceName: editData?.workplaceName || '',
         occupation: editData?.occupation || '',
@@ -393,19 +396,19 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
         e.preventDefault();
 
         if (!formData.workplaceName.trim()) {
-            setValidationError('Please select or enter a workplace');
+            setValidationError(t('income.recurringForm.validation.selectWorkplace'));
             return;
         }
         if (!formData.grossAmount || formData.grossAmount <= 0) {
-            setValidationError('Please enter a valid gross amount');
+            setValidationError(t('income.recurringForm.validation.enterValidGross'));
             return;
         }
         if (!formData.netAmount || formData.netAmount <= 0) {
-            setValidationError('Please enter a valid net amount');
+            setValidationError(t('income.recurringForm.validation.enterValidNet'));
             return;
         }
         if (!selectedDirection) {
-            setValidationError('Please select a direction (past/future/both)');
+            setValidationError(t('income.recurringForm.validation.selectDirection'));
             return;
         }
 
@@ -432,9 +435,6 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                 workplaceDomain: formData.workplaceDomain,
                 isActive: true,
                 source: 'manual',
-                workplaceDomain: formData.workplaceDomain,
-                isActive: true,
-                source: 'manual',
                 serverTimestamp: serverTimestamp(),
                 manualOverrides: manualOverrides,
                 otherDeposits: {
@@ -458,7 +458,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
             onSave();
         } catch (err) {
             console.error('Save recurring income failed:', err);
-            setValidationError('Failed to save recurring income');
+            setValidationError(t('income.recurringForm.validation.saveFailed'));
         } finally {
             setIsSaving(false);
         }
@@ -511,7 +511,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                             onClick={() => { setIsCustom(false); setCustomInput(''); }}
                             className="px-3 py-2 bg-slate-200 hover:bg-slate-300 rounded-lg text-sm font-medium transition-colors"
                         >
-                            Cancel
+                            {t('common.cancel')}
                         </button>
                     </div>
                 ) : (
@@ -551,7 +551,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                             onClick={() => setIsCustom(true)}
                             className="px-3 py-1.5 rounded-lg border border-dashed border-slate-300 text-slate-400 hover:text-slate-600 text-xs font-medium"
                         >
-                            ✏️ Custom
+                            ✏️ {t('income.recurringForm.custom')}
                         </button>
                     </div>
                 )}
@@ -572,7 +572,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
             // Enforce 5-year (60 months) limit
             const totalMonths = unit === 'years' ? count * 12 : count;
             if (totalMonths > 60) {
-                alert('Maximum period is 5 years (60 months)');
+                alert(t('income.recurringForm.validation.maxPeriod'));
                 return;
             }
 
@@ -600,7 +600,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                             onChange={(e) => setCustomInput({ ...customInput, count: e.target.value })}
                             onKeyPress={(e) => e.key === 'Enter' && handleApproveCustom()}
                             className="w-24 p-2 border border-slate-300 rounded-lg text-center font-bold"
-                            placeholder="Count"
+                            placeholder={t('income.recurringForm.count')}
                             autoFocus
                         />
                         <select
@@ -608,8 +608,8 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                             onChange={(e) => setCustomInput({ ...customInput, unit: e.target.value })}
                             className="p-2 border border-slate-300 rounded-lg font-medium"
                         >
-                            <option value="months">Months</option>
-                            <option value="years">Years</option>
+                            <option value="months">{t('income.recurringForm.months')}</option>
+                            <option value="years">{t('income.recurringForm.years')}</option>
                         </select>
                         <button
                             type="button"
@@ -623,7 +623,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                             onClick={() => { setIsCustom(false); setCustomInput({ count: '', unit: 'months' }); }}
                             className="px-3 py-2 bg-slate-200 hover:bg-slate-300 rounded-lg text-sm"
                         >
-                            Cancel
+                            {t('common.cancel')}
                         </button>
                     </div>
                 ) : (
@@ -661,7 +661,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                             onClick={() => setIsCustom(true)}
                             className="px-4 py-2 rounded-lg border border-dashed border-slate-300 text-slate-400 hover:text-slate-600 text-sm font-medium"
                         >
-                            ✏️ Custom
+                            ✏️ {t('income.recurringForm.custom')}
                         </button>
                     </div>
                 )}
@@ -690,7 +690,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
 
                     {/* Workplace Selection */}
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Workplace *</label>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">{t('income.recurringForm.workplace')}</label>
                         {workplaces.length > 0 && (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                                 {workplaces.map((w, i) => (
@@ -719,7 +719,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                             type="text"
                             value={formData.workplaceName}
                             onChange={(e) => setFormData({ ...formData, workplaceName: e.target.value })}
-                            placeholder="Or enter workplace name..."
+                            placeholder={t('income.recurringForm.orEnterWorkplace')}
                             className="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none"
                         />
                     </div>
@@ -753,7 +753,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                         : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
                                         }`}
                                 >
-                                    {hasTax ? '✓ Taxable Income' : '✗ Tax Free'}
+                                    {hasTax ? t('income.recurringForm.taxableIncome') : t('income.recurringForm.taxFree')}
                                 </button>
                             </div>
 
@@ -772,19 +772,19 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                     {/* Tax Details */}
                                     <div className="mt-4 space-y-3">
                                         <div className="flex justify-between items-center text-sm">
-                                            <span className="text-orange-700">Tax Credit Points:</span>
+                                            <span className="text-orange-700">{t('income.recurringForm.taxCreditPoints')}</span>
                                             <span className="font-mono font-bold text-orange-900">{taxCreditPoints}</span>
                                         </div>
 
                                         <div className="flex justify-between items-center text-sm">
-                                            <span className="text-orange-700">Monthly Gross:</span>
+                                            <span className="text-orange-700">{t('income.recurringForm.monthlyGross')}</span>
                                             <span className="font-mono text-emerald-700 font-bold">
                                                 {parseFloat(formData.grossAmount).toLocaleString()} {formData.currency}
                                             </span>
                                         </div>
 
                                         <div className="flex justify-between items-center text-xs text-orange-600">
-                                            <span>Annual Gross (for tax calc):</span>
+                                            <span>{t('income.recurringForm.annualGross')}</span>
                                             <span className="font-mono">
                                                 {(parseFloat(formData.grossAmount) * 12).toLocaleString()} {formData.currency}
                                             </span>
@@ -795,17 +795,21 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
 
                                         {/* Income Tax */}
                                         <div className="flex justify-between items-center">
-                                            <span className="text-sm font-medium text-orange-800">Income Tax:</span>
+                                            <span className="text-sm font-medium text-orange-800">{t('income.recurringForm.incomeTax')}</span>
                                             <span className="font-mono font-bold text-orange-900">
                                                 {(manualOverrides.tax_income !== undefined ? manualOverrides.tax_income : calculatedTax).toLocaleString()} {formData.currency}
-                                                {manualOverrides.tax_income !== undefined && <span className="text-[10px] text-amber-600 ml-1">(Edited)</span>}
+                                                {manualOverrides.tax_income !== undefined && <span className="text-[10px] text-amber-600 ml-1">{t('income.recurringForm.edited')}</span>}
                                             </span>
                                         </div>
 
                                         {/* Additional Taxes */}
                                         {additionalTaxes.breakdown.map((tax, idx) => (
                                             <div key={idx} className="flex justify-between items-center text-sm">
-                                                <span className="text-orange-700">{tax.name}:</span>
+                                                <span className="text-orange-700">
+                                                    {tax.name.includes('Health') ? t('income.recurringForm.healthTax') :
+                                                        tax.name.includes('National') ? t('income.recurringForm.nationalInsurance') :
+                                                            tax.name}:
+                                                </span>
                                                 <span className="font-mono text-orange-800">
                                                     {tax.amount.toLocaleString()} {formData.currency}
                                                     <span className="text-xs text-orange-600 ml-2">
@@ -818,7 +822,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                         {/* Total Monthly Taxes */}
                                         <div className="mt-4 pt-4 border-t-2 border-orange-300">
                                             <div className="flex justify-between items-center">
-                                                <span className="text-sm font-bold text-orange-900">Total Monthly Taxes:</span>
+                                                <span className="text-sm font-bold text-orange-900">{t('income.recurringForm.totalMonthlyTaxes')}</span>
                                                 <span className="text-2xl font-mono font-black text-orange-600">
                                                     {(
                                                         (manualOverrides.tax_income ?? calculatedTax) +
@@ -837,7 +841,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                         <div className="mt-4 space-y-2">
                                             {/* Credit Points Mismatch */}
                                             <MismatchAlert
-                                                label="Credit Points"
+                                                label={t('income.recurringForm.taxCreditPoints')}
                                                 actual={extractedData.credit_points ?? 0}
                                                 expected={taxCreditPoints}
                                                 currency="pts"
@@ -852,7 +856,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                                 resolvedValue={undefined} // We don't store manual override for points in the same map yet
                                             />
                                             <MismatchAlert
-                                                label="Income Tax"
+                                                label={t('income.recurringForm.incomeTax')}
                                                 actual={extractedData.tax_income ?? 0}
                                                 expected={calculatedTax}
                                                 currency={formData.currency}
@@ -861,7 +865,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                                 resolvedValue={manualOverrides.tax_income}
                                             />
                                             <MismatchAlert
-                                                label="Health Tax"
+                                                label={t('income.recurringForm.healthTax')}
                                                 actual={extractedData.tax_health ?? 0}
                                                 expected={additionalTaxes.breakdown.find(t => t.name.includes('Health'))?.amount || 0}
                                                 currency={formData.currency}
@@ -870,7 +874,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                                 resolvedValue={manualOverrides.tax_health}
                                             />
                                             <MismatchAlert
-                                                label="National Insurance"
+                                                label={t('income.recurringForm.nationalInsurance')}
                                                 actual={extractedData.tax_national ?? 0}
                                                 expected={additionalTaxes.breakdown.find(t => t.name.includes('National'))?.amount || 0}
                                                 currency={formData.currency}
@@ -885,7 +889,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                 </>
                             ) : (
                                 <div className="text-center py-6 text-slate-400 text-sm italic">
-                                    No taxes calculated for this income
+                                    {t('income.recurringForm.noTaxesCalculated')}
                                 </div>
                             )}
                         </div>
@@ -895,7 +899,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                     <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-4">
                         <div className="flex items-center justify-between mb-4">
                             <h4 className="font-bold text-purple-900 flex items-center gap-2">
-                                💰 Pension Calculator
+                                {t('income.recurringForm.pensionCalculator')}
                             </h4>
                             <button
                                 type="button"
@@ -912,14 +916,14 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                     : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
                                     }`}
                             >
-                                {hasPension ? '✓ Has Pension' : '✗ No Pension'}
+                                {hasPension ? t('income.recurringForm.hasPension') : t('income.recurringForm.noPension')}
                             </button>
                         </div>
 
                         {hasPension ? (
                             <>
                                 <PercentageRow
-                                    label="Employee Contribution"
+                                    label={t('income.recurringForm.employeeContribution')}
                                     value={formData.employeePct}
                                     onChange={(val) => setFormData({ ...formData, employeePct: val })}
                                     color="text-blue-600"
@@ -930,7 +934,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                 />
 
                                 <PercentageRow
-                                    label="Employer Contribution"
+                                    label={t('income.recurringForm.employerContribution')}
                                     value={formData.employerPct}
                                     onChange={(val) => setFormData({ ...formData, employerPct: val })}
                                     color="text-green-600"
@@ -941,7 +945,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                 />
 
                                 <PercentageRow
-                                    label="Severance - Employer Pays"
+                                    label={t('income.recurringForm.severanceEmployerPays')}
                                     value={formData.severancePct}
                                     onChange={(val) => setFormData({ ...formData, severancePct: val })}
                                     color="text-amber-600"
@@ -953,13 +957,18 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
 
                                 <div className="mt-4 pt-4 border-t border-purple-200">
                                     <div className="flex justify-between items-center">
-                                        <span className="text-sm font-bold text-purple-900">Expected Monthly Total (Pension Fund):</span>
+                                        <span className="text-sm font-bold text-purple-900">{t('income.recurringForm.expectedPensionTotal')}</span>
                                         <span className="text-2xl font-mono font-black text-purple-600">
                                             {formData.expectedPension.toLocaleString()} {formData.currency}
                                         </span>
                                     </div>
                                     <div className="text-xs text-purple-600 mt-1 text-right">
-                                        Employee: {formData.employeePct}% + Employer: {formData.employerPct}% + Severance: {formData.severancePct}% = {(formData.employeePct + formData.employerPct + formData.severancePct).toFixed(2)}%
+                                        {t('income.recurringForm.pensionBreakdownLine', {
+                                            emp: formData.employeePct,
+                                            empr: formData.employerPct,
+                                            sev: formData.severancePct,
+                                            total: (formData.employeePct + formData.employerPct + formData.severancePct).toFixed(2)
+                                        })}
                                     </div>
                                 </div>
 
@@ -967,7 +976,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                 {extractedData && (
                                     <div className="mt-4">
                                         <MismatchAlert
-                                            label="Employee Pension"
+                                            label={t('income.recurringForm.pensionLabel')}
                                             actual={extractedData.pension_employee}
                                             expected={Math.round(parseFloat(formData.grossAmount || 0) * (formData.employeePct / 100))}
                                             currency={formData.currency}
@@ -990,7 +999,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                     <div className="bg-emerald-50 border-2 border-emerald-200 rounded-xl p-4">
                         <div className="flex items-center justify-between mb-4">
                             <h4 className="font-bold text-emerald-900 flex items-center gap-2">
-                                👜 Other Deposits (Keren Hishtalmut)
+                                {t('income.recurringForm.otherDeposits')}
                             </h4>
                             <button
                                 type="button"
@@ -1000,14 +1009,14 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                     : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
                                     }`}
                             >
-                                {hasOtherDeposits ? '✓ Active' : '✗ None'}
+                                {hasOtherDeposits ? t('income.recurringForm.active') : t('income.recurringForm.none')}
                             </button>
                         </div>
 
                         {hasOtherDeposits && (
                             <>
                                 <PercentageRow
-                                    label="Employee Contribution"
+                                    label={t('income.recurringForm.employeeContribution')}
                                     value={otherDepositEmployeePct}
                                     onChange={(val) => setOtherDepositEmployeePct(val)}
                                     color="text-emerald-700"
@@ -1017,7 +1026,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                     setCustomList={setCustomOtherEmployeePcts}
                                 />
                                 <PercentageRow
-                                    label="Employer Contribution"
+                                    label={t('income.recurringForm.employerContribution')}
                                     value={otherDepositEmployerPct}
                                     onChange={(val) => setOtherDepositEmployerPct(val)}
                                     color="text-emerald-700"
@@ -1027,7 +1036,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                     setCustomList={setCustomOtherEmployerPcts}
                                 />
                                 <div className="mt-2 text-xs text-emerald-600 font-bold border-t border-emerald-200 pt-2 text-right">
-                                    Total Other Deposit: {Math.round(parseFloat(formData.grossAmount || 0) * ((otherDepositEmployeePct + otherDepositEmployerPct) / 100)).toLocaleString()} {formData.currency}
+                                    {t('income.recurringForm.totalOtherDeposit')} {Math.round(parseFloat(formData.grossAmount || 0) * ((otherDepositEmployeePct + otherDepositEmployerPct) / 100)).toLocaleString()} {formData.currency}
                                 </div>
                             </>
                         )}
@@ -1037,7 +1046,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                     <div>
                         <div className="bg-white border-2 border-teal-100 rounded-xl p-5 shadow-sm">
                             <label className="block text-sm font-bold text-teal-900 mb-3 uppercase tracking-wider">
-                                Net Salary (Take Home)
+                                {t('income.recurringForm.netSalary')}
                             </label>
 
                             <div className="relative mb-4">
@@ -1056,18 +1065,18 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                             {/* Calculation Flow */}
                             <div className="bg-slate-50 rounded-lg p-3 space-y-2 text-sm font-mono text-slate-600">
                                 <div className="flex justify-between items-center">
-                                    <span>Gross Salary:</span>
+                                    <span>{t('income.recurringForm.monthlyGross')}</span>
                                     <span className="font-bold">{parseFloat(formData.grossAmount || 0).toLocaleString()}</span>
                                 </div>
 
                                 <div className="flex justify-between items-center text-red-500 relative">
                                     <span className="flex items-center gap-1 cursor-help" title="Income Tax + Health + National">
-                                        - Taxes ({((manualOverrides.tax_income ?? calculatedTax) +
+                                        - {t('income.recurringForm.taxes')} ({((manualOverrides.tax_income ?? calculatedTax) +
                                             (manualOverrides.tax_health ?? (additionalTaxes.breakdown.find(t => t.name.includes('Health'))?.amount || 0)) +
                                             (manualOverrides.tax_national ?? (additionalTaxes.breakdown.find(t => t.name.includes('National'))?.amount || 0))
                                         ).toLocaleString()})
                                         {(manualOverrides.tax_income !== undefined || manualOverrides.tax_health !== undefined || manualOverrides.tax_national !== undefined) && (
-                                            <span className="bg-amber-100 text-amber-700 text-[10px] px-1 rounded border border-amber-200">EDITED</span>
+                                            <span className="bg-amber-100 text-amber-700 text-[10px] px-1 rounded border border-amber-200">{t('income.recurringForm.edited')}</span>
                                         )}
                                     </span>
                                     <span
@@ -1084,7 +1093,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                     {/* Custom Edit Popover for Taxes */}
                                     {editingField === 'taxes' && (
                                         <EditValuePopover
-                                            title="Override Total Taxes"
+                                            title={t('income.recurringForm.overrideTaxes')}
                                             initialValue={(
                                                 (manualOverrides.tax_income ?? calculatedTax) +
                                                 (manualOverrides.tax_health ?? (additionalTaxes.breakdown.find(t => t.name.includes('Health'))?.amount || 0)) +
@@ -1111,7 +1120,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
 
                                 <div className="flex justify-between items-center text-red-500 relative">
                                     <span className="flex items-center gap-1">
-                                        - Pension (Employee)
+                                        - {t('income.recurringForm.pensionLabel')}
                                         {manualOverrides.pension_employee !== undefined && (
                                             <span className="bg-amber-100 text-amber-700 text-[10px] px-1 rounded border border-amber-200">EDITED</span>
                                         )}
@@ -1124,7 +1133,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                     </span>
                                     {editingField === 'pension' && (
                                         <EditValuePopover
-                                            title="Override Employee Pension"
+                                            title={t('income.recurringForm.overridePension')}
                                             initialValue={manualOverrides.pension_employee !== undefined ? manualOverrides.pension_employee : Math.round(parseFloat(formData.grossAmount || 0) * (formData.employeePct / 100))}
                                             onCancel={() => setEditingField(null)}
                                             onSave={(val) => {
@@ -1138,7 +1147,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                 {hasOtherDeposits && (
                                     <div className="flex justify-between items-center text-red-500 relative">
                                         <span className="flex items-center gap-1">
-                                            - Keren Hishtalmut (Emp)
+                                            - {t('income.recurringForm.kerenHishtalmut')}
                                             {manualOverrides.other_deposit_employee !== undefined && (
                                                 <span className="bg-amber-100 text-amber-700 text-[10px] px-1 rounded border border-amber-200">EDITED</span>
                                             )}
@@ -1171,7 +1180,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                 <div className="border-t border-slate-200 my-2"></div>
 
                                 <div className="flex justify-between items-center text-teal-700 font-bold text-base">
-                                    <span>= Net Salary:</span>
+                                    <span>= {t('income.recurringForm.netSalary')}</span>
                                     <span>{formData.netAmount?.toLocaleString()}</span>
                                 </div>
                             </div>
@@ -1184,7 +1193,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                             {extractedData && (
                                 <div className="mt-4">
                                     <MismatchAlert
-                                        label="Net Salary"
+                                        label={t('income.recurringForm.netSalary')}
                                         actual={extractedData.neto}
                                         expected={formData.netAmount}
                                         currency={formData.currency}
@@ -1201,8 +1210,8 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
 
                     {/* Direction */}
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-3">Apply To *</label>
-                        <div className="grid grid-cols-2 gap-4">
+                        <label className="block text-sm font-medium text-slate-700 mb-3">{t('income.recurringForm.applyTo')}</label>
+                        <div className="grid grid-cols-2 gap-4" dir="ltr">
                             <button
                                 type="button"
                                 onClick={() => handleDirectionToggle('past')}
@@ -1212,8 +1221,8 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                     }`}
                             >
                                 <div className="text-3xl mb-2">⏮️</div>
-                                <div className="font-bold text-slate-800 mb-1">This + Past Months</div>
-                                <div className="text-xs text-slate-600">Add to current and previous months</div>
+                                <div className="font-bold text-slate-800 mb-1">{t('income.recurringForm.pastMonths')}</div>
+                                <div className="text-xs text-slate-600">{t('income.recurringForm.addToPrevious')}</div>
                             </button>
                             <button
                                 type="button"
@@ -1224,8 +1233,8 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                     }`}
                             >
                                 <div className="text-3xl mb-2">▶️</div>
-                                <div className="font-bold text-slate-800 mb-1">This + Future Months</div>
-                                <div className="text-xs text-slate-600">Forecast upcoming months</div>
+                                <div className="font-bold text-slate-800 mb-1">{t('income.recurringForm.futureMonths')}</div>
+                                <div className="text-xs text-slate-600">{t('income.recurringForm.forecastUpcoming')}</div>
                             </button>
                         </div>
                     </div>
@@ -1235,7 +1244,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                         <div className="border-t border-slate-200 pt-6 space-y-6">
                             {(selectedDirection === 'past' || selectedDirection === 'both') && (
                                 <PeriodSelector
-                                    label="⏮️ How far back?"
+                                    label={`⏮️ ${t('income.recurringForm.howFarBack')}`}
                                     value={{ count: formData.pastPeriodCount, unit: formData.pastPeriodUnit }}
                                     onChange={(period) => setFormData({
                                         ...formData,
@@ -1251,7 +1260,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
 
                             {(selectedDirection === 'future' || selectedDirection === 'both') && (
                                 <PeriodSelector
-                                    label="▶️ How far forward?"
+                                    label={`▶️ ${t('income.recurringForm.howFarForward')}`}
                                     value={{ count: formData.futurePeriodCount, unit: formData.futurePeriodUnit }}
                                     onChange={(period) => setFormData({
                                         ...formData,
@@ -1270,10 +1279,10 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                     {/* Summary */}
                     <div className="bg-gradient-to-r from-teal-50 to-cyan-50 border-2 border-teal-200 rounded-xl p-4">
                         <div className="font-bold text-teal-900 mb-2 flex items-center gap-2">
-                            📊 Summary
+                            📊 {t('income.recurringForm.summary')}
                         </div>
                         <div className="text-sm text-teal-800 space-y-1">
-                            <div className="font-bold text-teal-900">📆 Months Covered:</div>
+                            <div className="font-bold text-teal-900">📆 {t('income.recurringForm.monthsCovered')}</div>
                             <div className="pl-4 text-xs">{getMonthRangeDisplay()}</div>
                         </div>
                     </div>
@@ -1291,10 +1300,10 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                     {/* Submit */}
                     <div className="flex gap-3 pt-4">
                         <Button type="submit" disabled={isSaving} className="flex-1">
-                            {isSaving ? 'Saving...' : editData ? 'Update Income' : 'Save Recurring Income'}
+                            {isSaving ? t('income.recurringForm.saving') : editData ? t('income.recurringForm.updateIncome') : t('income.recurringForm.saveRecurringIncome')}
                         </Button>
                         <Button type="button" variant="secondary" onClick={onCancel}>
-                            Cancel
+                            {t('common.cancel')}
                         </Button>
                     </div>
                 </form >

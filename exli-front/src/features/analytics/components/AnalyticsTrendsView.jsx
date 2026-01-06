@@ -1,9 +1,11 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { DollarSign } from 'lucide-react';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip
 } from 'recharts';
 import { Card } from '../../../components/UI';
+import { DEFAULT_CATEGORIES } from '../../../config/constants';
 
 export const AnalyticsTrendsView = ({
     trendType,
@@ -22,30 +24,38 @@ export const AnalyticsTrendsView = ({
     totalIncome,
     categorySpending
 }) => {
+    const { t } = useTranslation();
+
+    const getCategoryName = (name) => {
+        const defaultCat = DEFAULT_CATEGORIES.find(c => c.name === name);
+        if (defaultCat) return t(`categories.${defaultCat.id}`);
+        return name;
+    };
+
     return (
-        <div className="animate-fade-in">
+        <div className="animate-fade-in w-full">
             <div className="flex justify-center mb-8 bg-slate-100 p-1 rounded-xl w-fit mx-auto">
-                <button onClick={() => setTrendType('expense')} className={`px-6 py-2 rounded-lg font-bold text-sm transition-all ${trendType === 'expense' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>Expense Trends</button>
-                <button onClick={() => setTrendType('income')} className={`px-6 py-2 rounded-lg font-bold text-sm transition-all ${trendType === 'income' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500'}`}>Income Trends</button>
+                <button onClick={() => setTrendType('expense')} className={`px-6 py-2 rounded-lg font-bold text-sm transition-all ${trendType === 'expense' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>{t('analytics.expenseTrends')}</button>
+                <button onClick={() => setTrendType('income')} className={`px-6 py-2 rounded-lg font-bold text-sm transition-all ${trendType === 'income' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500'}`}>{t('analytics.incomeTrends')}</button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Filter Category / Metric</label>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">{t('analytics.filterCategoryMetric')}</label>
                     <div className="flex flex-wrap gap-2">
                         {trendType === 'expense' ? categories.map(c => (
-                            <button key={c.id} onClick={() => setSelectedCategory(c.name)} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${selectedCategory === c.name ? 'border-blue-500 bg-blue-50 text-blue-700' : 'bg-white border-slate-200 text-slate-500'}`}>{c.name}</button>
-                        )) : ['neto', 'bruto', 'taxes'].map(t => (
-                            <button key={t} onClick={() => setSelectedIncomeType(t)} className={`px-3 py-1.5 rounded-lg text-xs font-bold border uppercase transition-all ${selectedIncomeType === t ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'bg-white border-slate-200 text-slate-500'}`}>{t}</button>
+                            <button key={c.id} onClick={() => setSelectedCategory(c.name)} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${selectedCategory === c.name ? 'border-blue-500 bg-blue-50 text-blue-700' : 'bg-white border-slate-200 text-slate-500'}`}>{getCategoryName(c.name)}</button>
+                        )) : ['neto', 'bruto', 'taxes'].map(type => (
+                            <button key={type} onClick={() => setSelectedIncomeType(type)} className={`px-3 py-1.5 rounded-lg text-xs font-bold border uppercase transition-all ${selectedIncomeType === type ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'bg-white border-slate-200 text-slate-500'}`}>{type === 'taxes' ? t('analytics.tax') : t(type, { defaultValue: type })}</button>
                         ))}
                     </div>
                 </div>
                 {trendType === 'income' && jobOptions.length > 2 && (
                     <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Filter by Job</label>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">{t('analytics.filterJob')}</label>
                         <div className="flex flex-wrap gap-2">
                             {jobOptions.map(job => (
-                                <button key={job} onClick={() => setSelectedJobFilter(job)} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${selectedJobFilter === job ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'bg-white border-slate-200 text-slate-500'}`}>{job}</button>
+                                <button key={job} onClick={() => setSelectedJobFilter(job)} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${selectedJobFilter === job ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'bg-white border-slate-200 text-slate-500'}`}>{job === 'ALL_JOBS' ? t('analytics.allJobs') : t(job, { defaultValue: job })}</button>
                             ))}
                         </div>
                     </div>
@@ -58,9 +68,9 @@ export const AnalyticsTrendsView = ({
                     <div className="mb-6 px-6 py-4 bg-red-50 border-2 border-red-300 rounded-xl flex items-center gap-3 animate-fade-in">
                         <div className="text-3xl">⚠️</div>
                         <div className="flex-1">
-                            <div className="font-bold text-red-800 text-lg">Spending Exceeds Income</div>
+                            <div className="font-bold text-red-800 text-lg">{t('analytics.spendingExceedsIncome')}</div>
                             <div className="text-sm text-red-600 mt-1">
-                                Total spending is {categorySpending.reduce((sum, c) => sum + c.percentage, 0).toFixed(1)}% of income this year. Consider reducing expenses or increasing income.
+                                {t('analytics.spendingExceedsIncomeDesc', { percent: categorySpending.reduce((sum, c) => sum + c.percentage, 0).toFixed(1) })}
                             </div>
                         </div>
                     </div>
@@ -68,24 +78,24 @@ export const AnalyticsTrendsView = ({
             }
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                <Card className="p-4 flex flex-col justify-between"><div className="text-slate-400 text-xs font-bold uppercase">Total {trendType === 'expense' ? 'Spent' : 'Earned'}</div><div className="text-2xl font-bold text-slate-800">{dominantCurrency} {trendOverview.total.toLocaleString()}</div></Card>
-                <Card className="p-4 flex flex-col justify-between"><div className="text-slate-400 text-xs font-bold uppercase">Monthly Average</div><div className="text-2xl font-bold text-blue-600">{dominantCurrency} {trendOverview.avg.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div></Card>
-                <Card className="p-4 flex flex-col justify-between"><div className="text-slate-400 text-xs font-bold uppercase">Highest Month</div><div className="text-2xl font-bold text-orange-500">{dominantCurrency} {trendOverview.max.toLocaleString()}</div></Card>
+                <Card className="p-4 flex flex-col justify-between"><div className="text-slate-400 text-xs font-bold uppercase">{trendType === 'expense' ? t('analytics.totalSpent') : t('analytics.totalEarned')}</div><div className="text-2xl font-bold text-slate-800">{dominantCurrency} {trendOverview.total.toLocaleString()}</div></Card>
+                <Card className="p-4 flex flex-col justify-between"><div className="text-slate-400 text-xs font-bold uppercase">{t('analytics.monthlyAverage')}</div><div className="text-2xl font-bold text-blue-600">{dominantCurrency} {trendOverview.avg.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div></Card>
+                <Card className="p-4 flex flex-col justify-between"><div className="text-slate-400 text-xs font-bold uppercase">{t('analytics.highestMonth')}</div><div className="text-2xl font-bold text-orange-500">{dominantCurrency} {trendOverview.max.toLocaleString()}</div></Card>
 
                 {/* Category % of Income Card - Shows SELECTED category only */}
                 {trendType === 'expense' && totalIncome > 0 && categorySpending && categorySpending.length > 0 && (
                     <Card className="p-4 col-span-1 md:col-span-2 lg:col-span-1">
-                        <div className="text-slate-400 text-xs font-bold uppercase mb-3">📊 % of Income</div>
+                        <div className="text-slate-400 text-xs font-bold uppercase mb-3">{t('analytics.percentOfIncome')}</div>
                         {(() => {
                             const selectedCatData = categorySpending.find(c => c.category === selectedCategory);
                             if (!selectedCatData) {
-                                return <div className="text-xs text-slate-500 text-center py-4">No data for {selectedCategory}</div>;
+                                return <div className="text-xs text-slate-500 text-center py-4">{t('analytics.noDataFor', { category: getCategoryName(selectedCategory) })}</div>;
                             }
                             return (
                                 <div>
                                     <div className="mb-4">
                                         <div className="flex justify-between items-center mb-2">
-                                            <span className="text-sm font-medium text-slate-700">{selectedCatData.category}</span>
+                                            <span className="text-sm font-medium text-slate-700">{getCategoryName(selectedCatData.category)}</span>
                                             <span className="text-3xl font-bold text-emerald-600">{selectedCatData.percentage.toFixed(1)}%</span>
                                         </div>
                                         <div className="w-full bg-slate-200 rounded-full h-3">
@@ -96,7 +106,7 @@ export const AnalyticsTrendsView = ({
                                         </div>
                                     </div>
                                     <div className="text-xs text-slate-500 mt-3">
-                                        {dominantCurrency} {selectedCatData.amount.toLocaleString()} of {dominantCurrency} {totalIncome.toLocaleString()} income
+                                        {t('analytics.amountOfIncome', { amount: `${dominantCurrency} ${selectedCatData.amount.toLocaleString()}`, total: `${dominantCurrency} ${totalIncome.toLocaleString()}` })}
                                     </div>
                                 </div>
                             );
@@ -105,8 +115,8 @@ export const AnalyticsTrendsView = ({
                 )}
             </div>
 
-            <div className="h-72 mb-8">
-                <ResponsiveContainer>
+            <div className="h-72 mb-8 w-full" style={{ minHeight: '300px' }}>
+                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                     <BarChart data={activeTrendData}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
                         <XAxis dataKey="month" />

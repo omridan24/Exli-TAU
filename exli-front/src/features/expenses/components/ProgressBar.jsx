@@ -1,12 +1,15 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export const ProgressBar = ({ progress, processingTimeEstimate }) => {
+    const { t } = useTranslation();
+
     if (!progress) return null;
 
     const {
         progress_percent = 0,
-        current_step = "Processing...",
+        current_step = t('common.loading'),
         estimated_seconds_remaining = 0,
         completed_files = 0,
         total_files = 1
@@ -25,7 +28,7 @@ export const ProgressBar = ({ progress, processingTimeEstimate }) => {
             <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                     <Loader2 className="w-5 h-5 text-emerald-600 animate-spin" />
-                    <span className="font-semibold text-slate-800">Processing Files...</span>
+                    <span className="font-semibold text-slate-800">{t('expenses.progress.processingFiles')}</span>
                 </div>
                 <span className="text-2xl font-bold text-emerald-600">{progress_percent}%</span>
             </div>
@@ -46,16 +49,16 @@ export const ProgressBar = ({ progress, processingTimeEstimate }) => {
             {/* File Counter */}
             <div className="flex items-center justify-between text-xs text-slate-600">
                 <span>
-                    Files: {completed_files} / {total_files}
+                    {t('expenses.progress.files', { completed: completed_files, total: total_files })}
                 </span>
                 {estimated_seconds_remaining > 0 && (
                     <span>
-                        Est. time remaining: {formatTime(estimated_seconds_remaining)}
+                        {t('expenses.progress.timeRemaining', { time: formatTime(estimated_seconds_remaining) })}
                     </span>
                 )}
                 {!estimated_seconds_remaining && processingTimeEstimate && (
                     <span>
-                        Est. total time: {processingTimeEstimate}
+                        {t('expenses.progress.totalTime', { time: processingTimeEstimate })}
                     </span>
                 )}
             </div>

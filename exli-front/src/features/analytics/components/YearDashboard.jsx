@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     PieChart as PieIcon, BarChart3, ArrowLeft
 } from 'lucide-react';
@@ -8,6 +9,7 @@ import { AnalyticsReportsView } from './AnalyticsReportsView';
 import { AnalyticsTrendsView } from './AnalyticsTrendsView';
 
 export const YearDashboard = ({ year, data, income, categories, userId, onBack }) => {
+    const { t } = useTranslation();
     const [viewMode, setViewMode] = useState('month');
     const [trendType, setTrendType] = useState('expense');
     const [selectedMonth, setSelectedMonth] = useState('average');
@@ -28,7 +30,7 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
 
     const [selectedCategory, setSelectedCategory] = useState(categories[0]?.name || '');
     const [selectedIncomeType, setSelectedIncomeType] = useState('neto');
-    const [selectedJobFilter, setSelectedJobFilter] = useState('All Jobs');
+    const [selectedJobFilter, setSelectedJobFilter] = useState('ALL_JOBS');
 
     const formatDate = (dateStr) => {
         try { return new Date(dateStr).toLocaleDateString(); } catch (e) { return dateStr; }
@@ -163,7 +165,7 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
 
     const jobOptions = useMemo(() => {
         const jobs = new Set(filteredData.income.map(i => i.source_name).filter(Boolean));
-        return ['All Jobs', ...Array.from(jobs)];
+        return ['ALL_JOBS', ...Array.from(jobs)];
     }, [filteredData.income]);
 
     const activeTrendData = useMemo(() => {
@@ -175,7 +177,7 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
         } else {
             const monthlyAgg = {};
             filteredData.income.forEach(inc => {
-                if (selectedJobFilter !== 'All Jobs' && inc.source_name !== selectedJobFilter) return;
+                if (selectedJobFilter !== 'ALL_JOBS' && inc.source_name !== selectedJobFilter) return;
                 const m = inc.month || 'Unknown';
                 monthlyAgg[m] = (monthlyAgg[m] || 0) + (Number(inc[selectedIncomeType]) || 0);
             });
@@ -191,7 +193,7 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
     }, [activeTrendData, availableMonths]);
 
     const handleIncomeDelete = async (id) => {
-        if (confirm('Delete this income record?')) {
+        if (confirm(t('analytics.deleteIncomeConfirm'))) {
             await deleteDoc(doc(db, 'users', userId, 'income', id));
             logUserAction(userId, 'INCOME_DELETE', `Deleted income ${id}`);
         }
@@ -206,16 +208,16 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
             if (mode === 'income' || mode === 'both') displayIncome.forEach(inc => batch.delete(doc(db, 'users', userId, 'income', inc.id)));
             await batch.commit();
             logUserAction(userId, 'DELETE_MONTH', `Deleted ${mode} for ${selectedMonth}`);
-            setSuccessMessage(`✅ Deleted ${mode} for ${formatMonth(selectedMonth)}`);
+            setSuccessMessage(t('analytics.deletedMonth', { mode, month: formatMonth(selectedMonth) }));
             if (mode === 'both') setSelectedMonth('average');
         } catch (error) {
             console.error(error);
-            setErrorMessage("Failed to delete month data.");
+            setErrorMessage(t('analytics.deleteMonthFailed'));
         }
     };
 
     const handleDelete = async (docId) => {
-        if (confirm('Delete?')) {
+        if (confirm(t('analytics.deleteConfirm'))) {
             await deleteDoc(doc(db, 'users', userId, 'expenses', docId));
             logUserAction(userId, 'EXPENSE_DELETE', `Deleted expense ${docId}`);
         }
@@ -237,11 +239,11 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
 
             // Optimistic update for immediate feedback if relying on props update which might be slow
             // Actually, for now let's just rely on the subscription or parent refresh.
-            setSuccessMessage(`✅ Added note to ${ids.length} expense(s)`);
+            setSuccessMessage(t('analytics.addedNoteSuccess', { count: ids.length }));
             setSelectedIds([]);
         } catch (e) {
             console.error("Add note failed", e);
-            setErrorMessage("Failed to add note.");
+            setErrorMessage(t('analytics.addNoteFailed'));
         }
     };
 
@@ -252,11 +254,11 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
                 const ref = doc(db, 'users', userId, 'expenses', id);
                 return updateDoc(ref, { isSuspect: true });
             }));
-            setSuccessMessage(`✅ Marked ${ids.length} expense(s) as suspect`);
+            setSuccessMessage(t('analytics.markedSuspectSuccess', { count: ids.length }));
             setSelectedIds([]);
         } catch (e) {
             console.error("Mark suspect failed", e);
-            setErrorMessage("Failed to mark as suspect.");
+            setErrorMessage(t('analytics.markSuspectFailed'));
         }
     };
 
@@ -267,11 +269,11 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
                 const ref = doc(db, 'users', userId, 'expenses', id);
                 return updateDoc(ref, { isSuspect: false });
             }));
-            setSuccessMessage(`✅ Cleared suspect flag from ${ids.length} expense(s)`);
+            setSuccessMessage(t('analytics.clearedSuspectSuccess', { count: ids.length }));
             setSelectedIds([]);
         } catch (e) {
             console.error("Clear suspect failed", e);
-            setErrorMessage("Failed to clear suspect flag.");
+            setErrorMessage(t('analytics.clearSuspectFailed'));
         }
     };
 
@@ -286,27 +288,27 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
                     movedFrom: selectedMonth
                 });
             }));
-            setSuccessMessage(`✅ Moved ${ids.length} expense(s) to ${formatMonth(targetMonth)}`);
+            setSuccessMessage(t('analytics.movedMonthSuccess', { count: ids.length, month: formatMonth(targetMonth) }));
             setSelectedIds([]);
         } catch (e) {
             console.error("Move month failed", e);
-            setErrorMessage("Failed to move expenses.");
+            setErrorMessage(t('analytics.moveMonthFailed'));
         }
     };
 
     const handleRemoveNote = async (ids) => {
         if (!ids.length) return;
-        if (!confirm(`Remove notes from ${ids.length} expense(s)?`)) return;
+        if (!confirm(t('analytics.removeNotesConfirm', { count: ids.length }))) return;
         try {
             await Promise.all(ids.map(id => {
                 const ref = doc(db, 'users', userId, 'expenses', id);
                 return updateDoc(ref, { note: null });
             }));
-            setSuccessMessage(`✅ Removed notes from ${ids.length} expense(s)`);
+            setSuccessMessage(t('analytics.removedNotesSuccess', { count: ids.length }));
             setSelectedIds([]);
         } catch (e) {
             console.error("Remove note failed", e);
-            setErrorMessage("Failed to remove notes.");
+            setErrorMessage(t('analytics.removeNotesFailed'));
         }
     };
 
@@ -314,10 +316,10 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
         try {
             const ref = doc(db, 'users', userId, 'income', id);
             await updateDoc(ref, updates);
-            setSuccessMessage(`✅ Updated income record`);
+            setSuccessMessage(t('analytics.updatedIncomeSuccess'));
         } catch (e) {
             console.error("Update income failed", e);
-            setErrorMessage("Failed to update income.");
+            setErrorMessage(t('analytics.updateIncomeFailed'));
         }
     };
 
@@ -386,17 +388,17 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <div className="flex items-center gap-4">
                     <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-full text-slate-500"><ArrowLeft className="w-6 h-6" /></button>
-                    <h2 className="text-2xl font-bold text-slate-800">{year} Dashboard</h2>
+                    <h2 className="text-2xl font-bold text-slate-800">{t('analytics.dashboard', { year })}</h2>
                 </div>
                 <div className="flex bg-slate-100 p-1 rounded-xl">
-                    <button onClick={() => setViewMode('month')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === 'month' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}><PieIcon className="w-4 h-4" /> Reports</button>
-                    <button onClick={() => setViewMode('category')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === 'category' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}><BarChart3 className="w-4 h-4" /> Trends</button>
+                    <button onClick={() => setViewMode('month')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === 'month' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}><PieIcon className="w-4 h-4" /> {t('analytics.reports')}</button>
+                    <button onClick={() => setViewMode('category')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === 'category' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}><BarChart3 className="w-4 h-4" /> {t('analytics.trends')}</button>
                 </div>
             </div>
 
             {viewMode === 'month' && (
                 <div className="flex items-center gap-2 overflow-x-auto pb-4 mb-4 border-b border-slate-100">
-                    <button onClick={() => setSelectedMonth('average')} className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${selectedMonth === 'average' ? 'bg-blue-600 text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>📊 Yearly Avg</button>
+                    <button onClick={() => setSelectedMonth('average')} className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${selectedMonth === 'average' ? 'bg-blue-600 text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>{t('analytics.yearlyAvg')}</button>
                     {availableMonths.map(m => {
                         const currentMonth = new Date().toISOString().slice(0, 7);
                         const isForecast = forecastMonths.has(m);
@@ -421,10 +423,10 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
                                 {hoveredMonth === m && isForecast && (
                                     <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-slate-900 text-white rounded-xl p-3 shadow-2xl z-50 animate-fade-in w-64 text-left">
                                         <div className="font-bold text-purple-400 text-xs mb-1 flex items-center gap-1">
-                                            🔮 Forecast Month
+                                            🔮 {t('analytics.forecastMonth')}
                                         </div>
                                         <div className="text-[11px] text-slate-300">
-                                            Contains projected recurring expenses. Upload actual expenses to convert to a real report.
+                                            {t('analytics.forecastDescription')}
                                         </div>
                                     </div>
                                 )}

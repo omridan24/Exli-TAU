@@ -220,11 +220,7 @@ def extract_payslip_data(file_bytes, mime_type="application/pdf"):
     # Step 2: Reconstruct Text using Geometry
     sorted_text = geometry_sort_text(doc_object)
     
-    # DEBUG LOGGING
-    logger.info(f"--- DEBUG: Extract Payslip ---")
-    logger.info(f"Sorted Text Length: {len(sorted_text)} chars")
-    # Log first 500 chars to check for gibberish/encoding issues
-    logger.info(f"Sorted Text Preview: {sorted_text[:500]}...")
+
 
     # Step 3: Send Sorted Text to Gemini
     model_name = get_model_by_tier("flash") 
@@ -291,8 +287,7 @@ def extract_payslip_data(file_bytes, mime_type="application/pdf"):
         )
         
         response = model.generate_content(prompt)
-        logger.info(f"--- DEBUG: Raw AI Response ---")
-        logger.info(response.text)
+       
         
         return json.loads(response.text)
         

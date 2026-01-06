@@ -1,5 +1,6 @@
 import React from 'react';
 import { Upload, Trash2, FileText, XCircle, Clock, ArrowRight, Sparkles, PenTool } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '../../../components/UI';
 
 export const ExpenseUpload = ({
@@ -13,20 +14,22 @@ export const ExpenseUpload = ({
     onAnalyze,
     isLoading
 }) => {
+    const { t } = useTranslation();
+
     return (
         <div className="space-y-6">
             <div className="flex gap-4">
                 <div className="flex-1 border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center hover:bg-slate-50 transition-colors relative flex flex-col items-center justify-center min-h-[200px]">
                     <input type="file" accept=".csv, .xls, .xlsx, .pdf" multiple onChange={onFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
                     <Upload className="w-12 h-12 text-slate-300 mb-4" />
-                    <div className="font-bold text-lg text-slate-600">Drop files here or Click</div>
-                    <p className="text-sm text-slate-400 mt-1">Up to 4 files (PDF, Excel, CSV)</p>
+                    <div className="font-bold text-lg text-slate-600">{t('expenses.upload.dropFiles')}</div>
+                    <p className="text-sm text-slate-400 mt-1">{t('expenses.upload.fileLimit')}</p>
                 </div>
                 <div onClick={onManualConfig} className="w-1/3 border-2 border-slate-100 rounded-2xl p-8 text-center hover:bg-emerald-50 hover:border-emerald-200 transition-all cursor-pointer flex flex-col items-center justify-center gap-2 group">
                     <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
                         <PenTool className="w-6 h-6 text-slate-400 group-hover:text-emerald-600" />
                     </div>
-                    <div className="font-bold text-slate-600 group-hover:text-emerald-700">Add Manually</div>
+                    <div className="font-bold text-slate-600 group-hover:text-emerald-700">{t('expenses.upload.addManually')}</div>
                 </div>
             </div>
             {files.length > 0 && (
@@ -43,12 +46,12 @@ export const ExpenseUpload = ({
                 </div>
             )}
             {error && (
-                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl flex items-start gap-3 text-sm animate-fade-in text-left">
+                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl flex items-start gap-3 text-sm animate-fade-in text-start">
                     <XCircle className="w-5 h-5 shrink-0 mt-0.5" />
                     <div>
-                        <div className="font-bold">Analysis Failed</div>
+                        <div className="font-bold">{t('expenses.upload.analysisFailed')}</div>
                         <div>{error}</div>
-                        <div className="text-xs text-red-400 mt-1">Please try again or use manual entry.</div>
+                        <div className="text-xs text-red-400 mt-1">{t('expenses.upload.tryAgainOrManual')}</div>
                     </div>
                 </div>
             )}
@@ -59,17 +62,17 @@ export const ExpenseUpload = ({
                     {processingTimeEstimate && (
                         <div className="flex items-center gap-1.5 text-xs font-medium text-slate-400 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 animate-fade-in">
                             <Clock className="w-3.5 h-3.5" />
-                            <span>Est. {processingTimeEstimate}</span>
+                            <span>{t('expenses.upload.estimatedTime', { time: processingTimeEstimate })}</span>
                         </div>
                     )}
-                    <Button onClick={onAnalyze} disabled={isLoading} className="ml-auto">
-                        {isLoading ? <><Sparkles className="w-4 h-4 animate-spin text-yellow-400" /> Analyzing {files.length} files...</> : <>Analyze Files <ArrowRight className="w-4 h-4" /></>}
+                    <Button onClick={onAnalyze} disabled={isLoading} className="ms-auto">
+                        {isLoading ? <><Sparkles className="w-4 h-4 animate-spin text-yellow-400" /> {t('expenses.upload.analyzingFiles', { count: files.length })}</> : <>{t('expenses.upload.analyzeFiles')} <ArrowRight className="w-4 h-4" /></>}
                     </Button>
                 </div>
             )}
             {/* Back button only */}
             <div className="flex justify-start">
-                <Button variant="secondary" onClick={onBack}>Back</Button>
+                <Button variant="secondary" onClick={onBack}>{t('common.back')}</Button>
             </div>
         </div>
     );

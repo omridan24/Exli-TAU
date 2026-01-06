@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, AlertCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { collection, addDoc, serverTimestamp, getDoc, doc } from 'firebase/firestore';
 import { db } from '../../../config/firebase.js';
 import { Button } from '../../../components/UI.jsx';
@@ -14,6 +15,7 @@ const PENSION_PERCENTAGES = [6.0, 6.5, 7.0, 7.5, 8.0, 8.33, 8.5];
 
 // Helper Component for Editing Values
 const EditValuePopover = ({ initialValue, onSave, onCancel, title }) => {
+    const { t } = useTranslation();
     const [val, setVal] = useState(initialValue);
 
     // Auto-select text on mount
@@ -43,14 +45,14 @@ const EditValuePopover = ({ initialValue, onSave, onCancel, title }) => {
                     onClick={() => onSave(parseFloat(val))}
                     className="flex-1 bg-teal-600 hover:bg-teal-700 text-white py-2 rounded-lg font-bold text-sm transition-colors"
                 >
-                    Save
+                    {t('income.oneTimeForm.save')}
                 </button>
                 <button
                     type="button"
                     onClick={onCancel}
                     className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 py-2 rounded-lg font-bold text-sm transition-colors"
                 >
-                    Cancel
+                    {t('common.cancel')}
                 </button>
             </div>
             {/* Arrow */}
@@ -60,6 +62,7 @@ const EditValuePopover = ({ initialValue, onSave, onCancel, title }) => {
 };
 
 export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, onSave, onCancel, extractedData }) => {
+    const { t } = useTranslation();
     const [formData, setFormData] = useState({
         workplaceName: '',
         occupation: '',
@@ -81,6 +84,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
     const [severanceCustom, setSeveranceCustom] = useState(false);
     const [userCountry, setUserCountry] = useState('Israel');
     const [taxCreditPoints, setTaxCreditPoints] = useState(2.25);
+    const [defaultCreditPoints, setDefaultCreditPoints] = useState(2.25);
     const [calculatedTax, setCalculatedTax] = useState(0);
     const [taxBracketInfo, setTaxBracketInfo] = useState(null);
     const [additionalTaxes, setAdditionalTaxes] = useState({ total: 0, breakdown: [] });
@@ -126,7 +130,9 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                 if (userDoc.exists()) {
                     const data = userDoc.data();
                     setUserCountry(data.profile?.country || 'Israel');
-                    setTaxCreditPoints(data.profile?.taxCreditPoints || 2.25);
+                    const points = data.profile?.taxCreditPoints || 2.25;
+                    setTaxCreditPoints(points);
+                    setDefaultCreditPoints(points);
                 }
             } catch (err) {
                 console.error('Failed to fetch user tax settings:', err);
@@ -309,7 +315,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
             await onSave();
         } catch (err) {
             console.error('Save failed:', err);
-            setValidationError('Failed to save. Please try again.');
+            setValidationError(t('income.oneTimeForm.validation.saveFailed'));
         } finally {
             setIsSaving(false);
         }
@@ -361,7 +367,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                             onClick={() => { setIsCustom(false); setCustomInput(''); }}
                             className="px-3 py-2 bg-slate-200 hover:bg-slate-300 rounded-lg text-sm transition-colors"
                         >
-                            Cancel
+                            {t('common.cancel')}
                         </button>
                     </div>
                 ) : (
@@ -399,7 +405,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                             onClick={() => setIsCustom(true)}
                             className="px-3 py-1.5 rounded-lg border border-dashed border-slate-300 text-slate-400 hover:text-slate-600 text-xs font-medium transition-colors"
                         >
-                            ✏️ Custom
+                            ✏️ {t('income.oneTimeForm.custom')}
                         </button>
                     </div>
                 )}
@@ -413,7 +419,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                 {/* Header - MATCHES RecurringIncomeForm */}
                 <div className="sticky top-0 bg-white border-b border-slate-200 p-6 flex items-center justify-between z-10">
                     <h3 className="font-bold text-xl text-slate-800 flex items-center gap-2">
-                        💰 One-Time Income - {reportMonth}
+                        {t('income.oneTimeForm.title')} - {reportMonth}
                     </h3>
                     <button onClick={onCancel} className="text-slate-400 hover:text-slate-600 transition-colors">
                         <X className="w-6 h-6" />
@@ -426,7 +432,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
 
                     {/* Workplace Selection */}
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Workplace *</label>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">{t('income.oneTimeForm.workplace')}</label>
                         {workplaces.length > 0 && (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                                 {workplaces.map((w, i) => (
@@ -455,14 +461,14 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                             type="text"
                             value={formData.workplaceName}
                             onChange={(e) => setFormData({ ...formData, workplaceName: e.target.value })}
-                            placeholder="Or enter workplace name..."
+                            placeholder={t('income.oneTimeForm.orEnterWorkplace')}
                             className="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none"
                         />
                     </div>
 
                     {/* Gross Salary - EXACT COPY */}
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Gross Salary (Bruto) - Monthly *</label>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">{t('income.oneTimeForm.grossSalary')}</label>
                         <input
                             type="number"
                             step="0.01"
@@ -477,7 +483,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                     {/* Progressive Reveal: Show rest of form after workplace + gross amount filled */}
                     {!showFullForm && (
                         <div className="text-center py-6 text-slate-400 text-sm">
-                            👆 Fill in workplace and gross amount to continue
+                            {t('income.oneTimeForm.fillToProgress')}
                         </div>
                     )}
 
@@ -488,7 +494,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                 <div className={`border-2 rounded-xl p-4 transition-colors ${hasTax ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200'}`}>
                                     <div className="flex items-center justify-between mb-4">
                                         <h4 className={`font-bold flex items-center gap-2 ${hasTax ? 'text-blue-900' : 'text-slate-500'}`}>
-                                            🧾 Tax Calculator
+                                            {t('income.oneTimeForm.taxCalculator')}
                                         </h4>
                                         <button
                                             type="button"
@@ -498,7 +504,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                                 : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
                                                 }`}
                                         >
-                                            {hasTax ? '✓ Taxable Income' : '✗ Tax Free'}
+                                            {hasTax ? t('income.oneTimeForm.taxableIncome') : t('income.oneTimeForm.taxFree')}
                                         </button>
                                     </div>
 
@@ -515,19 +521,19 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                             {/* Tax Details */}
                                             <div className="mt-4 space-y-3">
                                                 <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-blue-700">Tax Credit Points:</span>
+                                                    <span className="text-blue-700">{t('income.oneTimeForm.taxCreditPoints')}</span>
                                                     <span className="font-mono font-bold text-blue-900">{taxCreditPoints}</span>
                                                 </div>
 
                                                 <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-blue-700">Monthly Gross:</span>
+                                                    <span className="text-blue-700">{t('income.oneTimeForm.monthlyGross')}</span>
                                                     <span className="font-mono text-emerald-700 font-bold">
                                                         {parseFloat(formData.grossAmount).toLocaleString()} {formData.currency}
                                                     </span>
                                                 </div>
 
                                                 <div className="flex justify-between items-center text-xs text-blue-600">
-                                                    <span>Annual Gross (for tax calc):</span>
+                                                    <span>{t('income.oneTimeForm.annualGross')}</span>
                                                     <span className="font-mono">
                                                         {(parseFloat(formData.grossAmount) * 12).toLocaleString()} {formData.currency}
                                                     </span>
@@ -536,15 +542,19 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
 
                                             <div className="mt-4 space-y-2 text-sm border-t border-blue-200 pt-3">
                                                 <div className="flex justify-between">
-                                                    <span className="text-blue-700">Income Tax:</span>
+                                                    <span className="text-blue-700">{t('income.oneTimeForm.incomeTax')}</span>
                                                     <span className="font-mono font-bold">
                                                         {(manualOverrides.tax_income !== undefined ? manualOverrides.tax_income : calculatedTax).toLocaleString()} {formData.currency}
-                                                        {manualOverrides.tax_income !== undefined && <span className="text-[10px] text-amber-600 ml-1">(Edited)</span>}
+                                                        {manualOverrides.tax_income !== undefined && <span className="text-[10px] text-amber-600 ml-1">{t('income.oneTimeForm.edited')}</span>}
                                                     </span>
                                                 </div>
                                                 {additionalTaxes.breakdown && additionalTaxes.breakdown.map((tax, idx) => (
                                                     <div key={idx} className="flex justify-between">
-                                                        <span className="text-blue-700">{tax.name}:</span>
+                                                        <span className="text-blue-700">
+                                                            {tax.name.includes('Health') ? t('income.oneTimeForm.healthTax') :
+                                                                tax.name.includes('National') ? t('income.oneTimeForm.nationalInsurance') :
+                                                                    tax.name}:
+                                                        </span>
                                                         <span className="font-mono font-bold">
                                                             {(tax.amount || 0).toLocaleString()} {formData.currency}
                                                             <span className="text-xs text-blue-600 ml-2">
@@ -554,7 +564,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                                     </div>
                                                 ))}
                                                 <div className="flex justify-between pt-2 border-t border-blue-200">
-                                                    <span className="font-bold text-blue-900">Total Monthly Taxes:</span>
+                                                    <span className="font-bold text-blue-900">{t('income.oneTimeForm.totalMonthlyTaxes')}</span>
                                                     <span className="font-mono font-black text-blue-600">
                                                         {(
                                                             (manualOverrides.tax_income ?? calculatedTax) +
@@ -570,20 +580,19 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                                 <div className="mt-4 space-y-2">
                                                     {/* Credit Points Mismatch */}
                                                     <MismatchAlert
-                                                        label="Credit Points"
+                                                        label={t('income.oneTimeForm.taxCreditPoints')}
                                                         actual={extractedData.credit_points ?? 0}
-                                                        expected={taxCreditPoints}
+                                                        expected={defaultCreditPoints}
                                                         currency="pts"
                                                         fieldKey="credit_points"
                                                         onResolve={(key, val) => {
-                                                            // For OneTime form, we just update local state if user wants to resolve 
-                                                            // (though usually points are fixed settings, but this allows recalculation)
+                                                            setManualOverrides(prev => ({ ...prev, [key]: val }));
                                                             setTaxCreditPoints(val);
                                                         }}
-                                                        resolvedValue={undefined}
+                                                        resolvedValue={manualOverrides.credit_points}
                                                     />
                                                     <MismatchAlert
-                                                        label="Income Tax"
+                                                        label={t('income.oneTimeForm.incomeTax')}
                                                         actual={extractedData.tax_income ?? 0}
                                                         expected={calculatedTax}
                                                         currency={formData.currency}
@@ -592,7 +601,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                                         resolvedValue={manualOverrides.tax_income}
                                                     />
                                                     <MismatchAlert
-                                                        label="Health Tax"
+                                                        label={t('income.oneTimeForm.healthTax')}
                                                         actual={extractedData.tax_health ?? 0}
                                                         expected={additionalTaxes.breakdown.find(t => t.name.includes('Health'))?.amount || 0}
                                                         currency={formData.currency}
@@ -601,7 +610,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                                         resolvedValue={manualOverrides.tax_health}
                                                     />
                                                     <MismatchAlert
-                                                        label="National Insurance"
+                                                        label={t('income.oneTimeForm.nationalInsurance')}
                                                         actual={extractedData.tax_national ?? 0}
                                                         expected={additionalTaxes.breakdown.find(t => t.name.includes('National'))?.amount || 0}
                                                         currency={formData.currency}
@@ -614,7 +623,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                         </>
                                     ) : (
                                         <div className="text-center py-6 text-slate-400 text-sm italic">
-                                            No taxes calculated for this income
+                                            {t('income.oneTimeForm.noTaxesCalculated')}
                                         </div>
                                     )}
                                 </div>
@@ -624,7 +633,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                             {parseFloat(formData.grossAmount || 0) > 0 && (
                                 <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-4">
                                     <div className="flex items-center justify-between mb-4">
-                                        <h4 className="font-bold text-purple-900">💰 Pension & Severance Calculator</h4>
+                                        <h4 className="font-bold text-purple-900">{t('income.oneTimeForm.pensionCalculator')}</h4>
                                         <button
                                             type="button"
                                             onClick={() => {
@@ -640,14 +649,14 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                                 : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
                                                 }`}
                                         >
-                                            {hasPension ? '✓ Has Pension' : '✗ No Pension'}
+                                            {hasPension ? t('income.oneTimeForm.hasPension') : t('income.oneTimeForm.noPension')}
                                         </button>
                                     </div>
 
                                     {hasPension ? (
                                         <>
                                             <PercentageRow
-                                                label="Employee Contribution"
+                                                label={t('income.oneTimeForm.employeeContribution')}
                                                 value={formData.employeePct}
                                                 onChange={(val) => setFormData({ ...formData, employeePct: val })}
                                                 color="text-blue-600"
@@ -658,7 +667,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                             />
 
                                             <PercentageRow
-                                                label="Employer Contribution"
+                                                label={t('income.oneTimeForm.employerContribution')}
                                                 value={formData.employerPct}
                                                 onChange={(val) => setFormData({ ...formData, employerPct: val })}
                                                 color="text-green-600"
@@ -669,7 +678,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                             />
 
                                             <PercentageRow
-                                                label="Severance - Employer Pays"
+                                                label={t('income.oneTimeForm.severanceEmployerPays')}
                                                 value={formData.severancePct}
                                                 onChange={(val) => setFormData({ ...formData, severancePct: val })}
                                                 color="text-amber-600"
@@ -681,13 +690,18 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
 
                                             <div className="mt-4 pt-4 border-t border-purple-200">
                                                 <div className="flex justify-between items-center">
-                                                    <span className="text-sm font-bold text-purple-900">Expected Monthly Total (Pension Fund):</span>
+                                                    <span className="text-sm font-bold text-purple-900">{t('income.oneTimeForm.expectedPensionTotal')}</span>
                                                     <span className="text-2xl font-mono font-black text-purple-600">
                                                         {formData.expectedPension.toLocaleString()} {formData.currency}
                                                     </span>
                                                 </div>
                                                 <div className="text-xs text-purple-600 mt-1 text-right">
-                                                    Employee: {formData.employeePct}% + Employer: {formData.employerPct}% + Severance: {formData.severancePct}% = {(formData.employeePct + formData.employerPct + formData.severancePct).toFixed(2)}%
+                                                    {t('income.oneTimeForm.pensionTotalCalculation', {
+                                                        emp: formData.employeePct,
+                                                        empr: formData.employerPct,
+                                                        sev: formData.severancePct,
+                                                        total: (formData.employeePct + formData.employerPct + formData.severancePct).toFixed(2)
+                                                    })}
                                                 </div>
                                             </div>
 
@@ -695,7 +709,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                             {extractedData && (
                                                 <div className="mt-4">
                                                     <MismatchAlert
-                                                        label="Employee Pension"
+                                                        label={t('income.oneTimeForm.pensionLabel')}
                                                         actual={extractedData.pension_employee}
                                                         expected={Math.round(parseFloat(formData.grossAmount || 0) * (formData.employeePct / 100))}
                                                         currency={formData.currency}
@@ -719,7 +733,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                             <div className="bg-emerald-50 border-2 border-emerald-200 rounded-xl p-4">
                                 <div className="flex items-center justify-between mb-4">
                                     <h4 className="font-bold text-emerald-900 flex items-center gap-2">
-                                        👜 Other Deposits (Keren Hishtalmut)
+                                        {t('income.oneTimeForm.otherDeposits')}
                                     </h4>
                                     <button
                                         type="button"
@@ -729,14 +743,14 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                             : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
                                             }`}
                                     >
-                                        {hasOtherDeposits ? '✓ Active' : '✗ None'}
+                                        {hasOtherDeposits ? t('income.oneTimeForm.active') : t('income.oneTimeForm.none')}
                                     </button>
                                 </div>
 
                                 {hasOtherDeposits && (
                                     <>
                                         <PercentageRow
-                                            label="Employee Contribution"
+                                            label={t('income.oneTimeForm.employeeContribution')}
                                             value={otherDepositEmployeePct}
                                             onChange={(val) => setOtherDepositEmployeePct(val)}
                                             color="text-emerald-700"
@@ -746,7 +760,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                             setCustomList={setCustomOtherEmployeePcts}
                                         />
                                         <PercentageRow
-                                            label="Employer Contribution"
+                                            label={t('income.oneTimeForm.employerContribution')}
                                             value={otherDepositEmployerPct}
                                             onChange={(val) => setOtherDepositEmployerPct(val)}
                                             color="text-emerald-700"
@@ -756,7 +770,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                             setCustomList={setCustomOtherEmployerPcts}
                                         />
                                         <div className="mt-2 text-xs text-emerald-600 font-bold border-t border-emerald-200 pt-2 text-right">
-                                            Total Other Deposit: {Math.round(parseFloat(formData.grossAmount || 0) * ((otherDepositEmployeePct + otherDepositEmployerPct) / 100)).toLocaleString()} {formData.currency}
+                                            {t('income.oneTimeForm.totalOtherDeposit')} {Math.round(parseFloat(formData.grossAmount || 0) * ((otherDepositEmployeePct + otherDepositEmployerPct) / 100)).toLocaleString()} {formData.currency}
                                         </div>
                                     </>
                                 )}
@@ -767,7 +781,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                 <div>
                                     <div className="bg-white border-2 border-teal-100 rounded-xl p-5 shadow-sm">
                                         <label className="block text-sm font-bold text-teal-900 mb-3 uppercase tracking-wider">
-                                            Net Salary (Take Home)
+                                            {t('income.oneTimeForm.netSalary')}
                                         </label>
 
                                         <div className="relative mb-4">
@@ -786,7 +800,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                         {/* Calculation Flow */}
                                         <div className="bg-slate-50 rounded-lg p-3 space-y-2 text-sm font-mono text-slate-600">
                                             <div className="flex justify-between items-center">
-                                                <span>Gross Salary:</span>
+                                                <span>{t('income.oneTimeForm.grossSalaryLabel')}</span>
                                                 <span className="font-bold">{parseFloat(formData.grossAmount || 0).toLocaleString()}</span>
                                             </div>
 
@@ -794,7 +808,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
 
                                             <div className="flex justify-between items-center text-red-500 relative">
                                                 <span className="flex items-center gap-1 cursor-help" title="Income Tax + Health + National">
-                                                    - Taxes ({((manualOverrides.tax_income ?? calculatedTax) +
+                                                    - {t('income.oneTimeForm.taxes')} ({((manualOverrides.tax_income ?? calculatedTax) +
                                                         (manualOverrides.tax_health ?? (additionalTaxes.breakdown.find(t => t.name.includes('Health'))?.amount || 0)) +
                                                         (manualOverrides.tax_national ?? (additionalTaxes.breakdown.find(t => t.name.includes('National'))?.amount || 0))
                                                     ).toLocaleString()})
@@ -816,7 +830,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                                 {/* Custom Edit Popover for Taxes */}
                                                 {editingField === 'taxes' && (
                                                     <EditValuePopover
-                                                        title="Override Total Taxes"
+                                                        title={t('income.oneTimeForm.overrideTaxes')}
                                                         initialValue={(
                                                             (manualOverrides.tax_income ?? calculatedTax) +
                                                             (manualOverrides.tax_health ?? (additionalTaxes.breakdown.find(t => t.name.includes('Health'))?.amount || 0)) +
@@ -843,7 +857,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
 
                                             <div className="flex justify-between items-center text-red-500 relative">
                                                 <span className="flex items-center gap-1">
-                                                    - Pension (Employee)
+                                                    - {t('income.oneTimeForm.pensionLabel')}
                                                     {manualOverrides.pension_employee !== undefined && (
                                                         <span className="bg-amber-100 text-amber-700 text-[10px] px-1 rounded border border-amber-200">EDITED</span>
                                                     )}
@@ -856,7 +870,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                                 </span>
                                                 {editingField === 'pension' && (
                                                     <EditValuePopover
-                                                        title="Override Employee Pension"
+                                                        title={t('income.oneTimeForm.overridePension')}
                                                         initialValue={manualOverrides.pension_employee !== undefined ? manualOverrides.pension_employee : Math.round(parseFloat(formData.grossAmount || 0) * (formData.employeePct / 100))}
                                                         onCancel={() => setEditingField(null)}
                                                         onSave={(val) => {
@@ -870,7 +884,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                             {hasOtherDeposits && (
                                                 <div className="flex justify-between items-center text-red-500 relative">
                                                     <span className="flex items-center gap-1">
-                                                        - Keren Hishtalmut (Emp)
+                                                        - {t('income.oneTimeForm.kerenHishtalmutLabel')}
                                                         {manualOverrides.other_deposit_employee !== undefined && (
                                                             <span className="bg-amber-100 text-amber-700 text-[10px] px-1 rounded border border-amber-200">EDITED</span>
                                                         )}
@@ -886,7 +900,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                                     </span>
                                                     {editingField === 'other_deposit' && (
                                                         <EditValuePopover
-                                                            title="Override Other Deposit"
+                                                            title={t('income.oneTimeForm.overrideOtherDeposit')}
                                                             initialValue={manualOverrides.other_deposit_employee !== undefined
                                                                 ? manualOverrides.other_deposit_employee
                                                                 : Math.round(parseFloat(formData.grossAmount || 0) * (otherDepositEmployeePct / 100))}
@@ -903,20 +917,20 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                             <div className="border-t border-slate-200 my-2"></div>
 
                                             <div className="flex justify-between items-center text-teal-700 font-bold text-base">
-                                                <span>= Net Salary:</span>
+                                                <span>= {t('income.oneTimeForm.netSalary')}</span>
                                                 <span>{formData.netAmount?.toLocaleString()}</span>
                                             </div>
                                         </div>
 
                                         <div className="mt-3 text-xs text-slate-400 text-center">
-                                            * Employer pension ({formData.employerPct}%) and Severance ({formData.severancePct}%) are paid by your employer and do NOT reduce your take-home pay.
+                                            {t('income.oneTimeForm.employerPensionNote', { emp: formData.employerPct, sev: formData.severancePct })}
                                         </div>
 
                                         {/* Mismatch Alert for Neto */}
                                         {extractedData && (
                                             <div className="mt-4">
                                                 <MismatchAlert
-                                                    label="Net Salary"
+                                                    label={t('income.oneTimeForm.netSalary')}
                                                     actual={extractedData.neto}
                                                     expected={formData.netAmount}
                                                     currency={formData.currency}
@@ -944,14 +958,14 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                     {/* Submit - EXACT COPY */}
                     <div className="flex gap-3 pt-4">
                         <Button type="submit" disabled={isSaving} className="flex-1">
-                            {isSaving ? 'Saving...' : 'Save One-Time Income'}
+                            {isSaving ? t('income.oneTimeForm.saving') : t('income.oneTimeForm.saveButton')}
                         </Button>
                         <Button type="button" variant="secondary" onClick={onCancel}>
-                            Cancel
+                            {t('common.cancel')}
                         </Button>
                     </div>
                 </form>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 };

@@ -1,18 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { X, AlertCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { collection, addDoc, updateDoc, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db } from '../../../config/firebase.js';
 import { Button, CategoryIcon } from '../../../components/UI.jsx';
 import { CategoryEditorModal } from '../../settings/components/CategoryEditorModal.jsx';
 import { ExpensePresetSelector } from './ExpensePresetSelector.jsx';
 
-const PERIOD_PRESETS = [
-    { label: '3 Months', count: 3, unit: 'months' },
-    { label: '6 Months', count: 6, unit: 'months' },
-    { label: '1 Year', count: 1, unit: 'years' },
-];
+// Category translation mapping
+const categoryKeyMap = {
+    'food': 'food', 'groceries': 'groceries', 'transport': 'transport', 'shopping': 'shopping',
+    'housing': 'housing', 'bills': 'bills', 'travel': 'travel', 'health': 'health',
+    'education': 'education', 'pets': 'pets', 'gifts': 'gifts', 'entertainment': 'entertainment', 'other': 'other'
+};
 
 export const RecurringForm = ({ userId, categories, onSave, onCancel, editData = null, onAddCategory }) => {
+    const { t, i18n } = useTranslation();
+
+    const PERIOD_PRESETS = [
+        { label: t('expenses.recurringForm.periodPresets.3months'), count: 3, unit: 'months' },
+        { label: t('expenses.recurringForm.periodPresets.6months'), count: 6, unit: 'months' },
+        { label: t('expenses.recurringForm.periodPresets.1year'), count: 1, unit: 'years' },
+    ];
+
     const [formData, setFormData] = useState({
         name: editData?.name || '',
         isCustomName: editData ? true : false,
@@ -33,6 +43,11 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
     const [selectedDirection, setSelectedDirection] = useState(editData?.direction || '');
     const [customNameInput, setCustomNameInput] = useState(editData?.name || '');
     const [validationError, setValidationError] = useState('');
+
+    const getCategoryName = (cat) => {
+        const key = categoryKeyMap[cat.id];
+        return key ? t(`categories.${key}`) : cat.name;
+    };
 
     const handlePresetSelect = (name, suggestedCategory) => {
         if (name === 'custom') {
@@ -137,7 +152,7 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
             if (pastMonths > 60) {
                 return {
                     valid: false,
-                    error: `Past period cannot exceed 5 years (60 months). You selected ${pastMonths} months.`
+                    error: t('expenses.recurringForm.validation.pastExceed', { months: pastMonths })
                 };
             }
         }
@@ -148,7 +163,7 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
             if (futureMonths > 60) {
                 return {
                     valid: false,
-                    error: `Future period cannot exceed 5 years (60 months). You selected ${futureMonths} months.`
+                    error: t('expenses.recurringForm.validation.futureExceed', { months: futureMonths })
                 };
             }
         }
@@ -175,7 +190,7 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
         if (frequencyInMonths > periodInMonths) {
             return {
                 valid: false,
-                error: `Frequency interval (${frequencyInMonths} months) cannot exceed the period range (${periodInMonths} months)`
+                error: t('expenses.recurringForm.validation.frequencyExceed', { frequency: frequencyInMonths, period: periodInMonths })
             };
         }
 
@@ -204,9 +219,10 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
 
     const getMonthRangeDisplay = () => {
         const currentMonth = new Date().toISOString().slice(0, 7);
+        const locale = i18n.language === 'he' ? 'he-IL' : 'en-US';
         const formatMonth = (monthStr) => {
             const date = new Date(monthStr + '-01');
-            return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            return date.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
         };
 
         let ranges = [];
@@ -214,16 +230,28 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
         if (selectedDirection === 'past' || selectedDirection === 'both') {
             const totalMonths = calculateTotalMonths(formData.pastPeriodCount, formData.pastPeriodUnit);
             const oldestMonth = subtractMonths(currentMonth, totalMonths);
-            ranges.push(`${formatMonth(oldestMonth)} to ${formatMonth(currentMonth)}`);
+            ranges.push(`${formatMonth(oldestMonth)} - ${formatMonth(currentMonth)}`);
         }
 
         if (selectedDirection === 'future' || selectedDirection === 'both') {
             const totalMonths = calculateTotalMonths(formData.futurePeriodCount, formData.futurePeriodUnit);
             const latestMonth = addMonths(currentMonth, totalMonths);
-            ranges.push(`${formatMonth(currentMonth)} to ${formatMonth(latestMonth)}`);
+            ranges.push(`${formatMonth(currentMonth)} - ${formatMonth(latestMonth)}`);
         }
 
-        return ranges.join(' and ');
+        return ranges.join(' & ');
+    };
+
+    const getFrequencyDisplay = () => {
+        const freq = formData.frequency;
+        if (freq.type === 'monthly') return t('expenses.recurringForm.frequencyMonthly');
+        if (freq.type === 'quarterly') return t('expenses.recurringForm.frequencyQuarterly');
+        if (freq.type === 'yearly') return t('expenses.recurringForm.frequencyYearly');
+        if (freq.type === 'custom') {
+            const unitText = freq.unit === 'months' ? t('expenses.recurringForm.months') : t('expenses.recurringForm.years');
+            return t('expenses.recurringForm.frequencyCustom', { interval: freq.interval, unit: unitText });
+        }
+        return '';
     };
 
     const applyRecurringToMonths = async (recurringId, recurringData) => {
@@ -240,7 +268,6 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
                 recurringData.pastPeriodUnit
             );
 
-            // Start from i=0 to include months properly
             for (let i = 0; i < totalMonths; i++) {
                 const targetMonth = subtractMonths(currentMonth, i + 1);
                 if (shouldAddToMonth(targetMonth, currentMonth, recurringData.frequency)) {
@@ -255,7 +282,6 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
                 recurringData.futurePeriodUnit
             );
 
-            // Start from i=0 for future months too
             for (let i = 0; i < totalMonths; i++) {
                 const targetMonth = addMonths(currentMonth, i + 1);
                 if (shouldAddToMonth(targetMonth, currentMonth, recurringData.frequency)) {
@@ -291,19 +317,19 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
 
         const displayName = formData.isCustomName ? customNameInput : formData.name;
         if (!displayName.trim()) {
-            setValidationError('Please enter or select an expense name');
+            setValidationError(t('expenses.recurringForm.validation.enterName'));
             return;
         }
         if (!formData.amount || formData.amount <= 0) {
-            setValidationError('Please enter a valid amount');
+            setValidationError(t('expenses.recurringForm.validation.enterAmount'));
             return;
         }
         if (!formData.category) {
-            setValidationError('Please select a category');
+            setValidationError(t('expenses.recurringForm.validation.selectCategory'));
             return;
         }
         if (!selectedDirection) {
-            setValidationError('Please select a direction (past/future/both)');
+            setValidationError(t('expenses.recurringForm.validation.selectDirection'));
             return;
         }
 
@@ -347,8 +373,8 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
                 pastPeriodUnit: formData.pastPeriodUnit,
                 futurePeriodCount: formData.futurePeriodCount,
                 futurePeriodUnit: formData.futurePeriodUnit,
-                frequency: frequencyString,  // Save as string, not object!
-                customFrequencyInterval,      // Save custom details separately
+                frequency: frequencyString,
+                customFrequencyInterval,
                 customFrequencyUnit,
                 notes: formData.notes,
                 matchPattern,
@@ -372,7 +398,7 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
             onSave();
         } catch (err) {
             console.error('Save recurring failed:', err);
-            setValidationError('Failed to save recurring expense');
+            setValidationError(t('expenses.recurringForm.validation.saveFailed'));
         } finally {
             setIsSaving(false);
         }
@@ -387,7 +413,7 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
                 <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
                     <div className="sticky top-0 bg-white border-b border-slate-200 p-6 flex items-center justify-between z-10">
                         <h3 className="font-bold text-xl text-slate-800">
-                            {editData ? 'Edit' : 'New'} Recurring Expense
+                            {editData ? t('expenses.recurringForm.editRecurring') : t('expenses.recurringForm.newRecurring')}
                         </h3>
                         <button onClick={onCancel} className="text-slate-400 hover:text-slate-600 transition-colors">
                             <X className="w-5 h-5" />
@@ -400,7 +426,7 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
                             {formData.isCustomName ? (
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-2">
-                                        Expense Name *
+                                        {t('expenses.recurringForm.expenseName')}
                                     </label>
                                     <div className="flex gap-2">
                                         <input
@@ -416,7 +442,7 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
                                             onClick={() => setFormData({ ...formData, isCustomName: false })}
                                             className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-sm font-medium transition-colors"
                                         >
-                                            Choose Preset
+                                            {t('expenses.recurringForm.choosePreset')}
                                         </button>
                                     </div>
                                 </div>
@@ -431,7 +457,7 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
                         {/* STEP 2: Amount, Currency, Category */}
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">Amount *</label>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">{t('expenses.recurringForm.amount')}</label>
                                 <input
                                     type="number"
                                     step="0.01"
@@ -442,7 +468,7 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">Currency</label>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">{t('expenses.recurringForm.currency')}</label>
                                 <select
                                     value={formData.currency}
                                     onChange={e => setFormData({ ...formData, currency: e.target.value })}
@@ -458,7 +484,7 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
 
                         {/* Category */}
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-3">Category *</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-3">{t('expenses.recurringForm.category')}</label>
                             <div className="grid grid-cols-4 gap-3">
                                 {categories.map(cat => (
                                     <button
@@ -471,7 +497,7 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
                                             }`}
                                     >
                                         <CategoryIcon iconName={cat.icon} color={cat.color} className="w-6 h-6" />
-                                        <span className="text-xs font-bold text-slate-700">{cat.name}</span>
+                                        <span className="text-xs font-bold text-slate-700">{getCategoryName(cat)}</span>
                                     </button>
                                 ))}
                                 <button
@@ -480,15 +506,16 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
                                     className="p-3 rounded-xl border-2 border-dashed border-slate-300 hover:border-emerald-400 hover:bg-emerald-50 transition-all flex flex-col items-center gap-2"
                                 >
                                     <div className="text-2xl">+</div>
-                                    <span className="text-xs font-bold text-slate-600">New</span>
+                                    <span className="text-xs font-bold text-slate-600">{t('expenses.recurringForm.new')}</span>
                                 </button>
                             </div>
                         </div>
 
                         {/* STEP 3: Direction */}
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-3">Apply To *</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-3">{t('expenses.recurringForm.applyTo')}</label>
                             <div className="grid grid-cols-2 gap-4">
+                                {/* In RTL: left=future, right=past. In LTR: left=past, right=future */}
                                 <button
                                     type="button"
                                     onClick={() => handleDirectionToggle('past')}
@@ -498,8 +525,8 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
                                         }`}
                                 >
                                     <div className="text-3xl mb-2">⏮️</div>
-                                    <div className="font-bold text-slate-800 mb-1">This + Past Months</div>
-                                    <div className="text-xs text-slate-600">Add to current and previous months</div>
+                                    <div className="font-bold text-slate-800 mb-1">{t('expenses.recurringForm.thisPlusPasst')}</div>
+                                    <div className="text-xs text-slate-600">{t('expenses.recurringForm.addToCurrentAndPrevious')}</div>
                                 </button>
                                 <button
                                     type="button"
@@ -510,8 +537,8 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
                                         }`}
                                 >
                                     <div className="text-3xl mb-2">▶️</div>
-                                    <div className="font-bold text-slate-800 mb-1">This + Future Months</div>
-                                    <div className="text-xs text-slate-600">Forecast upcoming months</div>
+                                    <div className="font-bold text-slate-800 mb-1">{t('expenses.recurringForm.thisPlusFuture')}</div>
+                                    <div className="text-xs text-slate-600">{t('expenses.recurringForm.forecastUpcoming')}</div>
                                 </button>
                             </div>
                         </div>
@@ -523,7 +550,7 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
                                 {(selectedDirection === 'past' || selectedDirection === 'both') && (
                                     <div>
                                         <h4 className="font-bold text-slate-700 mb-3 flex items-center gap-2">
-                                            ⏮️ How far back? (Range)
+                                            ⏮️ {t('expenses.recurringForm.howFarBack')}
                                         </h4>
                                         <div className="grid grid-cols-4 gap-2 mb-3">
                                             {PERIOD_PRESETS.map(preset => (
@@ -545,18 +572,18 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
                                             ))}
                                             <button
                                                 type="button"
-                                                onClick={() => setFormData({ ...formData, pastPeriodCount: 12, pastPeriodUnit: 'months' })} // Default to 12 months for custom
+                                                onClick={() => setFormData({ ...formData, pastPeriodCount: 12, pastPeriodUnit: 'months' })}
                                                 className={`p-4 rounded-xl border-2 transition-all ${!PERIOD_PRESETS.some(p => p.count === formData.pastPeriodCount && p.unit === formData.pastPeriodUnit)
                                                     ? 'border-purple-500 bg-purple-50 shadow-md text-purple-900'
                                                     : 'border-slate-200 bg-white hover:border-purple-300 text-slate-700'
                                                     }`}
                                             >
-                                                <div className="font-bold text-sm">✏️ Custom</div>
+                                                <div className="font-bold text-sm">✏️ {t('expenses.recurringForm.custom')}</div>
                                             </button>
                                         </div>
                                         {!PERIOD_PRESETS.some(p => p.count === formData.pastPeriodCount && p.unit === formData.pastPeriodUnit) && (
                                             <div className="mt-3 flex gap-2 items-center bg-purple-50 p-3 rounded-xl border-2 border-purple-200">
-                                                <span className="text-sm font-medium">Every</span>
+                                                <span className="text-sm font-medium">{t('expenses.recurringForm.every')}</span>
                                                 <input
                                                     type="number"
                                                     min="1"
@@ -573,8 +600,8 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
                                                     onChange={e => setFormData({ ...formData, pastPeriodUnit: e.target.value })}
                                                     className="flex-1 p-2 border border-slate-300 rounded-lg font-medium"
                                                 >
-                                                    <option value="months">Months</option>
-                                                    <option value="years">Years</option>
+                                                    <option value="months">{t('expenses.recurringForm.months')}</option>
+                                                    <option value="years">{t('expenses.recurringForm.years')}</option>
                                                 </select>
                                             </div>
                                         )}
@@ -585,7 +612,7 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
                                 {(selectedDirection === 'future' || selectedDirection === 'both') && (
                                     <div>
                                         <h4 className="font-bold text-slate-700 mb-3 flex items-center gap-2">
-                                            ▶️ How far forward? (Range)
+                                            ▶️ {t('expenses.recurringForm.howFarForward')}
                                         </h4>
                                         <div className="grid grid-cols-4 gap-2 mb-3">
                                             {PERIOD_PRESETS.map(preset => (
@@ -607,18 +634,18 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
                                             ))}
                                             <button
                                                 type="button"
-                                                onClick={() => setFormData({ ...formData, futurePeriodCount: 12, futurePeriodUnit: 'months' })} // Default to 12 months for custom
+                                                onClick={() => setFormData({ ...formData, futurePeriodCount: 12, futurePeriodUnit: 'months' })}
                                                 className={`p-4 rounded-xl border-2 transition-all ${!PERIOD_PRESETS.some(p => p.count === formData.futurePeriodCount && p.unit === formData.futurePeriodUnit)
                                                     ? 'border-blue-500 bg-blue-50 shadow-md text-blue-900'
                                                     : 'border-slate-200 bg-white hover:border-blue-300 text-slate-700'
                                                     }`}
                                             >
-                                                <div className="font-bold text-sm">✏️ Custom</div>
+                                                <div className="font-bold text-sm">✏️ {t('expenses.recurringForm.custom')}</div>
                                             </button>
                                         </div>
                                         {!PERIOD_PRESETS.some(p => p.count === formData.futurePeriodCount && p.unit === formData.futurePeriodUnit) && (
                                             <div className="mt-3 flex gap-2 items-center bg-blue-50 p-3 rounded-xl border-2 border-blue-200">
-                                                <span className="text-sm font-medium">Every</span>
+                                                <span className="text-sm font-medium">{t('expenses.recurringForm.every')}</span>
                                                 <input
                                                     type="number"
                                                     min="1"
@@ -635,8 +662,8 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
                                                     onChange={e => setFormData({ ...formData, futurePeriodUnit: e.target.value })}
                                                     className="flex-1 p-2 border border-slate-300 rounded-lg font-medium"
                                                 >
-                                                    <option value="months">Months</option>
-                                                    <option value="years">Years</option>
+                                                    <option value="months">{t('expenses.recurringForm.months')}</option>
+                                                    <option value="years">{t('expenses.recurringForm.years')}</option>
                                                 </select>
                                             </div>
                                         )}
@@ -646,7 +673,7 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
                                 {/* Frequency Selection */}
                                 <div>
                                     <h4 className="font-bold text-slate-700 mb-3 flex items-center gap-2">
-                                        📅 How often does it recur? (Frequency)
+                                        📅 {t('expenses.recurringForm.howOften')}
                                     </h4>
                                     <div className="grid grid-cols-4 gap-2 mb-3">
                                         <button
@@ -657,8 +684,8 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
                                                 : 'border-slate-200 hover:border-emerald-300'
                                                 }`}
                                         >
-                                            <div className="font-bold text-sm">Monthly</div>
-                                            <div className="text-xs text-slate-500 mt-1">Every month</div>
+                                            <div className="font-bold text-sm">{t('expenses.recurringForm.monthly')}</div>
+                                            <div className="text-xs text-slate-500 mt-1">{t('expenses.recurringForm.everyMonth')}</div>
                                         </button>
                                         <button
                                             type="button"
@@ -668,8 +695,8 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
                                                 : 'border-slate-200 hover:border-emerald-300'
                                                 }`}
                                         >
-                                            <div className="font-bold text-sm">Quarterly</div>
-                                            <div className="text-xs text-slate-500 mt-1">Every 3 months</div>
+                                            <div className="font-bold text-sm">{t('expenses.recurringForm.quarterly')}</div>
+                                            <div className="text-xs text-slate-500 mt-1">{t('expenses.recurringForm.every3Months')}</div>
                                         </button>
                                         <button
                                             type="button"
@@ -679,8 +706,8 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
                                                 : 'border-slate-200 hover:border-emerald-300'
                                                 }`}
                                         >
-                                            <div className="font-bold text-sm">Yearly</div>
-                                            <div className="text-xs text-slate-500 mt-1">Once a year</div>
+                                            <div className="font-bold text-sm">{t('expenses.recurringForm.yearly')}</div>
+                                            <div className="text-xs text-slate-500 mt-1">{t('expenses.recurringForm.onceAYear')}</div>
                                         </button>
                                         <button
                                             type="button"
@@ -693,15 +720,15 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
                                                 : 'border-slate-200 hover:border-emerald-300'
                                                 }`}
                                         >
-                                            <div className="font-bold text-sm">✏️ Custom</div>
-                                            <div className="text-xs text-slate-500 mt-1">Set interval</div>
+                                            <div className="font-bold text-sm">✏️ {t('expenses.recurringForm.custom')}</div>
+                                            <div className="text-xs text-slate-500 mt-1">{t('expenses.recurringForm.setInterval')}</div>
                                         </button>
                                     </div>
 
                                     {/* Custom Frequency Input */}
                                     {formData.frequency.type === 'custom' && (
                                         <div className="flex gap-2 items-center bg-slate-50 p-3 rounded-xl border-2 border-emerald-200">
-                                            <span className="text-sm font-medium">Every</span>
+                                            <span className="text-sm font-medium">{t('expenses.recurringForm.every')}</span>
                                             <input
                                                 type="number"
                                                 min="1"
@@ -724,8 +751,8 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
                                                 })}
                                                 className="flex-1 p-2 border border-slate-300 rounded-lg font-medium"
                                             >
-                                                <option value="months">Months</option>
-                                                <option value="years">Years</option>
+                                                <option value="months">{t('expenses.recurringForm.months')}</option>
+                                                <option value="years">{t('expenses.recurringForm.years')}</option>
                                             </select>
                                         </div>
                                     )}
@@ -734,22 +761,17 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
                                 {/* Summary */}
                                 <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-4">
                                     <div className="font-bold text-green-900 mb-2 flex items-center gap-2">
-                                        📊 Summary
+                                        📊 {t('expenses.recurringForm.summary')}
                                     </div>
                                     <div className="text-sm text-green-800 space-y-1">
-                                        <div className="font-bold text-green-900">📆 Months Covered:</div>
-                                        <div className="pl-4 text-xs">{getMonthRangeDisplay()}</div>
+                                        <div className="font-bold text-green-900">📆 {t('expenses.recurringForm.monthsCovered')}</div>
+                                        <div className="ps-4 text-xs">{getMonthRangeDisplay()}</div>
 
                                         <div className="border-t border-green-200 pt-2 mt-2">
-                                            📅 Frequency: {
-                                                formData.frequency.type === 'monthly' ? 'Monthly (every month)' :
-                                                    formData.frequency.type === 'quarterly' ? 'Quarterly (every 3 months)' :
-                                                        formData.frequency.type === 'yearly' ? 'Yearly (every 12 months)' :
-                                                            `Every ${formData.frequency.interval} ${formData.frequency.unit}`
-                                            }
+                                            📅 {t('expenses.recurringForm.frequency')} {getFrequencyDisplay()}
                                         </div>
                                         <div className="font-bold text-green-700">
-                                            ✅ Will add to approximately {calculateExpectedMonths()} months
+                                            ✅ {t('expenses.recurringForm.willAddToMonths', { count: calculateExpectedMonths() })}
                                         </div>
                                     </div>
                                 </div>
@@ -766,23 +788,23 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
 
                         {/* Notes */}
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">Notes (Optional)</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">{t('expenses.recurringForm.notes')}</label>
                             <textarea
                                 value={formData.notes}
                                 onChange={e => setFormData({ ...formData, notes: e.target.value })}
                                 rows={3}
                                 className="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none resize-none"
-                                placeholder="Additional notes..."
+                                placeholder={t('expenses.recurringForm.notesPlaceholder')}
                             />
                         </div>
 
                         {/* Submit */}
                         <div className="flex gap-3 pt-4">
                             <Button type="submit" disabled={isSaving} className="flex-1">
-                                {isSaving ? 'Saving...' : editData ? 'Update Expense' : 'Save Recurring Expense'}
+                                {isSaving ? t('expenses.recurringForm.saving') : editData ? t('expenses.recurringForm.updateExpense') : t('expenses.recurringForm.saveRecurringExpense')}
                             </Button>
                             <Button type="button" variant="secondary" onClick={onCancel}>
-                                Cancel
+                                {t('common.cancel')}
                             </Button>
                         </div>
                     </form>

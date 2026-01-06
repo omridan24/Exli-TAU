@@ -1,10 +1,13 @@
 import React from 'react';
+import { useTranslation, Trans } from 'react-i18next';
 
 /**
  * Visual tax bracket graph showing marginal tax rates
  * Displays all brackets as steps with user's current position highlighted
  */
 export const TaxBracketGraph = ({ annualIncome, brackets, currency = 'ILS', effectiveRate = 0, taxBreakdown = [] }) => {
+    const { t } = useTranslation();
+
     if (!brackets || brackets.length === 0) return null;
 
     const sortedBrackets = [...brackets].sort((a, b) => a.min - b.min);
@@ -51,7 +54,7 @@ export const TaxBracketGraph = ({ annualIncome, brackets, currency = 'ILS', effe
                             {isActive && (
                                 <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 animate-bounce">
                                     <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white text-[10px] font-black px-2 py-1 rounded-lg whitespace-nowrap shadow-lg">
-                                        You're here!
+                                        {t('income.taxGraph.youreHere')}
                                     </div>
                                     <div className="w-0 h-0 border-l-4 border-l-transparent border-r-4 border-r-transparent border-t-4 border-t-orange-500 mx-auto mt-0"></div>
                                 </div>
@@ -74,22 +77,22 @@ export const TaxBracketGraph = ({ annualIncome, brackets, currency = 'ILS', effe
                     <div className="bg-gradient-to-r from-orange-100 to-amber-100 border-2 border-orange-300 p-3 rounded-lg text-sm">
                         <div className="font-bold text-orange-900 flex items-center gap-2">
                             <span className="text-2xl">{(currentBracket.rate * 100).toFixed(0)}%</span>
-                            <span>Marginal Tax Rate</span>
+                            <span>{t('income.taxGraph.marginalTaxRate')}</span>
                         </div>
                         <div className="text-xs text-orange-700 mt-1">
-                            Income Range: {currentBracket.min.toLocaleString()} - {
+                            {t('income.taxGraph.incomeRange')} {currentBracket.min.toLocaleString()} - {
                                 currentBracket.max ? currentBracket.max.toLocaleString() : '∞'
                             } {currency}/year
                         </div>
                         <div className="text-xs text-orange-600 mt-1">
-                            Your annual income: {annualIncome.toLocaleString()} {currency}
+                            {t('income.taxGraph.yourAnnualIncome')} {annualIncome.toLocaleString()} {currency}
                         </div>
                     </div>
 
                     {/* NEW: Tax Breakdown with Step-by-Step Calculation */}
                     <div className="bg-emerald-50 border-2 border-emerald-300 p-3 rounded-lg">
                         <div className="text-sm text-emerald-700 font-bold mb-2">
-                            ✅ Total Tax Paid: {effectiveRate.toFixed(1)}%
+                            {t('income.taxGraph.totalTaxPaid')} {effectiveRate.toFixed(1)}%
                         </div>
 
                         {/* Step-by-step breakdown - MONTHLY AMOUNTS */}
@@ -104,13 +107,23 @@ export const TaxBracketGraph = ({ annualIncome, brackets, currency = 'ILS', effe
                                     const monthlyTaxable = Math.round(step.taxableAmount / 12);
                                     const monthlyTax = Math.round(step.taxAmount / 12);
 
-                                    const label = isFirst
-                                        ? `First ${monthlyTaxable.toLocaleString()}/mo`
-                                        : `Next ${monthlyTaxable.toLocaleString()}/mo`;
+                                    const lineKey = isFirst ? 'income.taxGraph.breakdownLineFirst' : 'income.taxGraph.breakdownLineNext';
 
                                     return (
-                                        <div key={idx}>
-                                            • {label} @ {(step.rate * 100).toFixed(0)}% = {monthlyTax.toLocaleString()}/mo
+                                        <div key={idx} className="flex gap-1 items-center justify-start flex-wrap">
+                                            <span className="text-emerald-500">•</span>
+                                            <Trans
+                                                i18nKey={lineKey}
+                                                values={{
+                                                    amount: monthlyTaxable.toLocaleString(),
+                                                    rate: (step.rate * 100).toFixed(0),
+                                                    tax: monthlyTax.toLocaleString()
+                                                }}
+                                                components={{
+                                                    rate: <span className="font-bold bg-emerald-100 px-1 rounded mx-1" />,
+                                                    result: <span className="font-bold underline decoration-emerald-300 mx-1" />
+                                                }}
+                                            />
                                         </div>
                                     );
                                 })}

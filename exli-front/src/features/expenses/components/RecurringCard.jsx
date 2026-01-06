@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Repeat, Sparkles, Plus, Edit2, Loader2, Trash2, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { collection, getDocs, addDoc, deleteDoc, doc, serverTimestamp, query, where } from 'firebase/firestore';
 import { db, CLOUD_RUN_URL } from '../../../config/firebase.js';
 import { Button } from '../../../components/UI.jsx';
 import { RecurringForm } from './RecurringForm.jsx';
 
 export const RecurringCard = ({ userId, categories, recurringExpenses, onUpdate }) => {
+    const { t } = useTranslation();
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [analyzeProgress, setAnalyzeProgress] = useState(null);
     const [suggestions, setSuggestions] = useState([]);
@@ -73,7 +75,7 @@ export const RecurringCard = ({ userId, categories, recurringExpenses, onUpdate 
                 setSuggestions(filteredSuggestions);
 
                 if (filteredSuggestions.length === 0) {
-                    setError("No new recurring patterns found. All detected patterns are already tracked!");
+                    setError(t('expenses.recurring.noNewPatterns'));
                 }
 
                 setIsAnalyzing(false);
@@ -132,7 +134,7 @@ export const RecurringCard = ({ userId, categories, recurringExpenses, onUpdate 
                     }
                 });
                 await Promise.all(deletePromises);
-                setDeleteSuccess(`✅ Removed ${expense.name} from ${currentMonth} only`);
+                setDeleteSuccess(`✅ ${t('expenses.recurringDelete.removedFromMonth', { name: expense.name, month: currentMonth })}`);
             } else if (option === 'past') {
                 // Delete from all past months (including current)
                 snapshot.docs.forEach(docSnap => {
@@ -143,7 +145,7 @@ export const RecurringCard = ({ userId, categories, recurringExpenses, onUpdate 
                     }
                 });
                 await Promise.all(deletePromises);
-                setDeleteSuccess(`✅ Removed ${expense.name} from ${deletedMonths.length} past month(s): ${deletedMonths.sort().join(', ')}`);
+                setDeleteSuccess(`✅ ${t('expenses.recurringDelete.removedFromPast', { name: expense.name, count: deletedMonths.length, months: deletedMonths.sort().join(', ') })}`);
             } else if (option === 'future') {
                 // Delete from current and future months
                 snapshot.docs.forEach(docSnap => {
@@ -154,7 +156,7 @@ export const RecurringCard = ({ userId, categories, recurringExpenses, onUpdate 
                     }
                 });
                 await Promise.all(deletePromises);
-                setDeleteSuccess(`✅ Stopped future payments for ${expense.name}. Removed from ${deletedMonths.length} month(s): ${deletedMonths.sort().join(', ')}`);
+                setDeleteSuccess(`✅ ${t('expenses.recurringDelete.stoppedFuture', { name: expense.name, count: deletedMonths.length, months: deletedMonths.sort().join(', ') })}`);
             }
 
             setDeleteModal({ show: false, expense: null });
@@ -169,7 +171,7 @@ export const RecurringCard = ({ userId, categories, recurringExpenses, onUpdate 
     };
 
     const deleteRecurring = async (recurringId) => {
-        if (!confirm('Delete this recurring expense completely from ALL months?')) return;
+        if (!confirm(t('expenses.recurringDelete.confirmDeleteAll'))) return;
         try {
             const expensesRef = collection(db, 'users', userId, 'expenses');
             const q = query(expensesRef, where('recurringExpenseId', '==', recurringId));
@@ -186,7 +188,7 @@ export const RecurringCard = ({ userId, categories, recurringExpenses, onUpdate 
             await deleteDoc(doc(db, 'users', userId, 'recurring_expenses', recurringId));
 
             setDeleteModal({ show: false, expense: null });
-            setDeleteSuccess(`✅ Completely deleted recurring expense from ${deletedMonths.length} month(s): ${deletedMonths.sort().join(', ')}`);
+            setDeleteSuccess(`✅ ${t('expenses.recurringDelete.deletedCompletely', { count: deletedMonths.length, months: deletedMonths.sort().join(', ') })}`);
             onUpdate();
 
             setTimeout(() => setDeleteSuccess(null), 5000);
@@ -199,7 +201,7 @@ export const RecurringCard = ({ userId, categories, recurringExpenses, onUpdate 
         <div className="border-2 border-purple-200 bg-purple-50 rounded-2xl p-6 relative">
             {/* Success Message */}
             {deleteSuccess && (
-                <div className="absolute top-2 left-2 right-2 bg-green-100 border border-green-300 text-green-800 px-4 py-2 rounded-lg text-sm font-medium animate-fade-in z-10 shadow-lg">
+                <div className="absolute top-2 start-2 end-2 bg-green-100 border border-green-300 text-green-800 px-4 py-2 rounded-lg text-sm font-medium animate-fade-in z-10 shadow-lg">
                     {deleteSuccess}
                 </div>
             )}
@@ -207,10 +209,10 @@ export const RecurringCard = ({ userId, categories, recurringExpenses, onUpdate 
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                     <Repeat className="w-6 h-6 text-purple-600" />
-                    <h3 className="text-lg font-bold text-purple-900">Recurring Expenses</h3>
+                    <h3 className="text-lg font-bold text-purple-900">{t('expenses.recurring.title')}</h3>
                 </div>
                 <div className="text-xs text-purple-600 font-medium">
-                    {recurringExpenses.length} recurring
+                    {t('expenses.recurring.count', { count: recurringExpenses.length })}
                 </div>
             </div>
 
@@ -225,7 +227,7 @@ export const RecurringCard = ({ userId, categories, recurringExpenses, onUpdate 
                         >
                             <div className="flex-1">
                                 <div className="font-bold text-sm text-slate-800 group-hover:text-purple-600">{exp.name}</div>
-                                <div className="text-xs text-slate-500 capitalize">{exp.frequency} • Day {exp.dayOfMonth || 1}</div>
+                                <div className="text-xs text-slate-500 capitalize">{exp.frequency} • {t('expenses.recurring.day', { day: exp.dayOfMonth || 1 })}</div>
                             </div>
                             <div className="flex items-center gap-3">
                                 <span className="font-bold text-purple-600">
@@ -234,7 +236,7 @@ export const RecurringCard = ({ userId, categories, recurringExpenses, onUpdate 
                                 <button
                                     onClick={(e) => { e.stopPropagation(); setDeleteModal({ show: true, expense: exp }); }}
                                     className="text-slate-400 hover:text-red-500 transition-colors"
-                                    title="Delete"
+                                    title={t('common.delete')}
                                 >
                                     <Trash2 className="w-4 h-4" />
                                 </button>
@@ -249,7 +251,7 @@ export const RecurringCard = ({ userId, categories, recurringExpenses, onUpdate 
                 <div className="bg-white border border-purple-200 rounded-xl p-4 mb-4 animate-fade-in">
                     <div className="flex items-center gap-2 mb-3">
                         <Sparkles className="w-4 h-4 text-yellow-500" />
-                        <div className="font-bold text-sm text-purple-900">AI Detected Recurring Patterns</div>
+                        <div className="font-bold text-sm text-purple-900">{t('expenses.recurring.aiDetectedPatterns')}</div>
                     </div>
                     <div className="space-y-2">
                         {suggestions.map((sug, i) => (
@@ -257,11 +259,11 @@ export const RecurringCard = ({ userId, categories, recurringExpenses, onUpdate 
                                 <div className="flex-1">
                                     <div className="text-sm font-medium text-slate-700">{sug.name}</div>
                                     <div className="text-xs text-slate-500 capitalize">
-                                        {sug.frequency} • {sug.occurrences} times • {sug.confidence} confidence
+                                        {sug.frequency} • {t('expenses.recurring.times', { count: sug.occurrences })} • {t('expenses.recurring.confidence', { level: sug.confidence })}
                                     </div>
                                 </div>
-                                <Button size="sm" onClick={() => saveRecurring(sug)} className="ml-3">
-                                    <Plus className="w-3 h-3 mr-1" /> Add
+                                <Button size="sm" onClick={() => saveRecurring(sug)} className="ms-3">
+                                    <Plus className="w-3 h-3 me-1" /> {t('common.add')}
                                 </Button>
                             </div>
                         ))}
@@ -282,7 +284,7 @@ export const RecurringCard = ({ userId, categories, recurringExpenses, onUpdate 
                     <div className="w-full">
                         <div className="flex items-center gap-3 mb-2">
                             <Sparkles className="w-5 h-5 text-purple-600 animate-pulse" />
-                            <span className="font-bold text-purple-900">Analyzing Recurring Patterns...</span>
+                            <span className="font-bold text-purple-900">{t('expenses.recurring.analyzingPatterns')}</span>
                         </div>
                         <div className="w-full bg-purple-200 rounded-full h-2.5">
                             <div
@@ -290,7 +292,7 @@ export const RecurringCard = ({ userId, categories, recurringExpenses, onUpdate 
                                 style={{ width: `${analyzeProgress}%` }}
                             />
                         </div>
-                        <div className="text-xs text-purple-600 mt-1 text-right font-medium">
+                        <div className="text-xs text-purple-600 mt-1 text-end font-medium">
                             {Math.round(analyzeProgress)}%
                         </div>
                     </div>
@@ -300,7 +302,7 @@ export const RecurringCard = ({ userId, categories, recurringExpenses, onUpdate 
                         variant="secondary"
                         className="w-full max-w-xs"
                     >
-                        <Sparkles className="w-4 h-4" /> Auto-Analyze
+                        <Sparkles className="w-4 h-4" /> {t('expenses.recurring.autoAnalyze')}
                     </Button>
                 )}
             </div>
@@ -325,14 +327,14 @@ export const RecurringCard = ({ userId, categories, recurringExpenses, onUpdate 
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fade-in">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6">
                         <div className="flex items-center justify-between mb-6">
-                            <h3 className="font-bold text-xl text-slate-800">Remove Recurring Expense</h3>
+                            <h3 className="font-bold text-xl text-slate-800">{t('expenses.recurringDelete.title')}</h3>
                             <button onClick={() => setDeleteModal({ show: false, expense: null })} className="text-slate-400 hover:text-slate-600">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
 
                         <p className="text-sm text-slate-600 mb-4">
-                            Choose how to remove <strong>{deleteModal.expense?.name}</strong>:
+                            {t('expenses.recurringDelete.chooseHow', { name: deleteModal.expense?.name })}
                         </p>
 
                         <div className="grid grid-cols-3 gap-4">
@@ -341,8 +343,8 @@ export const RecurringCard = ({ userId, categories, recurringExpenses, onUpdate 
                                 className="p-6 rounded-xl border-2 border-slate-200 hover:border-blue-500 hover:bg-blue-50 transition-all flex flex-col items-center text-center group"
                             >
                                 <div className="text-3xl mb-2">📅</div>
-                                <div className="font-bold text-sm text-slate-800">This Month Only</div>
-                                <div className="text-xs text-slate-500 mt-1">Skip this month's charge</div>
+                                <div className="font-bold text-sm text-slate-800">{t('expenses.recurringDelete.thisMonthOnly')}</div>
+                                <div className="text-xs text-slate-500 mt-1">{t('expenses.recurringDelete.skipThisMonth')}</div>
                             </button>
 
                             <button
@@ -350,8 +352,8 @@ export const RecurringCard = ({ userId, categories, recurringExpenses, onUpdate 
                                 className="p-6 rounded-xl border-2 border-slate-200 hover:border-orange-500 hover:bg-orange-50 transition-all flex flex-col items-center text-center group"
                             >
                                 <div className="text-3xl mb-2">⏮️</div>
-                                <div className="font-bold text-sm text-slate-800">All Past Months</div>
-                                <div className="text-xs text-slate-500 mt-1">Remove from history</div>
+                                <div className="font-bold text-sm text-slate-800">{t('expenses.recurringDelete.allPastMonths')}</div>
+                                <div className="text-xs text-slate-500 mt-1">{t('expenses.recurringDelete.removeFromHistory')}</div>
                             </button>
 
                             <button
@@ -359,8 +361,8 @@ export const RecurringCard = ({ userId, categories, recurringExpenses, onUpdate 
                                 className="p-6 rounded-xl border-2 border-slate-200 hover:border-red-500 hover:bg-red-50 transition-all flex flex-col items-center text-center group"
                             >
                                 <div className="text-3xl mb-2">⏭️</div>
-                                <div className="font-bold text-sm text-slate-800">Stop Future</div>
-                                <div className="text-xs text-slate-500 mt-1">Cancel subscription</div>
+                                <div className="font-bold text-sm text-slate-800">{t('expenses.recurringDelete.stopFuture')}</div>
+                                <div className="text-xs text-slate-500 mt-1">{t('expenses.recurringDelete.cancelSubscription')}</div>
                             </button>
                         </div>
 
@@ -369,7 +371,7 @@ export const RecurringCard = ({ userId, categories, recurringExpenses, onUpdate 
                                 onClick={() => deleteRecurring(deleteModal.expense.id)}
                                 className="w-full p-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors"
                             >
-                                🗑️ Delete Completely (Recurring + All Months)
+                                🗑️ {t('expenses.recurringDelete.deleteCompletely')}
                             </button>
                         </div>
                     </div>

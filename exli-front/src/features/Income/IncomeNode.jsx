@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Wallet, Receipt, Repeat, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { collection, addDoc, serverTimestamp, doc, getDoc, getDocs } from 'firebase/firestore';
 import { db, CLOUD_RUN_URL } from '../../config/firebase.js';
 import { CURRENCIES } from '../../config/constants.js';
@@ -13,6 +14,7 @@ import { RecurringIncomeForm } from './components/RecurringIncomeForm';
 import { OneTimeIncomeForm } from './components/OneTimeIncomeForm';
 
 export const IncomeNode = ({ userId, onComplete }) => {
+    const { t } = useTranslation();
     const [step, setStep] = useState(0);
     const [reportMonth, setReportMonth] = useState(new Date().toISOString().slice(0, 7));
     const [isLoading, setIsLoading] = useState(false);
@@ -103,7 +105,7 @@ export const IncomeNode = ({ userId, onComplete }) => {
             const percent = Math.min(95, Math.floor((elapsed / estimatedSeconds) * 100));
             setUploadProgress({
                 progress_percent: percent,
-                current_step: "Analyzing payslip detailed data...",
+                current_step: t('income.upload.analyzingPayslip'),
                 estimated_seconds_remaining: Math.max(0, estimatedSeconds - elapsed)
             });
         }, 1000);
@@ -182,9 +184,9 @@ export const IncomeNode = ({ userId, onComplete }) => {
             <div className="flex items-center justify-between mb-8">
                 <div>
                     <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <Wallet className="w-6 h-6 text-emerald-600" /> Income Manager
+                        <Wallet className="w-6 h-6 text-emerald-600" /> {t('income.title')}
                     </h2>
-                    <p className="text-slate-500 mt-1">Track monthly earnings.</p>
+                    <p className="text-slate-500 mt-1">{t('income.trackMonthlyEarnings')}</p>
                 </div>
 
             </div>
@@ -252,7 +254,7 @@ export const IncomeNode = ({ userId, onComplete }) => {
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fade-in">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-8">
                         <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-2xl font-bold text-slate-800">Choose Income Type</h2>
+                            <h2 className="text-2xl font-bold text-slate-800">{t('income.typeSelector.title')}</h2>
                             <button onClick={() => setShowManualSelector(false)} className="text-slate-400 hover:text-slate-600">
                                 <X className="w-6 h-6" />
                             </button>
@@ -273,10 +275,10 @@ export const IncomeNode = ({ userId, onComplete }) => {
                             >
                                 <div className="text-4xl mb-3 group-hover:scale-110 transition-transform">📅</div>
                                 <div className="font-bold text-lg text-slate-800 mb-2">
-                                    One-Time Income
+                                    {t('income.typeSelector.oneTime')}
                                 </div>
                                 <div className="text-sm text-slate-600">
-                                    {file ? 'Analyze and pre-fill as one-time income' : 'For part-time, hourly, bonuses, or unplanned incomes'}
+                                    {file ? t('income.typeSelector.oneTimeDescWithFile') : t('income.typeSelector.oneTimeDescNoFile')}
                                 </div>
                             </button>
 
@@ -294,10 +296,10 @@ export const IncomeNode = ({ userId, onComplete }) => {
                             >
                                 <div className="text-4xl mb-3 group-hover:scale-110 transition-transform">🔄</div>
                                 <div className="font-bold text-lg text-slate-800 mb-2">
-                                    Recurring Income
+                                    {t('income.typeSelector.recurring')}
                                 </div>
                                 <div className="text-sm text-slate-600">
-                                    {file ? 'Analyze and pre-fill as recurring income' : 'For employees with constant monthly salary'}
+                                    {file ? t('income.typeSelector.recurringDescWithFile') : t('income.typeSelector.recurringDescNoFile')}
                                 </div>
                             </button>
                         </div>
