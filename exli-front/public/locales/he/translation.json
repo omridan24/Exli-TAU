@@ -3,29 +3,40 @@
         "verifying": "מאמת...",
         "backToDashboard": "חזרה למסך הראשי"
     },
-    "common": {
-        "saveChanges": "שמור שינויים",
-        "cancel": "ביטול",
-        "recurring": "קבוע",
-        "oneTime": "חד פעמי"
-    },
     "dashboard": {
         "expenseManager": {
             "title": "ניהול הוצאות",
-            "description": "העלה קבצים, קטלג שורה אחר שורה."
+            "description": "לקחת שליטה על ההוצאות שלנו"
         },
         "incomeManager": {
             "title": "ניהול הכנסות",
-            "description": "עקוב אחר הכנסות חודשיות ותלושי שכר."
+            "description": "עבדנו קשה בשביל זה, בואו נבין את התלוש שלנו"
         },
         "analytics": {
             "title": "מרכז הנתונים שלי",
-            "description": "צפה בפירוט ההוצאות."
+            "description":"כל המידע, מסודר במקום אחד"
         },
         "settings": {
             "title": "הגדרות",
-            "description": "נהל קטגוריות והעדפות."
-        }
+            "description": "התאמה ופרטים אישיים"
+        },
+        "investments": {
+            "title": "השקעות",
+            "description": "לבנות את העתיד שלי"
+        },
+        "partnership": {
+            "title": "זוגיות",
+            "description": "לצמוח ביחד"
+        },
+        "community": {
+            "title": "קהילת Exli",
+            "description": "האם אני מוציא יותר או פחות מאחרים?"
+        },
+        "wishlist": {
+            "title": "רשימת משאלות",
+            "description": "המתנות שאני רוצה לקנות לעצמי"
+        },
+        "comingSoon": "בקרוב"
     },
     "expenses": {
         "title": "ניהול הוצאות",
@@ -647,6 +658,9 @@
         }
     },
     "common": {
+        "saveChanges": "שמור שינויים",
+        "recurring": "קבוע",
+        "oneTime": "חד פעמי",
         "save": "שמור",
         "cancel": "ביטול",
         "delete": "מחק",

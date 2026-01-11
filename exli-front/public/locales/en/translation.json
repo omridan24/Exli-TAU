@@ -3,29 +3,40 @@
         "verifying": "Verifying...",
         "backToDashboard": "Back to Dashboard"
     },
-    "common": {
-        "saveChanges": "Save Changes",
-        "cancel": "Cancel",
-        "recurring": "Recurring",
-        "oneTime": "One-Time"
-    },
     "dashboard": {
         "expenseManager": {
             "title": "Expense Manager",
-            "description": "Upload files, categorize row-by-row."
+            "description": "Take control of your spending!"
         },
         "incomeManager": {
             "title": "Income Manager",
-            "description": "Track monthly earnings & payslips."
+            "description": "I worked hard for it, let's see the results!"
         },
         "analytics": {
             "title": "Analytics",
-            "description": "View spending breakdown."
+            "description": "All of my financial data in one place."
         },
         "settings": {
             "title": "Settings",
-            "description": "Manage categories & prefs."
-        }
+            "description": "Customize your experience."
+        },
+        "investments": {
+            "title": "Investments",
+            "description": "Build my future"
+        },
+        "partnership": {
+            "title": "Partnership",
+            "description": "Grow together"
+        },
+        "community": {
+            "title": "Exli Community",
+            "description": "Am I spending more or less than others?"
+        },
+        "wishlist": {
+            "title": "Wish List",
+            "description": "The gifts I want to get for myself"
+        },
+        "comingSoon": "Coming Soon"
     },
     "expenses": {
         "title": "Expense Manager",
@@ -638,6 +649,9 @@
         }
     },
     "common": {
+        "saveChanges": "Save Changes",
+        "recurring": "Recurring",
+        "oneTime": "One-Time",
         "save": "Save",
         "cancel": "Cancel",
         "delete": "Delete",

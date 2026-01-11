@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutGrid, Upload, PieChart as PieIcon, Settings, LogOut, Wallet, ArrowRight } from 'lucide-react';
+import { LayoutGrid, Upload, PieChart as PieIcon, Settings, LogOut, Wallet, ArrowRight, TrendingUp, Users, Globe, Gift } from 'lucide-react';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { collection, query, orderBy, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { useTranslation } from 'react-i18next';
@@ -84,26 +84,59 @@ export default function App() {
       <main className="max-w-6xl mx-auto p-6">
         {activeNode === 'dashboard' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
-            <button onClick={() => setActiveNode('import')} className="p-8 bg-white rounded-2xl shadow-sm hover:shadow-md border border-slate-100 text-start group transition-all">
+            {/* Active Modules */}
+            <button onClick={() => setActiveNode('import')} className="p-8 bg-white rounded-2xl shadow-sm hover:shadow-md border border-slate-100 text-start group transition-all relative overflow-hidden">
               <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 mb-4 group-hover:scale-110 transition-transform"><Upload /></div>
               <h3 className="font-bold text-lg text-slate-800">{t('dashboard.expenseManager.title')}</h3>
               <p className="text-slate-500 text-sm mt-1">{t('dashboard.expenseManager.description')}</p>
             </button>
-            <button onClick={() => setActiveNode('income')} className="p-8 bg-white rounded-2xl shadow-sm hover:shadow-md border border-slate-100 text-start group transition-all">
+
+            <button onClick={() => setActiveNode('income')} className="p-8 bg-white rounded-2xl shadow-sm hover:shadow-md border border-slate-100 text-start group transition-all relative overflow-hidden">
               <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center text-green-600 mb-4 group-hover:scale-110 transition-transform"><Wallet /></div>
               <h3 className="font-bold text-lg text-slate-800">{t('dashboard.incomeManager.title')}</h3>
               <p className="text-slate-500 text-sm mt-1">{t('dashboard.incomeManager.description')}</p>
             </button>
-            <button onClick={() => setActiveNode('analytics')} className="p-8 bg-white rounded-2xl shadow-sm hover:shadow-md border border-slate-100 text-start group transition-all">
+
+            <button onClick={() => setActiveNode('analytics')} className="p-8 bg-white rounded-2xl shadow-sm hover:shadow-md border border-slate-100 text-start group transition-all relative overflow-hidden">
               <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 mb-4 group-hover:scale-110 transition-transform"><PieIcon /></div>
               <h3 className="font-bold text-lg text-slate-800">{t('dashboard.analytics.title')}</h3>
               <p className="text-slate-500 text-sm mt-1">{t('dashboard.analytics.description')}</p>
             </button>
-            <button onClick={() => setActiveNode('settings')} className="p-8 bg-white rounded-2xl shadow-sm hover:shadow-md border border-slate-100 text-start group transition-all">
+
+            <button onClick={() => setActiveNode('settings')} className="p-8 bg-white rounded-2xl shadow-sm hover:shadow-md border border-slate-100 text-start group transition-all relative overflow-hidden">
               <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center text-slate-600 mb-4 group-hover:scale-110 transition-transform"><Settings /></div>
               <h3 className="font-bold text-lg text-slate-800">{t('dashboard.settings.title')}</h3>
               <p className="text-slate-500 text-sm mt-1">{t('dashboard.settings.description')}</p>
             </button>
+
+            {/* Coming Soon Modules */}
+            <div className="p-8 bg-slate-100/60 rounded-2xl border border-slate-200 text-start relative overflow-hidden grayscale-[0.3] hover:grayscale-0 transition-all duration-300 cursor-not-allowed group">
+              <div className="absolute top-3 right-3 bg-slate-200 text-slate-500 text-xs font-bold px-2 py-1 rounded-full">{t('dashboard.comingSoon')}</div>
+              <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600 mb-4 group-hover:scale-105 transition-transform"><TrendingUp /></div>
+              <h3 className="font-bold text-lg text-slate-700">{t('dashboard.investments.title')}</h3>
+              <p className="text-slate-500 text-sm mt-1">{t('dashboard.investments.description')}</p>
+            </div>
+
+            <div className="p-8 bg-slate-100/60 rounded-2xl border border-slate-200 text-start relative overflow-hidden grayscale-[0.3] hover:grayscale-0 transition-all duration-300 cursor-not-allowed group">
+              <div className="absolute top-3 right-3 bg-slate-200 text-slate-500 text-xs font-bold px-2 py-1 rounded-full">{t('dashboard.comingSoon')}</div>
+              <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 mb-4 group-hover:scale-105 transition-transform"><Users /></div>
+              <h3 className="font-bold text-lg text-slate-700">{t('dashboard.partnership.title')}</h3>
+              <p className="text-slate-500 text-sm mt-1">{t('dashboard.partnership.description')}</p>
+            </div>
+
+            <div className="p-8 bg-slate-100/60 rounded-2xl border border-slate-200 text-start relative overflow-hidden grayscale-[0.3] hover:grayscale-0 transition-all duration-300 cursor-not-allowed group">
+              <div className="absolute top-3 right-3 bg-slate-200 text-slate-500 text-xs font-bold px-2 py-1 rounded-full">{t('dashboard.comingSoon')}</div>
+              <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-orange-600 mb-4 group-hover:scale-105 transition-transform"><Globe /></div>
+              <h3 className="font-bold text-lg text-slate-700">{t('dashboard.community.title')}</h3>
+              <p className="text-slate-500 text-sm mt-1">{t('dashboard.community.description')}</p>
+            </div>
+
+            <div className="p-8 bg-slate-100/60 rounded-2xl border border-slate-200 text-start relative overflow-hidden grayscale-[0.3] hover:grayscale-0 transition-all duration-300 cursor-not-allowed group">
+              <div className="absolute top-3 right-3 bg-slate-200 text-slate-500 text-xs font-bold px-2 py-1 rounded-full">{t('dashboard.comingSoon')}</div>
+              <div className="w-12 h-12 bg-pink-100 rounded-xl flex items-center justify-center text-pink-600 mb-4 group-hover:scale-105 transition-transform"><Gift /></div>
+              <h3 className="font-bold text-lg text-slate-700">{t('dashboard.wishlist.title')}</h3>
+              <p className="text-slate-500 text-sm mt-1">{t('dashboard.wishlist.description')}</p>
+            </div>
           </div>
         ) : (
           <div className="bg-white rounded-3xl shadow-xl min-h-[600px] flex flex-col overflow-hidden">
