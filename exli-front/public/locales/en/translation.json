@@ -337,7 +337,13 @@
             "healthTax": "Health Tax",
             "nationalInsurance": "National Insurance",
             "pensionLabel": "Pension",
-            "kerenHishtalmutLabel": "Keren Hishtalmut"
+            "kerenHishtalmutLabel": "Keren Hishtalmut",
+            "expectedPensionTotal": "Expected Monthly Total (Pension Fund):",
+            "overrideTaxes": "Edit Total Taxes",
+            "overridePension": "Edit Employee Contribution",
+            "overrideOtherDeposit": "Edit Other Deposit",
+            "employerPensionNote": "* Employer contributions ({{emp}}%) and severance ({{sev}}%) are paid by the employer and are not deducted from net salary.",
+            "saveButton": "Save Income"
         },
         "recurringForm": {
             "newRecurring": "New Recurring Income",
@@ -456,7 +462,8 @@
             "foundInPayslip": "Found in Payslip",
             "customValue": "Custom Value",
             "setCustom": "Set Custom",
-            "selectValueNote": "Please select the value to use in your report."
+            "selectValueNote": "Please select the value to use in your report.",
+            "title": "Mismatch"
         },
         "taxGraph": {
             "youreHere": "You're here!",
