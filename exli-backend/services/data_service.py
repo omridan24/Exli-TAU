@@ -60,7 +60,7 @@ def process_uploaded_files(files):
                      raise ValueError(f"Failed to analyze PDF '{filename}'. {str(e)}")
             
             # Excel Handling
-            elif filename.endswith(('.xls', '.xlsx')):
+            elif filename.lower().endswith(('.xls', '.xlsx')):
                 is_excel = True
                 try:
                     # Check if valid excel
