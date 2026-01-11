@@ -3,6 +3,12 @@
         "verifying": "מאמת...",
         "backToDashboard": "חזרה למסך הראשי"
     },
+    "common": {
+        "saveChanges": "שמור שינויים",
+        "cancel": "ביטול",
+        "recurring": "קבוע",
+        "oneTime": "חד פעמי"
+    },
     "dashboard": {
         "expenseManager": {
             "title": "ניהול הוצאות",
@@ -108,9 +114,13 @@
             "analyzingPatterns": "מנתח דפוסים קבועים...",
             "autoAnalyze": "ניתוח אוטומטי",
             "noNewPatterns": "לא נמצאו דפוסים קבועים חדשים. כל הדפוסים שזוהו כבר במעקב!",
-            "detected": "זוהתה הוצאה קבועה",
-            "matches": "זה תואם ל: {{name}} ({{frequency}})",
-            "linkAndMerge": "קשר ומזג"
+            "detected": "זוהתה הוצאה קבועה!",
+            "matches": "נראה כמו \"{{name}}\" ({{frequency}})",
+            "linkAndMerge": "קשר וסווג אוטומטית",
+            "linkToRecurring": "קשר להוצאה קבועה",
+            "linkTitle": "קישור להוצאה קבועה",
+            "linkDescription": "בחר לאיזו הוצאה קבועה הפעולה הזו שייכת:",
+            "noRecurring": "עדיין לא הוגדרו הוצאות קבועות"
         },
         "recurringForm": {
             "newRecurring": "הוצאה קבועה חדשה",
@@ -224,6 +234,14 @@
     "income": {
         "title": "ניהול הכנסות",
         "trackMonthlyEarnings": "עקוב אחר הכנסות חודשיות.",
+        "editTitle": "ערוך הכנסה",
+        "sourceName": "מקום עבודה / מקור",
+        "gross": "ברוטו",
+        "net": "שכר נטו (בנק)",
+        "taxes": "מסים (סה\"כ)",
+        "benefits": "הטבות וחסכונות",
+        "pension": "פנסיה",
+        "otherDeposits": "הפקדות אחרות",
         "monthSelector": {
             "title": "בחר חודש הכנסה",
             "continue": "המשך ←"
@@ -645,7 +663,13 @@
         "addOther": "הוסף אחר",
         "customValue": "ערך מותאם אישית",
         "typeHere": "הקלד כאן...",
-        "continue": "המשך"
+        "continue": "המשך",
+        "closeConfirmation": {
+            "title": "שינויים לא נשמרו",
+            "message": "האם לסגור? השינויים שלך יאבדו.",
+            "continueEditing": "המשך עריכה",
+            "discard": "התעלם"
+        }
     },
     "categoryEditor": {
         "newCategory": "קטגוריה חדשה",

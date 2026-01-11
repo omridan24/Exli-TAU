@@ -3,6 +3,12 @@
         "verifying": "Verifying...",
         "backToDashboard": "Back to Dashboard"
     },
+    "common": {
+        "saveChanges": "Save Changes",
+        "cancel": "Cancel",
+        "recurring": "Recurring",
+        "oneTime": "One-Time"
+    },
     "dashboard": {
         "expenseManager": {
             "title": "Expense Manager",
@@ -108,9 +114,13 @@
             "analyzingPatterns": "Analyzing Recurring Patterns...",
             "autoAnalyze": "Auto-Analyze",
             "noNewPatterns": "No new recurring patterns found. All detected patterns are already tracked!",
-            "detected": "Recurring Expense Detected",
-            "matches": "This matches: {{name}} ({{frequency}})",
-            "linkAndMerge": "Link & Merge"
+            "detected": "Recurring Expense Detected!",
+            "matches": "This looks like \"{{name}}\" ({{frequency}})",
+            "linkAndMerge": "Link & Auto-Categorize",
+            "linkToRecurring": "Link to Recurring",
+            "linkTitle": "Link to Recurring Expense",
+            "linkDescription": "Select which recurring expense this transaction belongs to:",
+            "noRecurring": "No recurring expenses set up yet"
         },
         "recurringForm": {
             "newRecurring": "New Recurring Expense",
@@ -224,6 +234,14 @@
     "income": {
         "title": "Income Manager",
         "trackMonthlyEarnings": "Track monthly earnings.",
+        "editTitle": "Edit Income",
+        "sourceName": "Workplace / Source",
+        "gross": "Gross (Bruto)",
+        "net": "Net Salary (Bank)",
+        "taxes": "Taxes (Total)",
+        "benefits": "Benefits & Savings",
+        "pension": "Pension",
+        "otherDeposits": "Other Deposits",
         "monthSelector": {
             "title": "Select Income Month",
             "continue": "Continue →"
@@ -636,7 +654,13 @@
         "addOther": "Add Other",
         "customValue": "Custom Value",
         "typeHere": "Type here...",
-        "continue": "Continue"
+        "continue": "Continue",
+        "closeConfirmation": {
+            "title": "Unsaved Changes",
+            "message": "Are you sure you want to close? Your changes will be lost.",
+            "continueEditing": "Continue Editing",
+            "discard": "Discard"
+        }
     },
     "categoryEditor": {
         "newCategory": "New Category",

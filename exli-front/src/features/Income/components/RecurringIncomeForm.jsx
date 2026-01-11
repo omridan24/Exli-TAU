@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, AlertCircle, Repeat } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { collection, addDoc, updateDoc, doc, serverTimestamp, setDoc, getDocs, getDoc } from 'firebase/firestore';
@@ -10,6 +10,7 @@ import { getTaxConfig } from '../../../config/taxBrackets.js';
 import { TaxBracketGraph } from './TaxBracketGraph.jsx';
 import { MismatchAlert } from './MismatchAlert.jsx';
 import { ExtractionSummary } from './ExtractionSummary.jsx';
+import { CloseConfirmationModal } from '../../../components/CloseConfirmationModal.jsx';
 
 
 const PENSION_PERCENTAGES = [6.0, 6.5, 7.0, 7.5, 8.0, 8.33, 8.5];
@@ -117,6 +118,33 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
     const [showFullForm, setShowFullForm] = useState(false);
     const [manualOverrides, setManualOverrides] = useState(editData?.manualOverrides || {});
     const [editingField, setEditingField] = useState(null);
+
+    // Close confirmation state
+    const [showCloseConfirmation, setShowCloseConfirmation] = useState(false);
+    const initialFormDataRef = useRef(JSON.stringify({
+        workplaceName: editData?.workplaceName || '',
+        grossAmount: editData?.grossAmount || '',
+        direction: editData?.direction || ''
+    }));
+
+    // Check if form has unsaved changes
+    const hasUnsavedChanges = () => {
+        const current = JSON.stringify({
+            workplaceName: formData.workplaceName,
+            grossAmount: formData.grossAmount,
+            direction: selectedDirection
+        });
+        return current !== initialFormDataRef.current;
+    };
+
+    // Handle close attempt (X button or backdrop click)
+    const handleCloseAttempt = () => {
+        if (hasUnsavedChanges()) {
+            setShowCloseConfirmation(true);
+        } else {
+            onCancel();
+        }
+    };
 
     // Other Deposits State
     const [otherDepositEmployeePct, setOtherDepositEmployeePct] = useState(editData?.otherDepositEmployeePct || 0);
@@ -672,642 +700,658 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
     const showPeriodConfig = selectedDirection !== '';
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-                <div className="sticky top-0 bg-white border-b border-slate-200 p-6 flex items-center justify-between z-10">
-                    <h3 className="font-bold text-xl text-slate-800 flex items-center gap-2">
-                        <Repeat className="w-5 h-5 text-teal-600" />
-                        {editData ? 'Edit' : 'New'} Recurring Income
-                    </h3>
-                    <button onClick={onCancel} className="text-slate-400 hover:text-slate-600 transition-colors">
-                        <X className="w-5 h-5" />
-                    </button>
-                </div>
+        <>
+            {/* Close Confirmation Modal */}
+            {showCloseConfirmation && (
+                <CloseConfirmationModal
+                    onContinue={() => setShowCloseConfirmation(false)}
+                    onDiscard={onCancel}
+                />
+            )}
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-6">
-                    {/* Extraction Summary (if data exists) */}
-                    {extractedData && <ExtractionSummary extractedData={extractedData} />}
+            <div
+                className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+                onClick={handleCloseAttempt}
+            >
+                <div
+                    className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div className="sticky top-0 bg-white border-b border-slate-200 p-6 flex items-center justify-between z-10">
+                        <h3 className="font-bold text-xl text-slate-800 flex items-center gap-2">
+                            <Repeat className="w-5 h-5 text-teal-600" />
+                            {editData ? t('income.recurringForm.editRecurring') : t('income.recurringForm.newRecurring')}
+                        </h3>
+                        <button onClick={handleCloseAttempt} className="text-slate-400 hover:text-slate-600 transition-colors">
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
 
-                    {/* Workplace Selection */}
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">{t('income.recurringForm.workplace')}</label>
-                        {workplaces.length > 0 && (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                                {workplaces.map((w, i) => (
+                    <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                        {/* Extraction Summary (if data exists) */}
+                        {extractedData && <ExtractionSummary extractedData={extractedData} />}
+
+                        {/* Workplace Selection */}
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">{t('income.recurringForm.workplace')}</label>
+                            {workplaces.length > 0 && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                                    {workplaces.map((w, i) => (
+                                        <button
+                                            key={i}
+                                            type="button"
+                                            onClick={() => handleWorkplaceSelect(w)}
+                                            className={`flex items-center gap-3 p-3 rounded-2xl text-left border transition-all hover:shadow-md ${formData.workplaceName === w.name
+                                                ? 'bg-teal-50 border-teal-500 ring-1 ring-teal-500'
+                                                : 'bg-white border-slate-100 hover:border-teal-200'
+                                                }`}
+                                        >
+                                            <LogoImage logo={w.logo} domain={w.domain} className="w-10 h-10 flex-shrink-0" />
+                                            <div className="min-w-0">
+                                                <div className={`text-xs font-black truncate uppercase tracking-tighter ${formData.workplaceName === w.name ? 'text-teal-700' : 'text-slate-400'
+                                                    }`}>
+                                                    {w.linkedOccupation}
+                                                </div>
+                                                <div className="text-sm font-bold text-slate-700 truncate">at {w.name}</div>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                            <input
+                                type="text"
+                                value={formData.workplaceName}
+                                onChange={(e) => setFormData({ ...formData, workplaceName: e.target.value })}
+                                placeholder={t('income.recurringForm.orEnterWorkplace')}
+                                className="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none"
+                            />
+                        </div>
+
+                        {/* Gross Salary */}
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Monthly Gross Salary (Bruto) *</label>
+                            <input
+                                type="number"
+                                step="0.01"
+                                value={formData.grossAmount}
+                                onChange={(e) => setFormData({ ...formData, grossAmount: e.target.value })}
+                                className="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none"
+                                required
+                            />
+                            <div className="text-xs text-slate-500 mt-1">Monthly amount (we'll calculate annual for tax)</div>
+                        </div>
+
+                        {/* Tax Calculator - FIXED: Shows for any gross amount, not just high values */}
+                        {formData.grossAmount > 0 && (
+                            <div className={`border-2 rounded-xl p-4 transition-colors ${hasTax ? 'bg-orange-50 border-orange-200' : 'bg-slate-50 border-slate-200'}`}>
+                                <div className="flex items-center justify-between mb-4">
+                                    <h4 className={`font-bold flex items-center gap-2 ${hasTax ? 'text-orange-900' : 'text-slate-500'}`}>
+                                        🏛️ Tax Calculator ({userCountry})
+                                    </h4>
                                     <button
-                                        key={i}
                                         type="button"
-                                        onClick={() => handleWorkplaceSelect(w)}
-                                        className={`flex items-center gap-3 p-3 rounded-2xl text-left border transition-all hover:shadow-md ${formData.workplaceName === w.name
-                                            ? 'bg-teal-50 border-teal-500 ring-1 ring-teal-500'
-                                            : 'bg-white border-slate-100 hover:border-teal-200'
+                                        onClick={() => setHasTax(!hasTax)}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${hasTax
+                                            ? 'bg-orange-600 text-white shadow-sm hover:bg-orange-700'
+                                            : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
                                             }`}
                                     >
-                                        <LogoImage logo={w.logo} domain={w.domain} className="w-10 h-10 flex-shrink-0" />
-                                        <div className="min-w-0">
-                                            <div className={`text-xs font-black truncate uppercase tracking-tighter ${formData.workplaceName === w.name ? 'text-teal-700' : 'text-slate-400'
-                                                }`}>
-                                                {w.linkedOccupation}
-                                            </div>
-                                            <div className="text-sm font-bold text-slate-700 truncate">at {w.name}</div>
-                                        </div>
+                                        {hasTax ? t('income.recurringForm.taxableIncome') : t('income.recurringForm.taxFree')}
                                     </button>
-                                ))}
+                                </div>
+
+                                {hasTax ? (
+                                    <>
+
+                                        {/* Tax Bracket Visual Graph */}
+                                        <TaxBracketGraph
+                                            annualIncome={parseFloat(formData.grossAmount || 0) * 12}
+                                            brackets={getTaxConfig(userCountry)?.brackets}
+                                            currency={formData.currency}
+                                            effectiveRate={taxBracketInfo?.effectiveRate || 0}
+                                            taxBreakdown={taxBracketInfo?.breakdown || []}
+                                        />
+
+                                        {/* Tax Details */}
+                                        <div className="mt-4 space-y-3">
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-orange-700">{t('income.recurringForm.taxCreditPoints')}</span>
+                                                <span className="font-mono font-bold text-orange-900">{taxCreditPoints}</span>
+                                            </div>
+
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-orange-700">{t('income.recurringForm.monthlyGross')}</span>
+                                                <span className="font-mono text-emerald-700 font-bold">
+                                                    {parseFloat(formData.grossAmount).toLocaleString()} {formData.currency}
+                                                </span>
+                                            </div>
+
+                                            <div className="flex justify-between items-center text-xs text-orange-600">
+                                                <span>{t('income.recurringForm.annualGross')}</span>
+                                                <span className="font-mono">
+                                                    {(parseFloat(formData.grossAmount) * 12).toLocaleString()} {formData.currency}
+                                                </span>
+                                            </div>
+
+                                            {/* Divider */}
+                                            <div className="border-t-2 border-orange-300 my-3"></div>
+
+                                            {/* Income Tax */}
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-sm font-medium text-orange-800">{t('income.recurringForm.incomeTax')}</span>
+                                                <span className="font-mono font-bold text-orange-900">
+                                                    {(manualOverrides.tax_income !== undefined ? manualOverrides.tax_income : calculatedTax).toLocaleString()} {formData.currency}
+                                                    {manualOverrides.tax_income !== undefined && <span className="text-[10px] text-amber-600 ml-1">{t('income.recurringForm.edited')}</span>}
+                                                </span>
+                                            </div>
+
+                                            {/* Additional Taxes */}
+                                            {additionalTaxes.breakdown.map((tax, idx) => (
+                                                <div key={idx} className="flex justify-between items-center text-sm">
+                                                    <span className="text-orange-700">
+                                                        {tax.name.includes('Health') ? t('income.recurringForm.healthTax') :
+                                                            tax.name.includes('National') ? t('income.recurringForm.nationalInsurance') :
+                                                                tax.name}:
+                                                    </span>
+                                                    <span className="font-mono text-orange-800">
+                                                        {tax.amount.toLocaleString()} {formData.currency}
+                                                        <span className="text-xs text-orange-600 ml-2">
+                                                            ({(tax.rate * 100).toFixed(1)}%)
+                                                        </span>
+                                                    </span>
+                                                </div>
+                                            ))}
+
+                                            {/* Total Monthly Taxes */}
+                                            <div className="mt-4 pt-4 border-t-2 border-orange-300">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-sm font-bold text-orange-900">{t('income.recurringForm.totalMonthlyTaxes')}</span>
+                                                    <span className="text-2xl font-mono font-black text-orange-600">
+                                                        {(
+                                                            (manualOverrides.tax_income ?? calculatedTax) +
+                                                            (manualOverrides.tax_health ?? (additionalTaxes.breakdown.find(t => t.name.includes('Health'))?.amount || 0)) +
+                                                            (manualOverrides.tax_national ?? (additionalTaxes.breakdown.find(t => t.name.includes('National'))?.amount || 0))
+                                                        ).toLocaleString()} {formData.currency}
+                                                    </span>
+                                                </div>
+                                                <div className="text-xs text-orange-600 mt-1 text-right">
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Mismatch Alerts for Taxes */}
+                                        {extractedData && (
+                                            <div className="mt-4 space-y-2">
+                                                {/* Credit Points Mismatch */}
+                                                <MismatchAlert
+                                                    label={t('income.recurringForm.taxCreditPoints')}
+                                                    actual={extractedData.credit_points ?? 0}
+                                                    expected={taxCreditPoints}
+                                                    currency="pts"
+                                                    fieldKey="credit_points"
+                                                    onResolve={(key, val) => {
+                                                        // For credit points, we typically update the user settings or a local override
+                                                        // Since we don't have a direct form field for this in the same way, 
+                                                        // we might just want to update the local state to recalculate.
+                                                        setTaxCreditPoints(val);
+                                                        // Trigger recalculation if needed
+                                                    }}
+                                                    resolvedValue={undefined} // We don't store manual override for points in the same map yet
+                                                />
+                                                <MismatchAlert
+                                                    label={t('income.recurringForm.incomeTax')}
+                                                    actual={extractedData.tax_income ?? 0}
+                                                    expected={calculatedTax}
+                                                    currency={formData.currency}
+                                                    fieldKey="tax_income"
+                                                    onResolve={handleMismatchResolution}
+                                                    resolvedValue={manualOverrides.tax_income}
+                                                />
+                                                <MismatchAlert
+                                                    label={t('income.recurringForm.healthTax')}
+                                                    actual={extractedData.tax_health ?? 0}
+                                                    expected={additionalTaxes.breakdown.find(t => t.name.includes('Health'))?.amount || 0}
+                                                    currency={formData.currency}
+                                                    fieldKey="tax_health"
+                                                    onResolve={handleMismatchResolution}
+                                                    resolvedValue={manualOverrides.tax_health}
+                                                />
+                                                <MismatchAlert
+                                                    label={t('income.recurringForm.nationalInsurance')}
+                                                    actual={extractedData.tax_national ?? 0}
+                                                    expected={additionalTaxes.breakdown.find(t => t.name.includes('National'))?.amount || 0}
+                                                    currency={formData.currency}
+                                                    fieldKey="tax_national"
+                                                    onResolve={handleMismatchResolution}
+                                                    resolvedValue={manualOverrides.tax_national}
+                                                />
+                                            </div>
+                                        )}
+
+
+                                    </>
+                                ) : (
+                                    <div className="text-center py-6 text-slate-400 text-sm italic">
+                                        {t('income.recurringForm.noTaxesCalculated')}
+                                    </div>
+                                )}
                             </div>
                         )}
-                        <input
-                            type="text"
-                            value={formData.workplaceName}
-                            onChange={(e) => setFormData({ ...formData, workplaceName: e.target.value })}
-                            placeholder={t('income.recurringForm.orEnterWorkplace')}
-                            className="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none"
-                        />
-                    </div>
 
-                    {/* Gross Salary */}
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Monthly Gross Salary (Bruto) *</label>
-                        <input
-                            type="number"
-                            step="0.01"
-                            value={formData.grossAmount}
-                            onChange={(e) => setFormData({ ...formData, grossAmount: e.target.value })}
-                            className="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none"
-                            required
-                        />
-                        <div className="text-xs text-slate-500 mt-1">Monthly amount (we'll calculate annual for tax)</div>
-                    </div>
-
-                    {/* Tax Calculator - FIXED: Shows for any gross amount, not just high values */}
-                    {formData.grossAmount > 0 && (
-                        <div className={`border-2 rounded-xl p-4 transition-colors ${hasTax ? 'bg-orange-50 border-orange-200' : 'bg-slate-50 border-slate-200'}`}>
+                        {/* Pension Calculator */}
+                        <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-4">
                             <div className="flex items-center justify-between mb-4">
-                                <h4 className={`font-bold flex items-center gap-2 ${hasTax ? 'text-orange-900' : 'text-slate-500'}`}>
-                                    🏛️ Tax Calculator ({userCountry})
+                                <h4 className="font-bold text-purple-900 flex items-center gap-2">
+                                    {t('income.recurringForm.pensionCalculator')}
                                 </h4>
                                 <button
                                     type="button"
-                                    onClick={() => setHasTax(!hasTax)}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${hasTax
-                                        ? 'bg-orange-600 text-white shadow-sm hover:bg-orange-700'
+                                    onClick={() => {
+                                        setHasPension(!hasPension);
+                                        if (hasPension) {
+                                            setFormData({ ...formData, employeePct: 0, employerPct: 0, severancePct: 0 });
+                                        } else {
+                                            setFormData({ ...formData, employeePct: 6.0, employerPct: 6.5, severancePct: 8.33 });
+                                        }
+                                    }}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${hasPension
+                                        ? 'bg-purple-600 text-white'
                                         : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
                                         }`}
                                 >
-                                    {hasTax ? t('income.recurringForm.taxableIncome') : t('income.recurringForm.taxFree')}
+                                    {hasPension ? t('income.recurringForm.hasPension') : t('income.recurringForm.noPension')}
                                 </button>
                             </div>
 
-                            {hasTax ? (
+                            {hasPension ? (
                                 <>
-
-                                    {/* Tax Bracket Visual Graph */}
-                                    <TaxBracketGraph
-                                        annualIncome={parseFloat(formData.grossAmount || 0) * 12}
-                                        brackets={getTaxConfig(userCountry)?.brackets}
-                                        currency={formData.currency}
-                                        effectiveRate={taxBracketInfo?.effectiveRate || 0}
-                                        taxBreakdown={taxBracketInfo?.breakdown || []}
+                                    <PercentageRow
+                                        label={t('income.recurringForm.employeeContribution')}
+                                        value={formData.employeePct}
+                                        onChange={(val) => setFormData({ ...formData, employeePct: val })}
+                                        color="text-blue-600"
+                                        isCustom={employeeCustom}
+                                        setIsCustom={setEmployeeCustom}
+                                        customList={customEmployeePcts}
+                                        setCustomList={setCustomEmployeePcts}
                                     />
 
-                                    {/* Tax Details */}
-                                    <div className="mt-4 space-y-3">
-                                        <div className="flex justify-between items-center text-sm">
-                                            <span className="text-orange-700">{t('income.recurringForm.taxCreditPoints')}</span>
-                                            <span className="font-mono font-bold text-orange-900">{taxCreditPoints}</span>
-                                        </div>
+                                    <PercentageRow
+                                        label={t('income.recurringForm.employerContribution')}
+                                        value={formData.employerPct}
+                                        onChange={(val) => setFormData({ ...formData, employerPct: val })}
+                                        color="text-green-600"
+                                        isCustom={employerCustom}
+                                        setIsCustom={setEmployerCustom}
+                                        customList={customEmployerPcts}
+                                        setCustomList={setCustomEmployerPcts}
+                                    />
 
-                                        <div className="flex justify-between items-center text-sm">
-                                            <span className="text-orange-700">{t('income.recurringForm.monthlyGross')}</span>
-                                            <span className="font-mono text-emerald-700 font-bold">
-                                                {parseFloat(formData.grossAmount).toLocaleString()} {formData.currency}
-                                            </span>
-                                        </div>
+                                    <PercentageRow
+                                        label={t('income.recurringForm.severanceEmployerPays')}
+                                        value={formData.severancePct}
+                                        onChange={(val) => setFormData({ ...formData, severancePct: val })}
+                                        color="text-amber-600"
+                                        isCustom={severanceCustom}
+                                        setIsCustom={setSeveranceCustom}
+                                        customList={customSeverancePcts}
+                                        setCustomList={setCustomSeverancePcts}
+                                    />
 
-                                        <div className="flex justify-between items-center text-xs text-orange-600">
-                                            <span>{t('income.recurringForm.annualGross')}</span>
-                                            <span className="font-mono">
-                                                {(parseFloat(formData.grossAmount) * 12).toLocaleString()} {formData.currency}
-                                            </span>
-                                        </div>
-
-                                        {/* Divider */}
-                                        <div className="border-t-2 border-orange-300 my-3"></div>
-
-                                        {/* Income Tax */}
+                                    <div className="mt-4 pt-4 border-t border-purple-200">
                                         <div className="flex justify-between items-center">
-                                            <span className="text-sm font-medium text-orange-800">{t('income.recurringForm.incomeTax')}</span>
-                                            <span className="font-mono font-bold text-orange-900">
-                                                {(manualOverrides.tax_income !== undefined ? manualOverrides.tax_income : calculatedTax).toLocaleString()} {formData.currency}
-                                                {manualOverrides.tax_income !== undefined && <span className="text-[10px] text-amber-600 ml-1">{t('income.recurringForm.edited')}</span>}
+                                            <span className="text-sm font-bold text-purple-900">{t('income.recurringForm.expectedPensionTotal')}</span>
+                                            <span className="text-2xl font-mono font-black text-purple-600">
+                                                {formData.expectedPension.toLocaleString()} {formData.currency}
                                             </span>
                                         </div>
-
-                                        {/* Additional Taxes */}
-                                        {additionalTaxes.breakdown.map((tax, idx) => (
-                                            <div key={idx} className="flex justify-between items-center text-sm">
-                                                <span className="text-orange-700">
-                                                    {tax.name.includes('Health') ? t('income.recurringForm.healthTax') :
-                                                        tax.name.includes('National') ? t('income.recurringForm.nationalInsurance') :
-                                                            tax.name}:
-                                                </span>
-                                                <span className="font-mono text-orange-800">
-                                                    {tax.amount.toLocaleString()} {formData.currency}
-                                                    <span className="text-xs text-orange-600 ml-2">
-                                                        ({(tax.rate * 100).toFixed(1)}%)
-                                                    </span>
-                                                </span>
-                                            </div>
-                                        ))}
-
-                                        {/* Total Monthly Taxes */}
-                                        <div className="mt-4 pt-4 border-t-2 border-orange-300">
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-sm font-bold text-orange-900">{t('income.recurringForm.totalMonthlyTaxes')}</span>
-                                                <span className="text-2xl font-mono font-black text-orange-600">
-                                                    {(
-                                                        (manualOverrides.tax_income ?? calculatedTax) +
-                                                        (manualOverrides.tax_health ?? (additionalTaxes.breakdown.find(t => t.name.includes('Health'))?.amount || 0)) +
-                                                        (manualOverrides.tax_national ?? (additionalTaxes.breakdown.find(t => t.name.includes('National'))?.amount || 0))
-                                                    ).toLocaleString()} {formData.currency}
-                                                </span>
-                                            </div>
-                                            <div className="text-xs text-orange-600 mt-1 text-right">
-                                            </div>
+                                        <div className="text-xs text-purple-600 mt-1 text-right">
+                                            {t('income.recurringForm.pensionBreakdownLine', {
+                                                emp: formData.employeePct,
+                                                empr: formData.employerPct,
+                                                sev: formData.severancePct,
+                                                total: (formData.employeePct + formData.employerPct + formData.severancePct).toFixed(2)
+                                            })}
                                         </div>
                                     </div>
 
-                                    {/* Mismatch Alerts for Taxes */}
+                                    {/* Mismatch Alert for Pension */}
                                     {extractedData && (
-                                        <div className="mt-4 space-y-2">
-                                            {/* Credit Points Mismatch */}
+                                        <div className="mt-4">
                                             <MismatchAlert
-                                                label={t('income.recurringForm.taxCreditPoints')}
-                                                actual={extractedData.credit_points ?? 0}
-                                                expected={taxCreditPoints}
-                                                currency="pts"
-                                                fieldKey="credit_points"
-                                                onResolve={(key, val) => {
-                                                    // For credit points, we typically update the user settings or a local override
-                                                    // Since we don't have a direct form field for this in the same way, 
-                                                    // we might just want to update the local state to recalculate.
-                                                    setTaxCreditPoints(val);
-                                                    // Trigger recalculation if needed
-                                                }}
-                                                resolvedValue={undefined} // We don't store manual override for points in the same map yet
-                                            />
-                                            <MismatchAlert
-                                                label={t('income.recurringForm.incomeTax')}
-                                                actual={extractedData.tax_income ?? 0}
-                                                expected={calculatedTax}
+                                                label={t('income.recurringForm.pensionLabel')}
+                                                actual={extractedData.pension_employee}
+                                                expected={Math.round(parseFloat(formData.grossAmount || 0) * (formData.employeePct / 100))}
                                                 currency={formData.currency}
-                                                fieldKey="tax_income"
+                                                fieldKey="pension_employee"
                                                 onResolve={handleMismatchResolution}
-                                                resolvedValue={manualOverrides.tax_income}
-                                            />
-                                            <MismatchAlert
-                                                label={t('income.recurringForm.healthTax')}
-                                                actual={extractedData.tax_health ?? 0}
-                                                expected={additionalTaxes.breakdown.find(t => t.name.includes('Health'))?.amount || 0}
-                                                currency={formData.currency}
-                                                fieldKey="tax_health"
-                                                onResolve={handleMismatchResolution}
-                                                resolvedValue={manualOverrides.tax_health}
-                                            />
-                                            <MismatchAlert
-                                                label={t('income.recurringForm.nationalInsurance')}
-                                                actual={extractedData.tax_national ?? 0}
-                                                expected={additionalTaxes.breakdown.find(t => t.name.includes('National'))?.amount || 0}
-                                                currency={formData.currency}
-                                                fieldKey="tax_national"
-                                                onResolve={handleMismatchResolution}
-                                                resolvedValue={manualOverrides.tax_national}
+                                                resolvedValue={manualOverrides.pension_employee}
                                             />
                                         </div>
                                     )}
-
-
                                 </>
                             ) : (
-                                <div className="text-center py-6 text-slate-400 text-sm italic">
-                                    {t('income.recurringForm.noTaxesCalculated')}
+                                <div className="text-center py-6 text-slate-500">
+                                    <div className="text-4xl mb-2">🚫</div>
+                                    <div className="text-sm">No pension deductions</div>
                                 </div>
                             )}
                         </div>
-                    )}
 
-                    {/* Pension Calculator */}
-                    <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-4">
-                        <div className="flex items-center justify-between mb-4">
-                            <h4 className="font-bold text-purple-900 flex items-center gap-2">
-                                {t('income.recurringForm.pensionCalculator')}
-                            </h4>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setHasPension(!hasPension);
-                                    if (hasPension) {
-                                        setFormData({ ...formData, employeePct: 0, employerPct: 0, severancePct: 0 });
-                                    } else {
-                                        setFormData({ ...formData, employeePct: 6.0, employerPct: 6.5, severancePct: 8.33 });
-                                    }
-                                }}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${hasPension
-                                    ? 'bg-purple-600 text-white'
-                                    : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
-                                    }`}
-                            >
-                                {hasPension ? t('income.recurringForm.hasPension') : t('income.recurringForm.noPension')}
-                            </button>
+                        {/* Other Deposits (Keren Hishtalmut, etc.) */}
+                        <div className="bg-emerald-50 border-2 border-emerald-200 rounded-xl p-4">
+                            <div className="flex items-center justify-between mb-4">
+                                <h4 className="font-bold text-emerald-900 flex items-center gap-2">
+                                    {t('income.recurringForm.otherDeposits')}
+                                </h4>
+                                <button
+                                    type="button"
+                                    onClick={() => setHasOtherDeposits(!hasOtherDeposits)}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${hasOtherDeposits
+                                        ? 'bg-emerald-600 text-white'
+                                        : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                                        }`}
+                                >
+                                    {hasOtherDeposits ? t('income.recurringForm.active') : t('income.recurringForm.none')}
+                                </button>
+                            </div>
+
+                            {hasOtherDeposits && (
+                                <>
+                                    <PercentageRow
+                                        label={t('income.recurringForm.employeeContribution')}
+                                        value={otherDepositEmployeePct}
+                                        onChange={(val) => setOtherDepositEmployeePct(val)}
+                                        color="text-emerald-700"
+                                        isCustom={otherEmployeeCustom}
+                                        setIsCustom={setOtherEmployeeCustom}
+                                        customList={customOtherEmployeePcts}
+                                        setCustomList={setCustomOtherEmployeePcts}
+                                    />
+                                    <PercentageRow
+                                        label={t('income.recurringForm.employerContribution')}
+                                        value={otherDepositEmployerPct}
+                                        onChange={(val) => setOtherDepositEmployerPct(val)}
+                                        color="text-emerald-700"
+                                        isCustom={otherEmployerCustom}
+                                        setIsCustom={setOtherEmployerCustom}
+                                        customList={customOtherEmployerPcts}
+                                        setCustomList={setCustomOtherEmployerPcts}
+                                    />
+                                    <div className="mt-2 text-xs text-emerald-600 font-bold border-t border-emerald-200 pt-2 text-right">
+                                        {t('income.recurringForm.totalOtherDeposit')} {Math.round(parseFloat(formData.grossAmount || 0) * ((otherDepositEmployeePct + otherDepositEmployerPct) / 100)).toLocaleString()} {formData.currency}
+                                    </div>
+                                </>
+                            )}
                         </div>
 
-                        {hasPension ? (
-                            <>
-                                <PercentageRow
-                                    label={t('income.recurringForm.employeeContribution')}
-                                    value={formData.employeePct}
-                                    onChange={(val) => setFormData({ ...formData, employeePct: val })}
-                                    color="text-blue-600"
-                                    isCustom={employeeCustom}
-                                    setIsCustom={setEmployeeCustom}
-                                    customList={customEmployeePcts}
-                                    setCustomList={setCustomEmployeePcts}
-                                />
+                        {/* Net Salary (New Card Design) */}
+                        <div>
+                            <div className="bg-white border-2 border-teal-100 rounded-xl p-5 shadow-sm">
+                                <label className="block text-sm font-bold text-teal-900 mb-3 uppercase tracking-wider">
+                                    {t('income.recurringForm.netSalary')}
+                                </label>
 
-                                <PercentageRow
-                                    label={t('income.recurringForm.employerContribution')}
-                                    value={formData.employerPct}
-                                    onChange={(val) => setFormData({ ...formData, employerPct: val })}
-                                    color="text-green-600"
-                                    isCustom={employerCustom}
-                                    setIsCustom={setEmployerCustom}
-                                    customList={customEmployerPcts}
-                                    setCustomList={setCustomEmployerPcts}
-                                />
+                                <div className="relative mb-4">
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        value={formData.netAmount}
+                                        onChange={(e) => setFormData({ ...formData, netAmount: parseFloat(e.target.value) || 0 })}
+                                        className="w-full p-4 border-2 border-teal-400 rounded-xl text-4xl font-mono font-black text-teal-700 bg-teal-50 focus:ring-4 focus:ring-teal-100 outline-none text-right"
+                                    />
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-teal-300 font-bold text-xl">
+                                        {formData.currency}
+                                    </div>
+                                </div>
 
-                                <PercentageRow
-                                    label={t('income.recurringForm.severanceEmployerPays')}
-                                    value={formData.severancePct}
-                                    onChange={(val) => setFormData({ ...formData, severancePct: val })}
-                                    color="text-amber-600"
-                                    isCustom={severanceCustom}
-                                    setIsCustom={setSeveranceCustom}
-                                    customList={customSeverancePcts}
-                                    setCustomList={setCustomSeverancePcts}
-                                />
-
-                                <div className="mt-4 pt-4 border-t border-purple-200">
+                                {/* Calculation Flow */}
+                                <div className="bg-slate-50 rounded-lg p-3 space-y-2 text-sm font-mono text-slate-600">
                                     <div className="flex justify-between items-center">
-                                        <span className="text-sm font-bold text-purple-900">{t('income.recurringForm.expectedPensionTotal')}</span>
-                                        <span className="text-2xl font-mono font-black text-purple-600">
-                                            {formData.expectedPension.toLocaleString()} {formData.currency}
+                                        <span>{t('income.recurringForm.monthlyGross')}</span>
+                                        <span className="font-bold">{parseFloat(formData.grossAmount || 0).toLocaleString()}</span>
+                                    </div>
+
+                                    <div className="flex justify-between items-center text-red-500 relative">
+                                        <span className="flex items-center gap-1 cursor-help" title="Income Tax + Health + National">
+                                            - {t('income.recurringForm.taxes')} ({((manualOverrides.tax_income ?? calculatedTax) +
+                                                (manualOverrides.tax_health ?? (additionalTaxes.breakdown.find(t => t.name.includes('Health'))?.amount || 0)) +
+                                                (manualOverrides.tax_national ?? (additionalTaxes.breakdown.find(t => t.name.includes('National'))?.amount || 0))
+                                            ).toLocaleString()})
+                                            {(manualOverrides.tax_income !== undefined || manualOverrides.tax_health !== undefined || manualOverrides.tax_national !== undefined) && (
+                                                <span className="bg-amber-100 text-amber-700 text-[10px] px-1 rounded border border-amber-200">{t('income.recurringForm.edited')}</span>
+                                            )}
                                         </span>
-                                    </div>
-                                    <div className="text-xs text-purple-600 mt-1 text-right">
-                                        {t('income.recurringForm.pensionBreakdownLine', {
-                                            emp: formData.employeePct,
-                                            empr: formData.employerPct,
-                                            sev: formData.severancePct,
-                                            total: (formData.employeePct + formData.employerPct + formData.severancePct).toFixed(2)
-                                        })}
-                                    </div>
-                                </div>
-
-                                {/* Mismatch Alert for Pension */}
-                                {extractedData && (
-                                    <div className="mt-4">
-                                        <MismatchAlert
-                                            label={t('income.recurringForm.pensionLabel')}
-                                            actual={extractedData.pension_employee}
-                                            expected={Math.round(parseFloat(formData.grossAmount || 0) * (formData.employeePct / 100))}
-                                            currency={formData.currency}
-                                            fieldKey="pension_employee"
-                                            onResolve={handleMismatchResolution}
-                                            resolvedValue={manualOverrides.pension_employee}
-                                        />
-                                    </div>
-                                )}
-                            </>
-                        ) : (
-                            <div className="text-center py-6 text-slate-500">
-                                <div className="text-4xl mb-2">🚫</div>
-                                <div className="text-sm">No pension deductions</div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Other Deposits (Keren Hishtalmut, etc.) */}
-                    <div className="bg-emerald-50 border-2 border-emerald-200 rounded-xl p-4">
-                        <div className="flex items-center justify-between mb-4">
-                            <h4 className="font-bold text-emerald-900 flex items-center gap-2">
-                                {t('income.recurringForm.otherDeposits')}
-                            </h4>
-                            <button
-                                type="button"
-                                onClick={() => setHasOtherDeposits(!hasOtherDeposits)}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${hasOtherDeposits
-                                    ? 'bg-emerald-600 text-white'
-                                    : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
-                                    }`}
-                            >
-                                {hasOtherDeposits ? t('income.recurringForm.active') : t('income.recurringForm.none')}
-                            </button>
-                        </div>
-
-                        {hasOtherDeposits && (
-                            <>
-                                <PercentageRow
-                                    label={t('income.recurringForm.employeeContribution')}
-                                    value={otherDepositEmployeePct}
-                                    onChange={(val) => setOtherDepositEmployeePct(val)}
-                                    color="text-emerald-700"
-                                    isCustom={otherEmployeeCustom}
-                                    setIsCustom={setOtherEmployeeCustom}
-                                    customList={customOtherEmployeePcts}
-                                    setCustomList={setCustomOtherEmployeePcts}
-                                />
-                                <PercentageRow
-                                    label={t('income.recurringForm.employerContribution')}
-                                    value={otherDepositEmployerPct}
-                                    onChange={(val) => setOtherDepositEmployerPct(val)}
-                                    color="text-emerald-700"
-                                    isCustom={otherEmployerCustom}
-                                    setIsCustom={setOtherEmployerCustom}
-                                    customList={customOtherEmployerPcts}
-                                    setCustomList={setCustomOtherEmployerPcts}
-                                />
-                                <div className="mt-2 text-xs text-emerald-600 font-bold border-t border-emerald-200 pt-2 text-right">
-                                    {t('income.recurringForm.totalOtherDeposit')} {Math.round(parseFloat(formData.grossAmount || 0) * ((otherDepositEmployeePct + otherDepositEmployerPct) / 100)).toLocaleString()} {formData.currency}
-                                </div>
-                            </>
-                        )}
-                    </div>
-
-                    {/* Net Salary (New Card Design) */}
-                    <div>
-                        <div className="bg-white border-2 border-teal-100 rounded-xl p-5 shadow-sm">
-                            <label className="block text-sm font-bold text-teal-900 mb-3 uppercase tracking-wider">
-                                {t('income.recurringForm.netSalary')}
-                            </label>
-
-                            <div className="relative mb-4">
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={formData.netAmount}
-                                    onChange={(e) => setFormData({ ...formData, netAmount: parseFloat(e.target.value) || 0 })}
-                                    className="w-full p-4 border-2 border-teal-400 rounded-xl text-4xl font-mono font-black text-teal-700 bg-teal-50 focus:ring-4 focus:ring-teal-100 outline-none text-right"
-                                />
-                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-teal-300 font-bold text-xl">
-                                    {formData.currency}
-                                </div>
-                            </div>
-
-                            {/* Calculation Flow */}
-                            <div className="bg-slate-50 rounded-lg p-3 space-y-2 text-sm font-mono text-slate-600">
-                                <div className="flex justify-between items-center">
-                                    <span>{t('income.recurringForm.monthlyGross')}</span>
-                                    <span className="font-bold">{parseFloat(formData.grossAmount || 0).toLocaleString()}</span>
-                                </div>
-
-                                <div className="flex justify-between items-center text-red-500 relative">
-                                    <span className="flex items-center gap-1 cursor-help" title="Income Tax + Health + National">
-                                        - {t('income.recurringForm.taxes')} ({((manualOverrides.tax_income ?? calculatedTax) +
-                                            (manualOverrides.tax_health ?? (additionalTaxes.breakdown.find(t => t.name.includes('Health'))?.amount || 0)) +
-                                            (manualOverrides.tax_national ?? (additionalTaxes.breakdown.find(t => t.name.includes('National'))?.amount || 0))
-                                        ).toLocaleString()})
-                                        {(manualOverrides.tax_income !== undefined || manualOverrides.tax_health !== undefined || manualOverrides.tax_national !== undefined) && (
-                                            <span className="bg-amber-100 text-amber-700 text-[10px] px-1 rounded border border-amber-200">{t('income.recurringForm.edited')}</span>
-                                        )}
-                                    </span>
-                                    <span
-                                        className="font-bold cursor-pointer hover:bg-red-50 px-1 rounded border border-transparent hover:border-red-200"
-                                        onClick={() => setEditingField('taxes')}
-                                    >
-                                        -{(
-                                            (manualOverrides.tax_income ?? calculatedTax) +
-                                            (manualOverrides.tax_health ?? (additionalTaxes.breakdown.find(t => t.name.includes('Health'))?.amount || 0)) +
-                                            (manualOverrides.tax_national ?? (additionalTaxes.breakdown.find(t => t.name.includes('National'))?.amount || 0))
-                                        ).toLocaleString()} ✏️
-                                    </span>
-
-                                    {/* Custom Edit Popover for Taxes */}
-                                    {editingField === 'taxes' && (
-                                        <EditValuePopover
-                                            title={t('income.recurringForm.overrideTaxes')}
-                                            initialValue={(
+                                        <span
+                                            className="font-bold cursor-pointer hover:bg-red-50 px-1 rounded border border-transparent hover:border-red-200"
+                                            onClick={() => setEditingField('taxes')}
+                                        >
+                                            -{(
                                                 (manualOverrides.tax_income ?? calculatedTax) +
                                                 (manualOverrides.tax_health ?? (additionalTaxes.breakdown.find(t => t.name.includes('Health'))?.amount || 0)) +
                                                 (manualOverrides.tax_national ?? (additionalTaxes.breakdown.find(t => t.name.includes('National'))?.amount || 0))
-                                            )}
-                                            onCancel={() => setEditingField(null)}
-                                            onSave={(newVal) => {
-                                                if (!isNaN(newVal)) {
-                                                    const currentTotal = (
-                                                        (manualOverrides.tax_income ?? calculatedTax) +
-                                                        (manualOverrides.tax_health ?? (additionalTaxes.breakdown.find(t => t.name.includes('Health'))?.amount || 0)) +
-                                                        (manualOverrides.tax_national ?? (additionalTaxes.breakdown.find(t => t.name.includes('National'))?.amount || 0))
-                                                    );
-                                                    const diff = newVal - currentTotal;
-                                                    const currentIncomeTax = manualOverrides.tax_income !== undefined ? manualOverrides.tax_income : calculatedTax;
-                                                    // adjust Income Tax to match the desired total
-                                                    handleMismatchResolution('tax_income', Math.max(0, currentIncomeTax + diff));
-                                                    setEditingField(null);
-                                                }
-                                            }}
-                                        />
-                                    )}
-                                </div>
+                                            ).toLocaleString()} ✏️
+                                        </span>
 
-                                <div className="flex justify-between items-center text-red-500 relative">
-                                    <span className="flex items-center gap-1">
-                                        - {t('income.recurringForm.pensionLabel')}
-                                        {manualOverrides.pension_employee !== undefined && (
-                                            <span className="bg-amber-100 text-amber-700 text-[10px] px-1 rounded border border-amber-200">EDITED</span>
+                                        {/* Custom Edit Popover for Taxes */}
+                                        {editingField === 'taxes' && (
+                                            <EditValuePopover
+                                                title={t('income.recurringForm.overrideTaxes')}
+                                                initialValue={(
+                                                    (manualOverrides.tax_income ?? calculatedTax) +
+                                                    (manualOverrides.tax_health ?? (additionalTaxes.breakdown.find(t => t.name.includes('Health'))?.amount || 0)) +
+                                                    (manualOverrides.tax_national ?? (additionalTaxes.breakdown.find(t => t.name.includes('National'))?.amount || 0))
+                                                )}
+                                                onCancel={() => setEditingField(null)}
+                                                onSave={(newVal) => {
+                                                    if (!isNaN(newVal)) {
+                                                        const currentTotal = (
+                                                            (manualOverrides.tax_income ?? calculatedTax) +
+                                                            (manualOverrides.tax_health ?? (additionalTaxes.breakdown.find(t => t.name.includes('Health'))?.amount || 0)) +
+                                                            (manualOverrides.tax_national ?? (additionalTaxes.breakdown.find(t => t.name.includes('National'))?.amount || 0))
+                                                        );
+                                                        const diff = newVal - currentTotal;
+                                                        const currentIncomeTax = manualOverrides.tax_income !== undefined ? manualOverrides.tax_income : calculatedTax;
+                                                        // adjust Income Tax to match the desired total
+                                                        handleMismatchResolution('tax_income', Math.max(0, currentIncomeTax + diff));
+                                                        setEditingField(null);
+                                                    }
+                                                }}
+                                            />
                                         )}
-                                    </span>
-                                    <span
-                                        className="font-bold cursor-pointer hover:bg-red-50 px-1 rounded border border-transparent hover:border-red-200"
-                                        onClick={() => setEditingField('pension')}
-                                    >
-                                        -{(manualOverrides.pension_employee !== undefined ? manualOverrides.pension_employee : Math.round(parseFloat(formData.grossAmount || 0) * (formData.employeePct / 100))).toLocaleString()} ✏️
-                                    </span>
-                                    {editingField === 'pension' && (
-                                        <EditValuePopover
-                                            title={t('income.recurringForm.overridePension')}
-                                            initialValue={manualOverrides.pension_employee !== undefined ? manualOverrides.pension_employee : Math.round(parseFloat(formData.grossAmount || 0) * (formData.employeePct / 100))}
-                                            onCancel={() => setEditingField(null)}
-                                            onSave={(val) => {
-                                                handleMismatchResolution('pension_employee', val);
-                                                setEditingField(null);
-                                            }}
-                                        />
-                                    )}
-                                </div>
+                                    </div>
 
-                                {hasOtherDeposits && (
                                     <div className="flex justify-between items-center text-red-500 relative">
                                         <span className="flex items-center gap-1">
-                                            - {t('income.recurringForm.kerenHishtalmut')}
-                                            {manualOverrides.other_deposit_employee !== undefined && (
+                                            - {t('income.recurringForm.pensionLabel')}
+                                            {manualOverrides.pension_employee !== undefined && (
                                                 <span className="bg-amber-100 text-amber-700 text-[10px] px-1 rounded border border-amber-200">EDITED</span>
                                             )}
                                         </span>
                                         <span
                                             className="font-bold cursor-pointer hover:bg-red-50 px-1 rounded border border-transparent hover:border-red-200"
-                                            onClick={() => setEditingField('other_deposit')}
+                                            onClick={() => setEditingField('pension')}
                                         >
-                                            -{(manualOverrides.other_deposit_employee !== undefined
-                                                ? manualOverrides.other_deposit_employee
-                                                : Math.round(parseFloat(formData.grossAmount || 0) * (otherDepositEmployeePct / 100))
-                                            ).toLocaleString()} ✏️
+                                            -{(manualOverrides.pension_employee !== undefined ? manualOverrides.pension_employee : Math.round(parseFloat(formData.grossAmount || 0) * (formData.employeePct / 100))).toLocaleString()} ✏️
                                         </span>
-                                        {editingField === 'other_deposit' && (
+                                        {editingField === 'pension' && (
                                             <EditValuePopover
-                                                title="Override Other Deposit"
-                                                initialValue={manualOverrides.other_deposit_employee !== undefined
-                                                    ? manualOverrides.other_deposit_employee
-                                                    : Math.round(parseFloat(formData.grossAmount || 0) * (otherDepositEmployeePct / 100))}
+                                                title={t('income.recurringForm.overridePension')}
+                                                initialValue={manualOverrides.pension_employee !== undefined ? manualOverrides.pension_employee : Math.round(parseFloat(formData.grossAmount || 0) * (formData.employeePct / 100))}
                                                 onCancel={() => setEditingField(null)}
                                                 onSave={(val) => {
-                                                    handleMismatchResolution('other_deposit_employee', val);
+                                                    handleMismatchResolution('pension_employee', val);
                                                     setEditingField(null);
                                                 }}
                                             />
                                         )}
                                     </div>
+
+                                    {hasOtherDeposits && (
+                                        <div className="flex justify-between items-center text-red-500 relative">
+                                            <span className="flex items-center gap-1">
+                                                - {t('income.recurringForm.kerenHishtalmut')}
+                                                {manualOverrides.other_deposit_employee !== undefined && (
+                                                    <span className="bg-amber-100 text-amber-700 text-[10px] px-1 rounded border border-amber-200">EDITED</span>
+                                                )}
+                                            </span>
+                                            <span
+                                                className="font-bold cursor-pointer hover:bg-red-50 px-1 rounded border border-transparent hover:border-red-200"
+                                                onClick={() => setEditingField('other_deposit')}
+                                            >
+                                                -{(manualOverrides.other_deposit_employee !== undefined
+                                                    ? manualOverrides.other_deposit_employee
+                                                    : Math.round(parseFloat(formData.grossAmount || 0) * (otherDepositEmployeePct / 100))
+                                                ).toLocaleString()} ✏️
+                                            </span>
+                                            {editingField === 'other_deposit' && (
+                                                <EditValuePopover
+                                                    title="Override Other Deposit"
+                                                    initialValue={manualOverrides.other_deposit_employee !== undefined
+                                                        ? manualOverrides.other_deposit_employee
+                                                        : Math.round(parseFloat(formData.grossAmount || 0) * (otherDepositEmployeePct / 100))}
+                                                    onCancel={() => setEditingField(null)}
+                                                    onSave={(val) => {
+                                                        handleMismatchResolution('other_deposit_employee', val);
+                                                        setEditingField(null);
+                                                    }}
+                                                />
+                                            )}
+                                        </div>
+                                    )}
+
+                                    <div className="border-t border-slate-200 my-2"></div>
+
+                                    <div className="flex justify-between items-center text-teal-700 font-bold text-base">
+                                        <span>= {t('income.recurringForm.netSalary')}</span>
+                                        <span>{formData.netAmount?.toLocaleString()}</span>
+                                    </div>
+                                </div>
+
+                                <div className="mt-3 text-xs text-slate-400 text-center">
+                                    * Employer pension ({formData.employerPct}%) is not deducted from net salary.
+                                </div>
+
+                                {/* Mismatch Alert for Neto */}
+                                {extractedData && (
+                                    <div className="mt-4">
+                                        <MismatchAlert
+                                            label={t('income.recurringForm.netSalary')}
+                                            actual={extractedData.neto}
+                                            expected={formData.netAmount}
+                                            currency={formData.currency}
+                                            fieldKey="neto"
+                                            onResolve={handleMismatchResolution}
+                                            resolvedValue={manualOverrides.neto}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+
+
+                        {/* Direction */}
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-3">{t('income.recurringForm.applyTo')}</label>
+                            <div className="grid grid-cols-2 gap-4">
+                                <button
+                                    type="button"
+                                    onClick={() => handleDirectionToggle('past')}
+                                    className={`p-6 rounded-xl border-2 transition-all ${selectedDirection === 'past' || selectedDirection === 'both'
+                                        ? 'border-purple-500 bg-purple-50 shadow-md'
+                                        : 'border-slate-200 hover:border-purple-300'
+                                        }`}
+                                >
+                                    <div className="text-3xl mb-2">⏮️</div>
+                                    <div className="font-bold text-slate-800 mb-1">{t('income.recurringForm.pastMonths')}</div>
+                                    <div className="text-xs text-slate-600">{t('income.recurringForm.addToPrevious')}</div>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleDirectionToggle('future')}
+                                    className={`p-6 rounded-xl border-2 transition-all ${selectedDirection === 'future' || selectedDirection === 'both'
+                                        ? 'border-blue-500 bg-blue-50 shadow-md'
+                                        : 'border-slate-200 hover:border-blue-300'
+                                        }`}
+                                >
+                                    <div className="text-3xl mb-2">▶️</div>
+                                    <div className="font-bold text-slate-800 mb-1">{t('income.recurringForm.futureMonths')}</div>
+                                    <div className="text-xs text-slate-600">{t('income.recurringForm.forecastUpcoming')}</div>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Period Configuration */}
+                        {showPeriodConfig && (
+                            <div className="border-t border-slate-200 pt-6 space-y-6">
+                                {(selectedDirection === 'past' || selectedDirection === 'both') && (
+                                    <PeriodSelector
+                                        label={`⏮️ ${t('income.recurringForm.howFarBack')}`}
+                                        value={{ count: formData.pastPeriodCount, unit: formData.pastPeriodUnit }}
+                                        onChange={(period) => setFormData({
+                                            ...formData,
+                                            pastPeriodCount: period.count,
+                                            pastPeriodUnit: period.unit
+                                        })}
+                                        customList={customPastPeriods}
+                                        setCustomList={setCustomPastPeriods}
+                                        isCustom={isPastCustom}
+                                        setIsCustom={setIsPastCustom}
+                                    />
                                 )}
 
-                                <div className="border-t border-slate-200 my-2"></div>
-
-                                <div className="flex justify-between items-center text-teal-700 font-bold text-base">
-                                    <span>= {t('income.recurringForm.netSalary')}</span>
-                                    <span>{formData.netAmount?.toLocaleString()}</span>
-                                </div>
-                            </div>
-
-                            <div className="mt-3 text-xs text-slate-400 text-center">
-                                * Employer pension ({formData.employerPct}%) is not deducted from net salary.
-                            </div>
-
-                            {/* Mismatch Alert for Neto */}
-                            {extractedData && (
-                                <div className="mt-4">
-                                    <MismatchAlert
-                                        label={t('income.recurringForm.netSalary')}
-                                        actual={extractedData.neto}
-                                        expected={formData.netAmount}
-                                        currency={formData.currency}
-                                        fieldKey="neto"
-                                        onResolve={handleMismatchResolution}
-                                        resolvedValue={manualOverrides.neto}
+                                {(selectedDirection === 'future' || selectedDirection === 'both') && (
+                                    <PeriodSelector
+                                        label={`▶️ ${t('income.recurringForm.howFarForward')}`}
+                                        value={{ count: formData.futurePeriodCount, unit: formData.futurePeriodUnit }}
+                                        onChange={(period) => setFormData({
+                                            ...formData,
+                                            futurePeriodCount: period.count,
+                                            futurePeriodUnit: period.unit
+                                        })}
+                                        customList={customFuturePeriods}
+                                        setCustomList={setCustomFuturePeriods}
+                                        isCustom={isFutureCustom}
+                                        setIsCustom={setIsFutureCustom}
                                     />
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-
-
-                    {/* Direction */}
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-3">{t('income.recurringForm.applyTo')}</label>
-                        <div className="grid grid-cols-2 gap-4" dir="ltr">
-                            <button
-                                type="button"
-                                onClick={() => handleDirectionToggle('past')}
-                                className={`p-6 rounded-xl border-2 transition-all ${selectedDirection === 'past' || selectedDirection === 'both'
-                                    ? 'border-purple-500 bg-purple-50 shadow-md'
-                                    : 'border-slate-200 hover:border-purple-300'
-                                    }`}
-                            >
-                                <div className="text-3xl mb-2">⏮️</div>
-                                <div className="font-bold text-slate-800 mb-1">{t('income.recurringForm.pastMonths')}</div>
-                                <div className="text-xs text-slate-600">{t('income.recurringForm.addToPrevious')}</div>
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => handleDirectionToggle('future')}
-                                className={`p-6 rounded-xl border-2 transition-all ${selectedDirection === 'future' || selectedDirection === 'both'
-                                    ? 'border-blue-500 bg-blue-50 shadow-md'
-                                    : 'border-slate-200 hover:border-blue-300'
-                                    }`}
-                            >
-                                <div className="text-3xl mb-2">▶️</div>
-                                <div className="font-bold text-slate-800 mb-1">{t('income.recurringForm.futureMonths')}</div>
-                                <div className="text-xs text-slate-600">{t('income.recurringForm.forecastUpcoming')}</div>
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Period Configuration */}
-                    {showPeriodConfig && (
-                        <div className="border-t border-slate-200 pt-6 space-y-6">
-                            {(selectedDirection === 'past' || selectedDirection === 'both') && (
-                                <PeriodSelector
-                                    label={`⏮️ ${t('income.recurringForm.howFarBack')}`}
-                                    value={{ count: formData.pastPeriodCount, unit: formData.pastPeriodUnit }}
-                                    onChange={(period) => setFormData({
-                                        ...formData,
-                                        pastPeriodCount: period.count,
-                                        pastPeriodUnit: period.unit
-                                    })}
-                                    customList={customPastPeriods}
-                                    setCustomList={setCustomPastPeriods}
-                                    isCustom={isPastCustom}
-                                    setIsCustom={setIsPastCustom}
-                                />
-                            )}
-
-                            {(selectedDirection === 'future' || selectedDirection === 'both') && (
-                                <PeriodSelector
-                                    label={`▶️ ${t('income.recurringForm.howFarForward')}`}
-                                    value={{ count: formData.futurePeriodCount, unit: formData.futurePeriodUnit }}
-                                    onChange={(period) => setFormData({
-                                        ...formData,
-                                        futurePeriodCount: period.count,
-                                        futurePeriodUnit: period.unit
-                                    })}
-                                    customList={customFuturePeriods}
-                                    setCustomList={setCustomFuturePeriods}
-                                    isCustom={isFutureCustom}
-                                    setIsCustom={setIsFutureCustom}
-                                />
-                            )}
-                        </div>
-                    )}
-
-                    {/* Summary */}
-                    <div className="bg-gradient-to-r from-teal-50 to-cyan-50 border-2 border-teal-200 rounded-xl p-4">
-                        <div className="font-bold text-teal-900 mb-2 flex items-center gap-2">
-                            📊 {t('income.recurringForm.summary')}
-                        </div>
-                        <div className="text-sm text-teal-800 space-y-1">
-                            <div className="font-bold text-teal-900">📆 {t('income.recurringForm.monthsCovered')}</div>
-                            <div className="pl-4 text-xs">{getMonthRangeDisplay()}</div>
-                        </div>
-                    </div>
-
-                    {/* Validation Error */}
-                    {
-                        validationError && (
-                            <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 flex items-start gap-3">
-                                <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                                <span className="text-sm text-red-700">{validationError}</span>
+                                )}
                             </div>
-                        )
-                    }
+                        )}
 
-                    {/* Submit */}
-                    <div className="flex gap-3 pt-4">
-                        <Button type="submit" disabled={isSaving} className="flex-1">
-                            {isSaving ? t('income.recurringForm.saving') : editData ? t('income.recurringForm.updateIncome') : t('income.recurringForm.saveRecurringIncome')}
-                        </Button>
-                        <Button type="button" variant="secondary" onClick={onCancel}>
-                            {t('common.cancel')}
-                        </Button>
-                    </div>
-                </form >
-            </div >
-        </div >
+                        {/* Summary */}
+                        <div className="bg-gradient-to-r from-teal-50 to-cyan-50 border-2 border-teal-200 rounded-xl p-4">
+                            <div className="font-bold text-teal-900 mb-2 flex items-center gap-2">
+                                📊 {t('income.recurringForm.summary')}
+                            </div>
+                            <div className="text-sm text-teal-800 space-y-1">
+                                <div className="font-bold text-teal-900">📆 {t('income.recurringForm.monthsCovered')}</div>
+                                <div className="pl-4 text-xs">{getMonthRangeDisplay()}</div>
+                            </div>
+                        </div>
+
+                        {/* Validation Error */}
+                        {
+                            validationError && (
+                                <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 flex items-start gap-3">
+                                    <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                                    <span className="text-sm text-red-700">{validationError}</span>
+                                </div>
+                            )
+                        }
+
+                        {/* Submit */}
+                        <div className="flex gap-3 pt-4">
+                            <Button type="submit" disabled={isSaving} className="flex-1">
+                                {isSaving ? t('income.recurringForm.saving') : editData ? t('income.recurringForm.updateIncome') : t('income.recurringForm.saveRecurringIncome')}
+                            </Button>
+                            <Button type="button" variant="secondary" onClick={handleCloseAttempt}>
+                                {t('common.cancel')}
+                            </Button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </>
     );
 };

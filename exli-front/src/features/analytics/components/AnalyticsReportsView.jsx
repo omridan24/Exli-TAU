@@ -23,7 +23,6 @@ export const AnalyticsReportsView = ({
     executeBulkCategory, bulkCategory, setBulkCategory, categories,
     editingId, startEditAmount, saveAmount, editAmountVal, setEditAmountVal,
     handleCategoryChange, formatDate, onAddNote, onMarkSuspect, onClearSuspect,
-
     onMoveMonth, onRemoveNote, onUpdateIncome, setSelectedIds
 }) => {
     const { t } = useTranslation();
@@ -93,29 +92,6 @@ export const AnalyticsReportsView = ({
 
     return (
         <>
-            {/* Recurring vs One-Time Breakdown */}
-            {selectedMonth !== 'average' && recurringTotal > 0 && (
-                <div className="mb-4 flex gap-3">
-                    <div className="flex-1 bg-purple-50 border border-purple-200 rounded-xl p-3 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Repeat className="w-4 h-4 text-purple-600" />
-                            <span className="text-xs font-bold text-purple-900">{t('analytics.recurring')}</span>
-                        </div>
-                        <span className="text-sm font-bold text-purple-600">
-                            {dominantCurrency} {recurringTotal.toLocaleString()}
-                        </span>
-                    </div>
-                    <div className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <DollarSign className="w-4 h-4 text-slate-600" />
-                            <span className="text-xs font-bold text-slate-700">{t('analytics.oneTime')}</span>
-                        </div>
-                        <span className="text-sm font-bold text-slate-600">
-                            {dominantCurrency} {oneTimeTotal.toLocaleString()}
-                        </span>
-                    </div>
-                </div>
-            )}
 
             {selectedMonth !== 'average' && isForecastMonth && (
                 <div className="mb-6 bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-200 rounded-2xl p-4 flex items-start gap-4 shadow-sm">
@@ -157,7 +133,7 @@ export const AnalyticsReportsView = ({
                                 <div key={s.name} className="flex items-center justify-between text-xs">
                                     <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />{getCategoryName(s.name)}</div>
                                     <div className="font-bold">
-                                        {dominantCurrency}{s.value.toFixed(0)}
+                                        {s.value.toFixed(0)}
                                         {totalIncome > 0 && (
                                             <span className="text-slate-400 ml-1.5 text-[10px]">
                                                 ({((s.value / totalIncome) * 100).toFixed(1)}%)
@@ -182,7 +158,7 @@ export const AnalyticsReportsView = ({
                             {incomeStats.map((s, idx) => (
                                 <div key={s.name} className="relative flex items-center justify-between text-xs p-2 rounded-lg hover:bg-slate-50 transition-colors cursor-help group" onMouseEnter={() => setHoveredIncome(s.name)} onMouseLeave={() => setHoveredIncome(null)}>
                                     <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />{t(s.name, { defaultValue: s.name })}</div>
-                                    <div className="font-bold text-emerald-600">{dominantCurrency}{s.value.toFixed(0)}</div>
+                                    <div className="font-bold text-emerald-600">{s.value.toFixed(0)}</div>
                                     {hoveredIncome === s.name && (
                                         <div className={`absolute right-0 w-48 bg-slate-900 text-white rounded-xl p-3 shadow-2xl z-50 animate-fade-in ${idx < 2 ? 'top-full mt-2' : 'bottom-full mb-2'}`}>
                                             <div className="font-bold border-b border-slate-700 pb-1 mb-2 text-emerald-400 text-[11px] truncate">{s.name}</div>
@@ -206,7 +182,7 @@ export const AnalyticsReportsView = ({
                 {/* Income Table - Hidden in Yearly Avg */}
                 {selectedMonth !== 'average' && (
                     <div>
-                        <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><Briefcase className="w-4 h-4" /> {t('analytics.incomeDetails')} ({selectedMonth})</h3>
+                        <h3 className="font-bold text-emerald-800 mb-4 flex items-center gap-2 bg-emerald-50 px-4 py-3 rounded-xl border border-emerald-200"><Briefcase className="w-4 h-4" /> {t('analytics.incomeDetails')} ({selectedMonth})</h3>
                         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
                             <table className="w-full text-sm text-left">
                                 <thead className="bg-slate-50 text-slate-500 font-medium">
@@ -233,27 +209,48 @@ export const AnalyticsReportsView = ({
 
                 {selectedMonth !== 'average' && (
                     <div>
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="font-bold text-slate-700 flex items-center gap-2"><DollarSign className="w-4 h-4" /> {t('analytics.expenseHistory')}</h3>
-                            <div className="flex gap-2">
-                                {/* Bulk actions moved to floating bar */}
-
-                                <div className="relative">
-                                    <button onClick={() => setIsDeleteModalOpen(true)} className="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1 border border-red-200 px-3 py-2 rounded-lg hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /> {t('analytics.clearMonth')}</button>
-                                    {isDeleteModalOpen && (
-                                        <div className="absolute bottom-full ltr:right-0 rtl:left-0 mb-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200 p-4 z-10 animate-fade-in">
-                                            <div className="flex justify-between items-center mb-3"><h4 className="font-bold text-slate-800 text-sm">{t('analytics.clearMonthTitle', { month: selectedMonth })}</h4><button onClick={() => setIsDeleteModalOpen(false)}><X className="w-4 h-4" /></button></div>
-                                            <div className="space-y-2">
-                                                <button onClick={() => executeDeleteMonth('expenses')} className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-50 text-red-600 text-sm font-medium">{t('analytics.expensesOnly')}</button>
-                                                <button onClick={() => executeDeleteMonth('income')} className="w-full text-left px-3 py-2 rounded-lg hover:bg-blue-50 text-blue-600 text-sm font-medium">{t('analytics.incomeOnly')}</button>
-                                                <div className="h-px bg-slate-100 my-1"></div>
-                                                <button onClick={() => executeDeleteMonth('both')} className="w-full text-left px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-bold">{t('analytics.everything')}</button>
-                                            </div>
+                        <div className="flex justify-between items-center mb-4 bg-red-50 px-4 py-3 rounded-xl border border-red-200">
+                            <h3 className="font-bold text-red-800 flex items-center gap-2"><DollarSign className="w-4 h-4" /> {t('analytics.expenseHistory')}</h3>
+                            <div className="relative">
+                                <button onClick={() => setIsDeleteModalOpen(true)} className="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1 border border-red-200 px-3 py-2 rounded-lg hover:bg-red-50 transition-colors bg-white"><Trash2 className="w-4 h-4" /> {t('analytics.clearMonth')}</button>
+                                {isDeleteModalOpen && (
+                                    <div className="absolute bottom-full ltr:right-0 rtl:left-0 mb-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200 p-4 z-10 animate-fade-in">
+                                        <div className="flex justify-between items-center mb-3"><h4 className="font-bold text-slate-800 text-sm">{t('analytics.clearMonthTitle', { month: selectedMonth })}</h4><button onClick={() => setIsDeleteModalOpen(false)}><X className="w-4 h-4" /></button></div>
+                                        <div className="space-y-2">
+                                            <button onClick={() => executeDeleteMonth('expenses')} className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-50 text-red-600 text-sm font-medium">{t('analytics.expensesOnly')}</button>
+                                            <button onClick={() => executeDeleteMonth('income')} className="w-full text-left px-3 py-2 rounded-lg hover:bg-blue-50 text-blue-600 text-sm font-medium">{t('analytics.incomeOnly')}</button>
+                                            <div className="h-px bg-slate-100 my-1"></div>
+                                            <button onClick={() => executeDeleteMonth('both')} className="w-full text-left px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-bold">{t('analytics.everything')}</button>
                                         </div>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
+
+                        {/* Recurring vs One-Time Breakdown - Moved here */}
+                        {recurringTotal > 0 && (
+                            <div className="mb-4 flex gap-3">
+                                <div className="flex-1 bg-purple-50 border border-purple-200 rounded-xl p-3 flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <Repeat className="w-4 h-4 text-purple-600" />
+                                        <span className="text-xs font-bold text-purple-900">{t('analytics.recurring')}</span>
+                                    </div>
+                                    <span className="text-sm font-bold text-purple-600">
+                                        {dominantCurrency} {recurringTotal.toLocaleString()}
+                                    </span>
+                                </div>
+                                <div className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <DollarSign className="w-4 h-4 text-slate-600" />
+                                        <span className="text-xs font-bold text-slate-700">{t('analytics.oneTime')}</span>
+                                    </div>
+                                    <span className="text-sm font-bold text-slate-600">
+                                        {dominantCurrency} {oneTimeTotal.toLocaleString()}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
+
                         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
                             <table className="w-full text-sm text-left">
                                 <thead className="bg-slate-50 text-slate-500 font-medium">

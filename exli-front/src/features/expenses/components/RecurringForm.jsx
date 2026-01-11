@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, AlertCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { collection, addDoc, updateDoc, doc, serverTimestamp, setDoc } from 'firebase/firestore';
@@ -6,6 +6,7 @@ import { db } from '../../../config/firebase.js';
 import { Button, CategoryIcon } from '../../../components/UI.jsx';
 import { CategoryEditorModal } from '../../settings/components/CategoryEditorModal.jsx';
 import { ExpensePresetSelector } from './ExpensePresetSelector.jsx';
+import { CloseConfirmationModal } from '../../../components/CloseConfirmationModal.jsx';
 
 // Category translation mapping
 const categoryKeyMap = {
@@ -43,6 +44,35 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
     const [selectedDirection, setSelectedDirection] = useState(editData?.direction || '');
     const [customNameInput, setCustomNameInput] = useState(editData?.name || '');
     const [validationError, setValidationError] = useState('');
+
+    // Close confirmation state
+    const [showCloseConfirmation, setShowCloseConfirmation] = useState(false);
+    const initialFormDataRef = useRef(JSON.stringify({
+        name: editData?.name || '',
+        amount: editData?.amount || '',
+        category: editData?.category || '',
+        direction: editData?.direction || ''
+    }));
+
+    // Check if form has unsaved changes
+    const hasUnsavedChanges = () => {
+        const current = JSON.stringify({
+            name: formData.isCustomName ? customNameInput : formData.name,
+            amount: formData.amount,
+            category: formData.category,
+            direction: selectedDirection
+        });
+        return current !== initialFormDataRef.current;
+    };
+
+    // Handle close attempt (X button or backdrop click)
+    const handleCloseAttempt = () => {
+        if (hasUnsavedChanges()) {
+            setShowCloseConfirmation(true);
+        } else {
+            onCancel();
+        }
+    };
 
     const getCategoryName = (cat) => {
         const key = categoryKeyMap[cat.id];
@@ -409,13 +439,27 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
 
     return (
         <>
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Close Confirmation Modal */}
+            {showCloseConfirmation && (
+                <CloseConfirmationModal
+                    onContinue={() => setShowCloseConfirmation(false)}
+                    onDiscard={onCancel}
+                />
+            )}
+
+            <div
+                className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+                onClick={handleCloseAttempt}
+            >
+                <div
+                    className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+                    onClick={(e) => e.stopPropagation()}
+                >
                     <div className="sticky top-0 bg-white border-b border-slate-200 p-6 flex items-center justify-between z-10">
                         <h3 className="font-bold text-xl text-slate-800">
                             {editData ? t('expenses.recurringForm.editRecurring') : t('expenses.recurringForm.newRecurring')}
                         </h3>
-                        <button onClick={onCancel} className="text-slate-400 hover:text-slate-600 transition-colors">
+                        <button onClick={handleCloseAttempt} className="text-slate-400 hover:text-slate-600 transition-colors">
                             <X className="w-5 h-5" />
                         </button>
                     </div>
@@ -803,7 +847,7 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
                             <Button type="submit" disabled={isSaving} className="flex-1">
                                 {isSaving ? t('expenses.recurringForm.saving') : editData ? t('expenses.recurringForm.updateExpense') : t('expenses.recurringForm.saveRecurringExpense')}
                             </Button>
-                            <Button type="button" variant="secondary" onClick={onCancel}>
+                            <Button type="button" variant="secondary" onClick={handleCloseAttempt}>
                                 {t('common.cancel')}
                             </Button>
                         </div>

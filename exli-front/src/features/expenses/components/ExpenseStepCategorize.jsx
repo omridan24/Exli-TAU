@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { CreditCard, RotateCcw, ArrowUp, ArrowDown, Edit2, Check, Plus, XCircle, Trash2, X, Flag, AlertTriangle, Calendar, Type, Repeat, HelpCircle, FileWarning, ShieldAlert, Link } from 'lucide-react';
+import { CreditCard, RotateCcw, ArrowUp, ArrowDown, Edit2, Check, Plus, XCircle, Trash2, X, Flag, AlertTriangle, Calendar, Type, Repeat, HelpCircle, FileWarning, ShieldAlert, Link, ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button, CategoryIcon } from '../../../components/UI';
 
@@ -36,6 +36,7 @@ export const ExpenseStepCategorize = ({
     const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
     const [isSuspectModalOpen, setIsSuspectModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isRecurringListOpen, setIsRecurringListOpen] = useState(false);
 
     // Edit Modal State
     const [editForm, setEditForm] = useState({ description: '', amount: '', date: '' });
@@ -72,21 +73,71 @@ export const ExpenseStepCategorize = ({
     };
 
     // Check if current transaction matches a recurring expense
+    // IMPROVED: Uses confidence scoring and priority matching
     const matchingRecurring = useMemo(() => {
         if (!recurringExpenses || !currentTx) return null;
 
-        return recurringExpenses.find(rec => {
-            // Match by description pattern
-            const descMatch = currentTx.description
-                .toLowerCase()
-                .includes(rec.matchPattern?.toLowerCase() || '');
+        // Normalize function for comparison - preserves Hebrew characters
+        const normalize = (str) => str
+            .toLowerCase()
+            .replace(/[^a-z0-9א-ת\s]/gi, '')  // Keep letters, numbers, Hebrew, spaces
+            .replace(/\s+/g, ' ')
+            .trim();
 
-            // Match by amount (±5%)
-            const amountDiff = Math.abs(currentTx.amount - rec.amount);
-            const amountMatch = amountDiff / rec.amount < 0.05;
+        const normalizedDesc = normalize(currentTx.description);
 
-            return descMatch && amountMatch;
-        });
+        // Score each recurring expense
+        const matches = recurringExpenses
+            .map(rec => {
+                const pattern = normalize(rec.matchPattern || rec.name || '');
+
+                // Skip if pattern is empty or too short
+                if (!pattern || pattern.length < 2) return null;
+
+                // Check different match types
+                const isExactMatch = normalizedDesc === pattern;
+                const startsWithPattern = normalizedDesc.startsWith(pattern);
+                const containsPattern = normalizedDesc.includes(pattern);
+
+                // Require pattern to be at least 3 characters for contains match
+                // to avoid false positives from short patterns
+                const validContains = containsPattern && pattern.length >= 3;
+
+                if (!isExactMatch && !startsWithPattern && !validContains) {
+                    return null;
+                }
+
+                // Amount matching with variable tolerance
+                const amountDiff = Math.abs(currentTx.amount - rec.amount);
+                const amountRatio = rec.amount > 0 ? amountDiff / rec.amount : 1;
+
+                // Stricter for exact matches, looser for utility-type expenses (bills, rent)
+                const isUtilityCategory = ['bills', 'utilities', 'housing']
+                    .includes(rec.category?.toLowerCase());
+                const amountTolerance = isUtilityCategory ? 0.15 : 0.05;
+
+                if (amountRatio > amountTolerance) {
+                    return null;
+                }
+
+                // Calculate confidence score (0-100)
+                let confidence = 0;
+                if (isExactMatch) confidence = 100;
+                else if (startsWithPattern) confidence = 80;
+                else if (validContains) confidence = 60;
+
+                // Bonus for closer amount match
+                confidence += Math.round((1 - amountRatio) * 20);
+
+                return { recurring: rec, confidence };
+            })
+            .filter(Boolean)
+            .sort((a, b) => b.confidence - a.confidence);
+
+        // Return highest confidence match (if above threshold of 70)
+        return matches.length > 0 && matches[0].confidence >= 70
+            ? matches[0].recurring
+            : null;
     }, [currentTx, recurringExpenses]);
 
     if (isCreatingCat) {
@@ -178,6 +229,63 @@ export const ExpenseStepCategorize = ({
                 <div className="mt-6 flex justify-end gap-2">
                     <Button variant="secondary" onClick={() => setIsEditModalOpen(false)}>{t('common.cancel')}</Button>
                     <Button onClick={saveEdit}>{t('expenses.categorize.saveChanges')}</Button>
+                </div>
+            </div>
+        );
+    }
+
+    // Recurring Expense List Modal
+    if (isRecurringListOpen) {
+        return (
+            <div className="p-6 bg-white rounded-3xl shadow-xl border border-slate-200 animate-fade-in mb-8">
+                <div className="flex justify-between items-center mb-4">
+                    <h4 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                        <Repeat className="w-5 h-5 text-purple-600" />
+                        {t('expenses.recurring.linkTitle') || 'Link to Recurring Expense'}
+                    </h4>
+                    <button onClick={() => setIsRecurringListOpen(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-500">
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+                <p className="text-sm text-slate-600 mb-4">
+                    {t('expenses.recurring.linkDescription') || 'Select which recurring expense this transaction belongs to:'}
+                </p>
+                {recurringExpenses && recurringExpenses.length > 0 ? (
+                    <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                        {recurringExpenses.map(rec => (
+                            <button
+                                key={rec.id}
+                                onClick={() => {
+                                    onCategorize(rec.category, false, false, rec.id);
+                                    setIsRecurringListOpen(false);
+                                }}
+                                className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-slate-200 hover:border-purple-400 hover:bg-purple-50 transition-all text-start group"
+                            >
+                                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                                    <Repeat className="w-6 h-6 text-purple-600" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="font-bold text-slate-800 truncate">{rec.name}</div>
+                                    <div className="text-sm text-slate-500 flex items-center gap-2">
+                                        <span className="font-mono font-bold">{rec.amount} {rec.currency}</span>
+                                        <span className="text-slate-300">•</span>
+                                        <span className="text-xs uppercase">{rec.frequency?.type || 'monthly'}</span>
+                                    </div>
+                                </div>
+                                <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-purple-500 transition-colors" />
+                            </button>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-center py-8 text-slate-400">
+                        <Repeat className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                        <p>{t('expenses.recurring.noRecurring') || 'No recurring expenses set up yet'}</p>
+                    </div>
+                )}
+                <div className="mt-4 pt-4 border-t border-slate-100">
+                    <Button variant="secondary" onClick={() => setIsRecurringListOpen(false)} className="w-full">
+                        {t('common.cancel')}
+                    </Button>
                 </div>
             </div>
         );
@@ -276,6 +384,13 @@ export const ExpenseStepCategorize = ({
                         <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center"><Trash2 className="w-4 h-4" /></div> {t('expenses.categorize.skip')}
                     </button>
 
+                    {recurringExpenses && recurringExpenses.length > 0 && (
+                        <button onClick={() => setIsRecurringListOpen(true)} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-purple-50 text-slate-600 font-bold text-sm transition-colors text-start border border-transparent hover:border-purple-100 group">
+                            <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center group-hover:scale-110 transition-transform"><Repeat className="w-4 h-4" /></div>
+                            <span className="group-hover:text-purple-700">{t('expenses.recurring.linkToRecurring') || 'Link to Recurring'}</span>
+                        </button>
+                    )}
+
                     <div className="h-px bg-slate-100 my-2"></div>
 
                     <button onClick={() => setIsSuspectModalOpen(true)} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-500 font-bold text-sm transition-colors text-start border border-transparent hover:border-red-100 group">
@@ -287,3 +402,4 @@ export const ExpenseStepCategorize = ({
         </div>
     );
 };
+
