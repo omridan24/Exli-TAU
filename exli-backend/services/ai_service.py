@@ -1,17 +1,29 @@
 import json
-import google.generativeai as genai
+import warnings
+# Suppress Google deprecation warnings
+warnings.filterwarnings("ignore", category=FutureWarning, module="google.generativeai")
+warnings.filterwarnings("ignore", category=FutureWarning, module="google.api_core")
+from google import genai
+from google.genai import types
+
 from google.cloud import documentai
 from google.api_core.client_options import ClientOptions
 from config import Config, logger
 from traceloop.sdk.decorators import workflow, task
 
-# Configure Gemini once
+# Configure Gemini Client
+client = None
 if Config.GEMINI_API_KEY:
-    genai.configure(api_key=Config.GEMINI_API_KEY)
+    try:
+        client = genai.Client(api_key=Config.GEMINI_API_KEY)
+    except Exception as e:
+        logger.error(f"Failed to initialize Gemini Client: {e}")
 
 def get_model_by_tier(tier="flash"):
     try:
-        all_models = [m.name for m in genai.list_models()]
+        # Note: Client.models.list() returns an iterator of Model objects
+        if not client: return 'gemini-1.5-flash'
+        all_models = [m.name for m in client.models.list()]
         if tier == "pro":
             priorities = ['gemini-3.0-pro', 'gemini-2.0-pro', 'gemini-pro']
         else: 
@@ -112,12 +124,16 @@ def convert_pdf_to_data(file_bytes):
     """
 
     try:
-        model = genai.GenerativeModel(
-            model_name,
-            generation_config={"response_mime_type": "application/json", "temperature": 0.0}
-        )
+        if not client: return None
         
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model=model_name,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                temperature=0.0
+            )
+        )
         return json.loads(response.text)
         
     except Exception as e:
@@ -183,8 +199,15 @@ def analyze_multiple_files_structure(file_samples):
     """
 
     try:
-        model = genai.GenerativeModel(model_name, generation_config={"response_mime_type": "application/json"})
-        response = model.generate_content(prompt)
+        if not client: return {"results": []}
+        
+        response = client.models.generate_content(
+            model=model_name,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json"
+            )
+        )
         return json.loads(response.text)
     except Exception as e:
         logger.error(f"AI Batch Analysis Failed: {e}", exc_info=True)
@@ -195,9 +218,17 @@ def analyze_income_statement(file_bytes, mime_type):
     model_name = get_model_by_tier("pro")
     prompt = "Analyze this Payslip. Return JSON { \"bruto\": 0, \"neto\": 0, \"taxes\": 0, \"pension\": 0, \"other_deposits\": 0 }"
     try:
-        model = genai.GenerativeModel(model_name, generation_config={"response_mime_type": "application/json"})
-        file_part = {"mime_type": mime_type, "data": file_bytes}
-        response = model.generate_content([prompt, file_part])
+        if not client: return None
+        
+        file_part = types.Part.from_bytes(data=file_bytes, mime_type=mime_type)
+        
+        response = client.models.generate_content(
+            model=model_name,
+            contents=[prompt, file_part],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json"
+            )
+        )
         return json.loads(response.text)
     except Exception as e:
         logger.error(f"AI Income Analysis Failed: {e}", exc_info=True)
@@ -281,14 +312,17 @@ def extract_payslip_data(file_bytes, mime_type="application/pdf"):
     """
 
     try:
-        model = genai.GenerativeModel(
-            model_name,
-            generation_config={"response_mime_type": "application/json", "temperature": 0.0}
+        if not client: return None
+
+        response = client.models.generate_content(
+            model=model_name,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                temperature=0.0
+            )
         )
-        
-        response = model.generate_content(prompt)
        
-        
         return json.loads(response.text)
         
     except Exception as e:

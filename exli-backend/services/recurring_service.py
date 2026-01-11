@@ -1,7 +1,7 @@
 import json
-import google.generativeai as genai
+from google.genai import types
 from config import Config, logger
-from .ai_service import get_model_by_tier
+from .ai_service import get_model_by_tier, client
 
 def analyze_recurring_with_ai(expenses_list):
     """
@@ -14,8 +14,8 @@ def analyze_recurring_with_ai(expenses_list):
     Returns:
         List of suggested recurring expenses
     """
-    if not Config.GEMINI_API_KEY:
-        logger.warning("No Gemini API key - skipping recurring analysis")
+    if not Config.GEMINI_API_KEY or not client:
+        logger.warning("No Gemini API key or Client - skipping recurring analysis")
         return []
     
     if len(expenses_list) < 10:
@@ -73,9 +73,13 @@ CRITICAL RULES:
         model_name = get_model_by_tier("flash")  # Flash is good for this
         logger.info(f"Using model {model_name} for recurring analysis")
         
-        model = genai.GenerativeModel(model_name, 
-            generation_config={"response_mime_type": "application/json"})
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model=model_name,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json"
+            )
+        )
         suggestions = json.loads(response.text)
         
         # Validate suggestions - only accept high confidence

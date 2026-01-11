@@ -114,6 +114,7 @@ export const IncomeNode = ({ userId, onComplete }) => {
 
         const formData = new FormData();
         formData.append('file', f);
+        formData.append('userId', userId);
 
         try {
             if (!CLOUD_RUN_URL || CLOUD_RUN_URL.includes("YOUR_CLOUD_RUN")) {

@@ -5,6 +5,10 @@ import os
 from services.data_service import process_uploaded_files
 from services.ai_service import analyze_income_statement, extract_payslip_data
 from services.stock_service import search_symbol, get_stock_details
+from services.quota_service import check_and_increment_quota
+from utils.security import validate_file_safety
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from traceloop.sdk import Traceloop
 
 # --- TRACELOOP INIT ---
@@ -24,6 +28,14 @@ print("--- EXLI BACKEND v12.0 (MULTI-FILE) ---", flush=True)
 
 app = Flask(__name__)
 CORS(app)
+
+# --- Rate Limit Init ---
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=[Config.RATE_LIMIT_GLOBAL],
+    storage_uri="memory://",
+)
 
 # Constants
 MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB (Document AI limit)
@@ -56,6 +68,7 @@ def health_check():
 
 # --- Expense Processing ---
 @app.route('/analyze-file', methods=['POST'])
+@limiter.limit(Config.RATE_LIMIT_AI)
 def analyze_file():
     # Check for multiple files (the key is usually 'files')
     # If the frontend sends 'file', we handle that too for backward compat,
@@ -68,6 +81,7 @@ def analyze_file():
         uploaded_files = [request.files['file']]
 
     if not uploaded_files or uploaded_files[0].filename == '':
+        logger.warning("Analyze file: No files uploaded")
         return jsonify({"error": "No files uploaded"}), 400
     
     # Validate file sizes BEFORE processing
@@ -76,6 +90,19 @@ def analyze_file():
     except ValueError as e:
         logger.warning(f"File size validation failed: {e}")
         return jsonify({"error": str(e)}), 413  # 413 Payload Too Large
+
+    # --- Security & Quota Checks ---
+    user_id = request.form.get('userId')
+    if not user_id:
+        logger.warning("Analyze file: Missing userId")
+        return jsonify({"error": "Missing userId"}), 400
+
+    # 1. Check Quota
+    check_and_increment_quota(user_id)
+
+    # 2. Check Security (Magic Numbers)
+    for f in uploaded_files:
+        validate_file_safety(f)
 
     # Process all files synchronously
     result = process_uploaded_files(uploaded_files)
@@ -87,20 +114,27 @@ def analyze_file():
 
 # --- Income Processing ---
 @app.route('/analyze-income', methods=['POST'])
+@limiter.limit(Config.RATE_LIMIT_AI)
 def analyze_income():
     if 'file' not in request.files:
+        logger.warning("Analyze income: No 'file' key in request.files")
         return jsonify({"error": "No file part"}), 400
     
     file = request.files['file']
     if file.filename == '':
+        logger.warning("Analyze income: filename is empty")
         return jsonify({"error": "No selected file"}), 400
     
-    # Validate file size BEFORE processing
-    try:
-        validate_uploaded_files([file])
-    except ValueError as e:
-        logger.warning(f"Income file size validation failed: {e}")
-        return jsonify({"error": str(e)}), 413
+
+
+    # --- Security & Quota Checks ---
+    user_id = request.form.get('userId')
+    if not user_id:
+        logger.warning("Analyze income: Missing userId")
+        return jsonify({"error": "Missing userId"}), 400
+
+    check_and_increment_quota(user_id)
+    validate_file_safety(file)
 
     mime_type = file.content_type
     allowed_types = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
@@ -110,6 +144,7 @@ def analyze_income():
         elif file.filename.lower().endswith(('.jpg', '.jpeg')): mime_type = 'image/jpeg'
         elif file.filename.lower().endswith('.png'): mime_type = 'image/png'
         else:
+            logger.warning(f"Analyze income: Unsupported file type: {file.filename}")
             return jsonify({"error": "Unsupported file type."}), 400
 
     try:
@@ -124,20 +159,27 @@ def analyze_income():
         return jsonify({"error": str(e)}), 500
 
 @app.route('/analyze-payslip', methods=['POST'])
+@limiter.limit(Config.RATE_LIMIT_AI)
 def analyze_payslip():
     if 'file' not in request.files:
+        logger.warning("Analyze payslip: No 'file' key in request.files")
         return jsonify({"error": "No file part"}), 400
     
     file = request.files['file']
     if file.filename == '':
+        logger.warning("Analyze payslip: filename is empty")
         return jsonify({"error": "No selected file"}), 400
     
-    # Validate file size BEFORE processing
-    try:
-        validate_uploaded_files([file])
-    except ValueError as e:
-        logger.warning(f"Payslip file size validation failed: {e}")
-        return jsonify({"error": str(e)}), 413
+
+
+    # --- Security & Quota Checks ---
+    user_id = request.form.get('userId')
+    if not user_id:
+        logger.warning("Analyze payslip: Missing userId")
+        return jsonify({"error": "Missing userId"}), 400
+
+    check_and_increment_quota(user_id)
+    validate_file_safety(file)
 
     mime_type = file.content_type
     allowed_types = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
@@ -147,6 +189,7 @@ def analyze_payslip():
         elif file.filename.lower().endswith(('.jpg', '.jpeg')): mime_type = 'image/jpeg'
         elif file.filename.lower().endswith('.png'): mime_type = 'image/png'
         else:
+            logger.warning(f"Analyze payslip: Unsupported file type: {file.filename}")
             return jsonify({"error": "Unsupported file type."}), 400
 
     try:
@@ -222,6 +265,17 @@ def analyze_recurring():
     except Exception as e:
         logger.error(f"Recurring analysis failed: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
+
+
+@app.route('/system/reset-quotas', methods=['POST'])
+def reset_quotas():
+    auth_header = request.headers.get("X-System-Key")
+    if not auth_header or auth_header != Config.SYSTEM_API_KEY:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    # Since quotas are stored by month-key (e.g. 2024-05), they auto-reset each month.
+    # This endpoint can be used for monitoring or explicit cleanups if needed.
+    return jsonify({"status": "success", "message": "Quotas reuse monthly keys. No manual reset needed."})
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))

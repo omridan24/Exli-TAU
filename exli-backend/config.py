@@ -16,6 +16,19 @@ class Config:
     GCP_PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
     GCP_LOCATION = os.environ.get("GCP_LOCATION", "eu") # 'us' or 'eu'
     DOCAI_PROCESSOR_ID = os.environ.get("DOCAI_PROCESSOR_ID")
+
+    # Security & Quota Configs
+    QUOTA_FREE_TIER_MONTHLY = 20
+    QUOTA_PRO_TIER_MONTHLY = 100
+    RATE_LIMIT_GLOBAL = "1000 per day"
+    RATE_LIMIT_AI = "20 per minute"
+    
+    SYSTEM_API_KEY = os.environ.get("SYSTEM_API_KEY")
+    
+    QUOTA_EXCEEDED_MESSAGE = (
+        "You've reached your free limit for this month! We love that you're using Exli. "
+        "To continue analyzing more files and unlock premium features, please consider upgrading to Pro."
+    )
     
     @staticmethod
     def validate():

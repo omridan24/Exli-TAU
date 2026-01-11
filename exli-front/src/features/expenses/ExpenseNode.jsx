@@ -220,6 +220,7 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
 
     const formData = new FormData();
     files.forEach(f => formData.append('files', f));
+    formData.append('userId', userId);
 
     try {
       if (!CLOUD_RUN_URL || CLOUD_RUN_URL.includes("YOUR_CLOUD_RUN")) throw new Error("Backend URL not configured.");
