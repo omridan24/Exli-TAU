@@ -4,7 +4,7 @@ import { DollarSign } from 'lucide-react';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip
 } from 'recharts';
-import { Card } from '../../../components/UI';
+import { Card, CategoryIcon } from '../../../components/UI';
 import { DEFAULT_CATEGORIES } from '../../../config/constants';
 
 export const AnalyticsTrendsView = ({
@@ -39,23 +39,44 @@ export const AnalyticsTrendsView = ({
                 <button onClick={() => setTrendType('income')} className={`px-6 py-2 rounded-lg font-bold text-sm transition-all ${trendType === 'income' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500'}`}>{t('analytics.incomeTrends')}</button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div className="flex flex-col gap-6 mb-6">
                 <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">{t('analytics.filterCategoryMetric')}</label>
-                    <div className="flex flex-wrap gap-2">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">{t('analytics.filterCategoryMetric')}</label>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
                         {trendType === 'expense' ? categories.map(c => (
-                            <button key={c.id} onClick={() => setSelectedCategory(c.name)} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${selectedCategory === c.name ? 'border-blue-500 bg-blue-50 text-blue-700' : 'bg-white border-slate-200 text-slate-500'}`}>{getCategoryName(c.name)}</button>
+                            <button 
+                                key={c.id} 
+                                onClick={() => setSelectedCategory(c.name)} 
+                                className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-2 ${selectedCategory === c.name ? 'border-blue-500 bg-blue-50 shadow-md' : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50/50 bg-white'}`}
+                            >
+                                <CategoryIcon iconName={c.icon} color={c.color} className="w-6 h-6 flex-shrink-0" />
+                                <span className="text-xs font-bold text-slate-700 text-center line-clamp-2">{getCategoryName(c.name)}</span>
+                            </button>
                         )) : ['neto', 'bruto', 'taxes'].map(type => (
-                            <button key={type} onClick={() => setSelectedIncomeType(type)} className={`px-3 py-1.5 rounded-lg text-xs font-bold border uppercase transition-all ${selectedIncomeType === type ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'bg-white border-slate-200 text-slate-500'}`}>{type === 'taxes' ? t('analytics.tax') : t(type, { defaultValue: type })}</button>
+                            <button 
+                                key={type} 
+                                onClick={() => setSelectedIncomeType(type)} 
+                                className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-2 ${selectedIncomeType === type ? 'border-emerald-500 bg-emerald-50 shadow-md' : 'border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50 bg-white'}`}
+                            >
+                                <DollarSign className={`w-6 h-6 flex-shrink-0 ${selectedIncomeType === type ? 'text-emerald-600' : 'text-emerald-500'}`} />
+                                <span className="text-xs font-bold text-slate-700 uppercase text-center line-clamp-2">{type === 'taxes' ? t('analytics.tax') : t(type, { defaultValue: type })}</span>
+                            </button>
                         ))}
                     </div>
                 </div>
                 {trendType === 'income' && jobOptions.length > 2 && (
                     <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">{t('analytics.filterJob')}</label>
-                        <div className="flex flex-wrap gap-2">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">{t('analytics.filterJob')}</label>
+                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
                             {jobOptions.map(job => (
-                                <button key={job} onClick={() => setSelectedJobFilter(job)} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${selectedJobFilter === job ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'bg-white border-slate-200 text-slate-500'}`}>{job === 'ALL_JOBS' ? t('analytics.allJobs') : t(job, { defaultValue: job })}</button>
+                                <button 
+                                    key={job} 
+                                    onClick={() => setSelectedJobFilter(job)} 
+                                    className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-2 ${selectedJobFilter === job ? 'border-emerald-500 bg-emerald-50 shadow-md' : 'border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50 bg-white'}`}
+                                >
+                                    <CategoryIcon iconName="Briefcase" color="#10b981" className="w-6 h-6 flex-shrink-0" />
+                                    <span className="text-xs font-bold text-slate-700 text-center line-clamp-2">{job === 'ALL_JOBS' ? t('analytics.allJobs') : t(job, { defaultValue: job })}</span>
+                                </button>
                             ))}
                         </div>
                     </div>
