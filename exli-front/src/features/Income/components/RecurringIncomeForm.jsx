@@ -722,7 +722,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                             <Repeat className="w-5 h-5 text-teal-600" />
                             {editData ? t('income.recurringForm.editRecurring') : t('income.recurringForm.newRecurring')}
                         </h3>
-                        <button onClick={handleCloseAttempt} className="text-slate-400 hover:text-slate-600 transition-colors">
+                        <button type="button" onClick={handleCloseAttempt} className="text-slate-400 hover:text-slate-600 transition-colors">
                             <X className="w-5 h-5" />
                         </button>
                     </div>
@@ -818,6 +818,30 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                                 <span className="text-orange-700">{t('income.recurringForm.taxCreditPoints')}</span>
                                                 <span className="font-mono font-bold text-orange-900">{taxCreditPoints}</span>
                                             </div>
+                                            {taxBracketInfo?.creditValue > 0 && (
+                                                <div className="text-[10px] text-orange-600/80 -mt-2 leading-tight">
+                                                    {t('income.recurringForm.taxSavedByCredits', {
+                                                        defaultValue: '{{points}} tax credits saves you {{amount}} {{currency}} in taxes a month',
+                                                        points: taxCreditPoints,
+                                                        amount: Math.round(Math.min(taxBracketInfo.annualTaxBeforeCredits, taxBracketInfo.creditValue) / 12).toLocaleString(),
+                                                        currency: formData.currency
+                                                    })}
+                                                </div>
+                                            )}
+                                            {extractedData && (
+                                                <MismatchAlert
+                                                    label={t('income.recurringForm.taxCreditPoints')}
+                                                    actual={extractedData.credit_points ?? 0}
+                                                    expected={taxCreditPoints}
+                                                    currency="pts"
+                                                    fieldKey="credit_points"
+                                                    onResolve={(key, val) => {
+                                                        setTaxCreditPoints(val);
+                                                    }}
+                                                    resolvedValue={undefined}
+                                                    theme="red"
+                                                />
+                                            )}
 
                                             <div className="flex justify-between items-center text-sm">
                                                 <span className="text-orange-700">{t('income.recurringForm.monthlyGross')}</span>
@@ -844,23 +868,58 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                                     {manualOverrides.tax_income !== undefined && <span className="text-[10px] text-amber-600 ml-1">{t('income.recurringForm.edited')}</span>}
                                                 </span>
                                             </div>
+                                            {extractedData && (
+                                                <MismatchAlert
+                                                    label={t('income.recurringForm.incomeTax')}
+                                                    actual={extractedData.tax_income ?? 0}
+                                                    expected={calculatedTax}
+                                                    currency={formData.currency}
+                                                    fieldKey="tax_income"
+                                                    onResolve={handleMismatchResolution}
+                                                    resolvedValue={manualOverrides.tax_income}
+                                                    theme="red"
+                                                />
+                                            )}
 
                                             {/* Additional Taxes */}
-                                            {additionalTaxes.breakdown.map((tax, idx) => (
-                                                <div key={idx} className="flex justify-between items-center text-sm">
-                                                    <span className="text-orange-700">
-                                                        {tax.name.includes('Health') ? t('income.recurringForm.healthTax') :
-                                                            tax.name.includes('National') ? t('income.recurringForm.nationalInsurance') :
-                                                                tax.name}:
-                                                    </span>
-                                                    <span className="font-mono text-orange-800">
-                                                        {tax.amount.toLocaleString()} {formData.currency}
-                                                        <span className="text-xs text-orange-600 ml-2">
-                                                            ({(tax.rate * 100).toFixed(1)}%)
-                                                        </span>
-                                                    </span>
-                                                </div>
-                                            ))}
+                                            {additionalTaxes.breakdown.map((tax, idx) => {
+                                                const isHealth = tax.name.includes('Health');
+                                                const isNational = tax.name.includes('National');
+                                                const expectedValue = tax.amount;
+                                                const actualValue = isHealth ? extractedData?.tax_health : isNational ? extractedData?.tax_national : undefined;
+                                                const fieldKey = isHealth ? 'tax_health' : isNational ? 'tax_national' : '';
+                                                const resolvedVal = isHealth ? manualOverrides.tax_health : isNational ? manualOverrides.tax_national : undefined;
+                                                
+                                                return (
+                                                    <React.Fragment key={idx}>
+                                                        <div className="flex justify-between items-center text-sm">
+                                                            <span className="text-orange-700">
+                                                                {isHealth ? t('income.recurringForm.healthTax') :
+                                                                    isNational ? t('income.recurringForm.nationalInsurance') :
+                                                                        tax.name}:
+                                                            </span>
+                                                            <span className="font-mono text-orange-800">
+                                                                {tax.amount.toLocaleString()} {formData.currency}
+                                                                <span className="text-xs text-orange-600 ml-2">
+                                                                    ({(tax.rate * 100).toFixed(1)}%)
+                                                                </span>
+                                                            </span>
+                                                        </div>
+                                                        {extractedData && fieldKey && actualValue !== undefined && (
+                                                            <MismatchAlert
+                                                                label={isHealth ? t('income.recurringForm.healthTax') : t('income.recurringForm.nationalInsurance')}
+                                                                actual={actualValue ?? 0}
+                                                                expected={expectedValue || 0}
+                                                                currency={formData.currency}
+                                                                fieldKey={fieldKey}
+                                                                onResolve={handleMismatchResolution}
+                                                                resolvedValue={resolvedVal}
+                                                                theme="red"
+                                                            />
+                                                        )}
+                                                    </React.Fragment>
+                                                );
+                                            })}
 
                                             {/* Total Monthly Taxes */}
                                             <div className="mt-4 pt-4 border-t-2 border-orange-300">
@@ -878,55 +937,6 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                                 </div>
                                             </div>
                                         </div>
-
-                                        {/* Mismatch Alerts for Taxes */}
-                                        {extractedData && (
-                                            <div className="mt-4 space-y-2">
-                                                {/* Credit Points Mismatch */}
-                                                <MismatchAlert
-                                                    label={t('income.recurringForm.taxCreditPoints')}
-                                                    actual={extractedData.credit_points ?? 0}
-                                                    expected={taxCreditPoints}
-                                                    currency="pts"
-                                                    fieldKey="credit_points"
-                                                    onResolve={(key, val) => {
-                                                        // For credit points, we typically update the user settings or a local override
-                                                        // Since we don't have a direct form field for this in the same way, 
-                                                        // we might just want to update the local state to recalculate.
-                                                        setTaxCreditPoints(val);
-                                                        // Trigger recalculation if needed
-                                                    }}
-                                                    resolvedValue={undefined} // We don't store manual override for points in the same map yet
-                                                />
-                                                <MismatchAlert
-                                                    label={t('income.recurringForm.incomeTax')}
-                                                    actual={extractedData.tax_income ?? 0}
-                                                    expected={calculatedTax}
-                                                    currency={formData.currency}
-                                                    fieldKey="tax_income"
-                                                    onResolve={handleMismatchResolution}
-                                                    resolvedValue={manualOverrides.tax_income}
-                                                />
-                                                <MismatchAlert
-                                                    label={t('income.recurringForm.healthTax')}
-                                                    actual={extractedData.tax_health ?? 0}
-                                                    expected={additionalTaxes.breakdown.find(t => t.name.includes('Health'))?.amount || 0}
-                                                    currency={formData.currency}
-                                                    fieldKey="tax_health"
-                                                    onResolve={handleMismatchResolution}
-                                                    resolvedValue={manualOverrides.tax_health}
-                                                />
-                                                <MismatchAlert
-                                                    label={t('income.recurringForm.nationalInsurance')}
-                                                    actual={extractedData.tax_national ?? 0}
-                                                    expected={additionalTaxes.breakdown.find(t => t.name.includes('National'))?.amount || 0}
-                                                    currency={formData.currency}
-                                                    fieldKey="tax_national"
-                                                    onResolve={handleMismatchResolution}
-                                                    resolvedValue={manualOverrides.tax_national}
-                                                />
-                                            </div>
-                                        )}
 
 
                                     </>
@@ -975,6 +985,20 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                         customList={customEmployeePcts}
                                         setCustomList={setCustomEmployeePcts}
                                     />
+                                    {extractedData && extractedData.pension_employee !== undefined && (
+                                        <div className="mt-2 mb-2">
+                                            <MismatchAlert
+                                                label={t('income.recurringForm.employeeContribution')}
+                                                actual={extractedData.pension_employee}
+                                                expected={Math.round(parseFloat(formData.grossAmount || 0) * (formData.employeePct / 100))}
+                                                currency={formData.currency}
+                                                fieldKey="pension_employee"
+                                                onResolve={handleMismatchResolution}
+                                                resolvedValue={manualOverrides.pension_employee}
+                                                theme="red"
+                                            />
+                                        </div>
+                                    )}
 
                                     <PercentageRow
                                         label={t('income.recurringForm.employerContribution')}
@@ -986,6 +1010,20 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                         customList={customEmployerPcts}
                                         setCustomList={setCustomEmployerPcts}
                                     />
+                                    {extractedData && extractedData.pension_employer !== undefined && (
+                                        <div className="mt-2 mb-2">
+                                            <MismatchAlert
+                                                label={t('income.recurringForm.employerContribution')}
+                                                actual={extractedData.pension_employer}
+                                                expected={Math.round(parseFloat(formData.grossAmount || 0) * (formData.employerPct / 100))}
+                                                currency={formData.currency}
+                                                fieldKey="pension_employer"
+                                                onResolve={handleMismatchResolution}
+                                                resolvedValue={manualOverrides.pension_employer}
+                                                theme="red"
+                                            />
+                                        </div>
+                                    )}
 
                                     <PercentageRow
                                         label={t('income.recurringForm.severanceEmployerPays')}
@@ -997,6 +1035,20 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                         customList={customSeverancePcts}
                                         setCustomList={setCustomSeverancePcts}
                                     />
+                                    {extractedData && extractedData.pension_severance !== undefined && (
+                                        <div className="mt-2 mb-2">
+                                            <MismatchAlert
+                                                label={t('income.recurringForm.severanceEmployerPays')}
+                                                actual={extractedData.pension_severance}
+                                                expected={Math.round(parseFloat(formData.grossAmount || 0) * (formData.severancePct / 100))}
+                                                currency={formData.currency}
+                                                fieldKey="pension_severance"
+                                                onResolve={handleMismatchResolution}
+                                                resolvedValue={manualOverrides.pension_severance}
+                                                theme="red"
+                                            />
+                                        </div>
+                                    )}
 
                                     <div className="mt-4 pt-4 border-t border-purple-200">
                                         <div className="flex justify-between items-center">
@@ -1014,21 +1066,6 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                             })}
                                         </div>
                                     </div>
-
-                                    {/* Mismatch Alert for Pension */}
-                                    {extractedData && (
-                                        <div className="mt-4">
-                                            <MismatchAlert
-                                                label={t('income.recurringForm.pensionLabel')}
-                                                actual={extractedData.pension_employee}
-                                                expected={Math.round(parseFloat(formData.grossAmount || 0) * (formData.employeePct / 100))}
-                                                currency={formData.currency}
-                                                fieldKey="pension_employee"
-                                                onResolve={handleMismatchResolution}
-                                                resolvedValue={manualOverrides.pension_employee}
-                                            />
-                                        </div>
-                                    )}
                                 </>
                             ) : (
                                 <div className="text-center py-6 text-slate-500">
@@ -1068,6 +1105,21 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                         customList={customOtherEmployeePcts}
                                         setCustomList={setCustomOtherEmployeePcts}
                                     />
+                                    {extractedData && extractedData.keren_hishtalmut_employee !== undefined && (
+                                        <div className="mt-2 mb-2">
+                                            <MismatchAlert
+                                                label={t('income.recurringForm.employeeContribution')}
+                                                actual={extractedData.keren_hishtalmut_employee}
+                                                expected={Math.round(parseFloat(formData.grossAmount || 0) * (otherDepositEmployeePct / 100))}
+                                                currency={formData.currency}
+                                                fieldKey="keren_hishtalmut_employee"
+                                                onResolve={handleMismatchResolution}
+                                                resolvedValue={manualOverrides.keren_hishtalmut_employee}
+                                                theme="red"
+                                            />
+                                        </div>
+                                    )}
+
                                     <PercentageRow
                                         label={t('income.recurringForm.employerContribution')}
                                         value={otherDepositEmployerPct}
@@ -1078,6 +1130,21 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                         customList={customOtherEmployerPcts}
                                         setCustomList={setCustomOtherEmployerPcts}
                                     />
+                                    {extractedData && extractedData.keren_hishtalmut_employer !== undefined && (
+                                        <div className="mt-2 mb-2">
+                                            <MismatchAlert
+                                                label={t('income.recurringForm.employerContribution')}
+                                                actual={extractedData.keren_hishtalmut_employer}
+                                                expected={Math.round(parseFloat(formData.grossAmount || 0) * (otherDepositEmployerPct / 100))}
+                                                currency={formData.currency}
+                                                fieldKey="keren_hishtalmut_employer"
+                                                onResolve={handleMismatchResolution}
+                                                resolvedValue={manualOverrides.keren_hishtalmut_employer}
+                                                theme="red"
+                                            />
+                                        </div>
+                                    )}
+
                                     <div className="mt-2 text-xs text-emerald-600 font-bold border-t border-emerald-200 pt-2 text-right">
                                         {t('income.recurringForm.totalOtherDeposit')} {Math.round(parseFloat(formData.grossAmount || 0) * ((otherDepositEmployeePct + otherDepositEmployerPct) / 100)).toLocaleString()} {formData.currency}
                                     </div>

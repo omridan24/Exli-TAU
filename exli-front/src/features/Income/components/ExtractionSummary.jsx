@@ -26,6 +26,7 @@ export const ExtractionSummary = ({ extractedData }) => {
     return (
         <div className="mb-6 border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
             <button
+                type="button"
                 onClick={() => setIsOpen(!isOpen)}
                 className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
             >

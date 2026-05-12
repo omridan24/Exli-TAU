@@ -1,6 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { AlertTriangle, Info, CheckCircle, Edit2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+
+const themes = {
+    amber: {
+        bg: 'bg-amber-50',
+        border: 'border-amber-200',
+        icon: 'text-amber-600',
+        titleText: 'text-amber-900',
+        infoText: 'text-amber-700/70',
+        customLabel: 'text-amber-600',
+        customHover: 'group-hover:text-amber-600'
+    },
+    red: {
+        bg: 'bg-red-50',
+        border: 'border-red-200',
+        icon: 'text-red-600',
+        titleText: 'text-red-900',
+        infoText: 'text-red-700/70',
+        customLabel: 'text-red-600',
+        customHover: 'group-hover:text-red-600'
+    }
+};
 
 export const MismatchAlert = ({
     actual,
@@ -9,7 +30,8 @@ export const MismatchAlert = ({
     currency = 'ILS',
     fieldKey,
     onResolve,
-    resolvedValue
+    resolvedValue,
+    theme = 'amber'
 }) => {
     const { t } = useTranslation();
     const [customMode, setCustomMode] = useState(false);
@@ -46,15 +68,17 @@ export const MismatchAlert = ({
         }
     };
 
+    const tStyles = themes[theme] || themes.amber;
+
     return (
-        <div className="flex flex-col p-4 rounded-xl border border-amber-200 bg-amber-50 animate-fade-in mb-4">
+        <div className={`flex flex-col p-4 rounded-xl border ${tStyles.border} ${tStyles.bg} animate-fade-in mb-4`}>
             <div className="flex items-center gap-2 mb-3">
                 {activeSource ? (
                     <CheckCircle className="w-5 h-5 text-emerald-600" />
                 ) : (
-                    <AlertTriangle className="w-5 h-5 text-amber-600" />
+                    <AlertTriangle className={`w-5 h-5 ${tStyles.icon}`} />
                 )}
-                <div className={`font-bold text-sm ${activeSource ? 'text-emerald-800' : 'text-amber-900'}`}>
+                <div className={`font-bold text-sm ${activeSource ? 'text-emerald-800' : tStyles.titleText}`}>
                     {label} {t('income.mismatch.title')} {activeSource && t('income.mismatch.resolved')}
                 </div>
             </div>
@@ -117,7 +141,7 @@ export const MismatchAlert = ({
                         : 'bg-white/60 border-dashed border-slate-300 hover:border-slate-400 hover:bg-white'
                         }`}
                 >
-                    <div className="text-xs uppercase font-extrabold text-amber-600 mb-1">{t('income.mismatch.customValue')}</div>
+                    <div className={`text-xs uppercase font-extrabold ${tStyles.customLabel} mb-1`}>{t('income.mismatch.customValue')}</div>
 
                     {customMode || activeSource === 'custom' ? (
                         <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
@@ -142,7 +166,7 @@ export const MismatchAlert = ({
                             )}
                         </div>
                     ) : (
-                        <div className="flex items-center gap-2 text-slate-400 group-hover:text-amber-600 transition-colors">
+                        <div className={`flex items-center gap-2 text-slate-400 ${tStyles.customHover} transition-colors`}>
                             <Edit2 className="w-4 h-4" />
                             <span className="text-sm font-bold">{t('income.mismatch.setCustom')}</span>
                         </div>
@@ -157,7 +181,7 @@ export const MismatchAlert = ({
             </div>
 
             {!activeSource && (
-                <div className="text-amber-700/70 mt-3 text-[10px] font-medium flex items-center gap-1.5 ml-1">
+                <div className={`${tStyles.infoText} mt-3 text-[10px] font-medium flex items-center gap-1.5 ml-1`}>
                     <Info className="w-3 h-3" />
                     {t('income.mismatch.selectValueNote')}
                 </div>

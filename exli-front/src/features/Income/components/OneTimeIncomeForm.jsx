@@ -462,7 +462,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                         <h3 className="font-bold text-xl text-slate-800 flex items-center gap-2">
                             {t('income.oneTimeForm.title')} - {reportMonth}
                         </h3>
-                        <button onClick={handleCloseAttempt} className="text-slate-400 hover:text-slate-600 transition-colors">
+                        <button type="button" onClick={handleCloseAttempt} className="text-slate-400 hover:text-slate-600 transition-colors">
                             <X className="w-6 h-6" />
                         </button>
                     </div>
@@ -565,6 +565,31 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                                         <span className="text-blue-700">{t('income.oneTimeForm.taxCreditPoints')}</span>
                                                         <span className="font-mono font-bold text-blue-900">{taxCreditPoints}</span>
                                                     </div>
+                                                    {taxBracketInfo?.creditValue > 0 && (
+                                                        <div className="text-[10px] text-blue-600/80 -mt-2 leading-tight">
+                                                            {t('income.oneTimeForm.taxSavedByCredits', {
+                                                                defaultValue: '{{points}} tax credits saves you {{amount}} {{currency}} in taxes a month',
+                                                                points: taxCreditPoints,
+                                                                amount: Math.round(Math.min(taxBracketInfo.annualTaxBeforeCredits, taxBracketInfo.creditValue) / 12).toLocaleString(),
+                                                                currency: formData.currency
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                    {extractedData && (
+                                                        <MismatchAlert
+                                                            label={t('income.oneTimeForm.taxCreditPoints')}
+                                                            actual={extractedData.credit_points ?? 0}
+                                                            expected={defaultCreditPoints}
+                                                            currency="pts"
+                                                            fieldKey="credit_points"
+                                                            onResolve={(key, val) => {
+                                                                setManualOverrides(prev => ({ ...prev, [key]: val }));
+                                                                setTaxCreditPoints(val);
+                                                            }}
+                                                            resolvedValue={manualOverrides.credit_points}
+                                                            theme="red"
+                                                        />
+                                                    )}
 
                                                     <div className="flex justify-between items-center text-sm">
                                                         <span className="text-blue-700">{t('income.oneTimeForm.monthlyGross')}</span>
@@ -582,28 +607,66 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                                 </div>
 
                                                 <div className="mt-4 space-y-2 text-sm border-t border-blue-200 pt-3">
-                                                    <div className="flex justify-between">
-                                                        <span className="text-blue-700">{t('income.oneTimeForm.incomeTax')}</span>
-                                                        <span className="font-mono font-bold">
-                                                            {(manualOverrides.tax_income !== undefined ? manualOverrides.tax_income : calculatedTax).toLocaleString()} {formData.currency}
-                                                            {manualOverrides.tax_income !== undefined && <span className="text-[10px] text-amber-600 ml-1">{t('income.oneTimeForm.edited')}</span>}
-                                                        </span>
-                                                    </div>
-                                                    {additionalTaxes.breakdown && additionalTaxes.breakdown.map((tax, idx) => (
-                                                        <div key={idx} className="flex justify-between">
-                                                            <span className="text-blue-700">
-                                                                {tax.name.includes('Health') ? t('income.oneTimeForm.healthTax') :
-                                                                    tax.name.includes('National') ? t('income.oneTimeForm.nationalInsurance') :
-                                                                        tax.name}:
-                                                            </span>
+                                                    <div className="flex flex-col gap-2">
+                                                        <div className="flex justify-between">
+                                                            <span className="text-blue-700">{t('income.oneTimeForm.incomeTax')}</span>
                                                             <span className="font-mono font-bold">
-                                                                {(tax.amount || 0).toLocaleString()} {formData.currency}
-                                                                <span className="text-xs text-blue-600 ml-2">
-                                                                    ({(tax.rate * 100).toFixed(1)}%)
-                                                                </span>
+                                                                {(manualOverrides.tax_income !== undefined ? manualOverrides.tax_income : calculatedTax).toLocaleString()} {formData.currency}
+                                                                {manualOverrides.tax_income !== undefined && <span className="text-[10px] text-amber-600 ml-1">{t('income.oneTimeForm.edited')}</span>}
                                                             </span>
                                                         </div>
-                                                    ))}
+                                                        {extractedData && (
+                                                            <MismatchAlert
+                                                                label={t('income.oneTimeForm.incomeTax')}
+                                                                actual={extractedData.tax_income ?? 0}
+                                                                expected={calculatedTax}
+                                                                currency={formData.currency}
+                                                                fieldKey="tax_income"
+                                                                onResolve={handleMismatchResolution}
+                                                                resolvedValue={manualOverrides.tax_income}
+                                                                theme="red"
+                                                            />
+                                                        )}
+                                                    </div>
+                                                    
+                                                    {additionalTaxes.breakdown && additionalTaxes.breakdown.map((tax, idx) => {
+                                                        const isHealth = tax.name.includes('Health');
+                                                        const isNational = tax.name.includes('National');
+                                                        const expectedValue = tax.amount;
+                                                        const actualValue = isHealth ? extractedData?.tax_health : isNational ? extractedData?.tax_national : undefined;
+                                                        const fieldKey = isHealth ? 'tax_health' : isNational ? 'tax_national' : '';
+                                                        const resolvedVal = isHealth ? manualOverrides.tax_health : isNational ? manualOverrides.tax_national : undefined;
+                                                        
+                                                        return (
+                                                            <React.Fragment key={idx}>
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-blue-700">
+                                                                        {isHealth ? t('income.oneTimeForm.healthTax') :
+                                                                            isNational ? t('income.oneTimeForm.nationalInsurance') :
+                                                                                tax.name}:
+                                                                    </span>
+                                                                    <span className="font-mono font-bold">
+                                                                        {(tax.amount || 0).toLocaleString()} {formData.currency}
+                                                                        <span className="text-xs text-blue-600 ml-2">
+                                                                            ({(tax.rate * 100).toFixed(1)}%)
+                                                                        </span>
+                                                                    </span>
+                                                                </div>
+                                                                {extractedData && fieldKey && actualValue !== undefined && (
+                                                                    <MismatchAlert
+                                                                        label={isHealth ? t('income.oneTimeForm.healthTax') : t('income.oneTimeForm.nationalInsurance')}
+                                                                        actual={actualValue ?? 0}
+                                                                        expected={expectedValue || 0}
+                                                                        currency={formData.currency}
+                                                                        fieldKey={fieldKey}
+                                                                        onResolve={handleMismatchResolution}
+                                                                        resolvedValue={resolvedVal}
+                                                                        theme="red"
+                                                                    />
+                                                                )}
+                                                            </React.Fragment>
+                                                        );
+                                                    })}
                                                     <div className="flex justify-between pt-2 border-t border-blue-200">
                                                         <span className="font-bold text-blue-900">{t('income.oneTimeForm.totalMonthlyTaxes')}</span>
                                                         <span className="font-mono font-black text-blue-600">
@@ -615,52 +678,6 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                                         </span>
                                                     </div>
                                                 </div>
-
-                                                {/* Mismatch Alerts for Taxes */}
-                                                {extractedData && (
-                                                    <div className="mt-4 space-y-2">
-                                                        {/* Credit Points Mismatch */}
-                                                        <MismatchAlert
-                                                            label={t('income.oneTimeForm.taxCreditPoints')}
-                                                            actual={extractedData.credit_points ?? 0}
-                                                            expected={defaultCreditPoints}
-                                                            currency="pts"
-                                                            fieldKey="credit_points"
-                                                            onResolve={(key, val) => {
-                                                                setManualOverrides(prev => ({ ...prev, [key]: val }));
-                                                                setTaxCreditPoints(val);
-                                                            }}
-                                                            resolvedValue={manualOverrides.credit_points}
-                                                        />
-                                                        <MismatchAlert
-                                                            label={t('income.oneTimeForm.incomeTax')}
-                                                            actual={extractedData.tax_income ?? 0}
-                                                            expected={calculatedTax}
-                                                            currency={formData.currency}
-                                                            fieldKey="tax_income"
-                                                            onResolve={handleMismatchResolution}
-                                                            resolvedValue={manualOverrides.tax_income}
-                                                        />
-                                                        <MismatchAlert
-                                                            label={t('income.oneTimeForm.healthTax')}
-                                                            actual={extractedData.tax_health ?? 0}
-                                                            expected={additionalTaxes.breakdown.find(t => t.name.includes('Health'))?.amount || 0}
-                                                            currency={formData.currency}
-                                                            fieldKey="tax_health"
-                                                            onResolve={handleMismatchResolution}
-                                                            resolvedValue={manualOverrides.tax_health}
-                                                        />
-                                                        <MismatchAlert
-                                                            label={t('income.oneTimeForm.nationalInsurance')}
-                                                            actual={extractedData.tax_national ?? 0}
-                                                            expected={additionalTaxes.breakdown.find(t => t.name.includes('National'))?.amount || 0}
-                                                            currency={formData.currency}
-                                                            fieldKey="tax_national"
-                                                            onResolve={handleMismatchResolution}
-                                                            resolvedValue={manualOverrides.tax_national}
-                                                        />
-                                                    </div>
-                                                )}
                                             </>
                                         ) : (
                                             <div className="text-center py-6 text-slate-400 text-sm italic">
@@ -706,6 +723,20 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                                     customList={customEmployeePcts}
                                                     setCustomList={setCustomEmployeePcts}
                                                 />
+                                                {extractedData && extractedData.pension_employee !== undefined && (
+                                                    <div className="mt-2 mb-2">
+                                                        <MismatchAlert
+                                                            label={t('income.oneTimeForm.employeeContribution')}
+                                                            actual={extractedData.pension_employee}
+                                                            expected={Math.round(parseFloat(formData.grossAmount || 0) * (formData.employeePct / 100))}
+                                                            currency={formData.currency}
+                                                            fieldKey="pension_employee"
+                                                            onResolve={handleMismatchResolution}
+                                                            resolvedValue={manualOverrides.pension_employee}
+                                                            theme="red"
+                                                        />
+                                                    </div>
+                                                )}
 
                                                 <PercentageRow
                                                     label={t('income.oneTimeForm.employerContribution')}
@@ -717,6 +748,20 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                                     customList={customEmployerPcts}
                                                     setCustomList={setCustomEmployerPcts}
                                                 />
+                                                {extractedData && extractedData.pension_employer !== undefined && (
+                                                    <div className="mt-2 mb-2">
+                                                        <MismatchAlert
+                                                            label={t('income.oneTimeForm.employerContribution')}
+                                                            actual={extractedData.pension_employer}
+                                                            expected={Math.round(parseFloat(formData.grossAmount || 0) * (formData.employerPct / 100))}
+                                                            currency={formData.currency}
+                                                            fieldKey="pension_employer"
+                                                            onResolve={handleMismatchResolution}
+                                                            resolvedValue={manualOverrides.pension_employer}
+                                                            theme="red"
+                                                        />
+                                                    </div>
+                                                )}
 
                                                 <PercentageRow
                                                     label={t('income.oneTimeForm.severanceEmployerPays')}
@@ -728,6 +773,20 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                                     customList={customSeverancePcts}
                                                     setCustomList={setCustomSeverancePcts}
                                                 />
+                                                {extractedData && extractedData.pension_severance !== undefined && (
+                                                    <div className="mt-2 mb-2">
+                                                        <MismatchAlert
+                                                            label={t('income.oneTimeForm.severanceEmployerPays')}
+                                                            actual={extractedData.pension_severance}
+                                                            expected={Math.round(parseFloat(formData.grossAmount || 0) * (formData.severancePct / 100))}
+                                                            currency={formData.currency}
+                                                            fieldKey="pension_severance"
+                                                            onResolve={handleMismatchResolution}
+                                                            resolvedValue={manualOverrides.pension_severance}
+                                                            theme="red"
+                                                        />
+                                                    </div>
+                                                )}
 
                                                 <div className="mt-4 pt-4 border-t border-purple-200">
                                                     <div className="flex justify-between items-center">
@@ -745,21 +804,6 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                                         })}
                                                     </div>
                                                 </div>
-
-                                                {/* Mismatch Alert for Pension */}
-                                                {extractedData && (
-                                                    <div className="mt-4">
-                                                        <MismatchAlert
-                                                            label={t('income.oneTimeForm.pensionLabel')}
-                                                            actual={extractedData.pension_employee}
-                                                            expected={Math.round(parseFloat(formData.grossAmount || 0) * (formData.employeePct / 100))}
-                                                            currency={formData.currency}
-                                                            fieldKey="pension_employee"
-                                                            onResolve={handleMismatchResolution}
-                                                            resolvedValue={manualOverrides.pension_employee}
-                                                        />
-                                                    </div>
-                                                )}
                                             </>
                                         ) : (
                                             <div className="text-center py-6 text-slate-500">
@@ -800,6 +844,21 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                                 customList={customOtherEmployeePcts}
                                                 setCustomList={setCustomOtherEmployeePcts}
                                             />
+                                            {extractedData && extractedData.keren_hishtalmut_employee !== undefined && (
+                                                <div className="mt-2 mb-2">
+                                                    <MismatchAlert
+                                                        label={t('income.oneTimeForm.employeeContribution')}
+                                                        actual={extractedData.keren_hishtalmut_employee}
+                                                        expected={Math.round(parseFloat(formData.grossAmount || 0) * (otherDepositEmployeePct / 100))}
+                                                        currency={formData.currency}
+                                                        fieldKey="keren_hishtalmut_employee"
+                                                        onResolve={handleMismatchResolution}
+                                                        resolvedValue={manualOverrides.keren_hishtalmut_employee}
+                                                        theme="red"
+                                                    />
+                                                </div>
+                                            )}
+
                                             <PercentageRow
                                                 label={t('income.oneTimeForm.employerContribution')}
                                                 value={otherDepositEmployerPct}
@@ -810,6 +869,21 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                                 customList={customOtherEmployerPcts}
                                                 setCustomList={setCustomOtherEmployerPcts}
                                             />
+                                            {extractedData && extractedData.keren_hishtalmut_employer !== undefined && (
+                                                <div className="mt-2 mb-2">
+                                                    <MismatchAlert
+                                                        label={t('income.oneTimeForm.employerContribution')}
+                                                        actual={extractedData.keren_hishtalmut_employer}
+                                                        expected={Math.round(parseFloat(formData.grossAmount || 0) * (otherDepositEmployerPct / 100))}
+                                                        currency={formData.currency}
+                                                        fieldKey="keren_hishtalmut_employer"
+                                                        onResolve={handleMismatchResolution}
+                                                        resolvedValue={manualOverrides.keren_hishtalmut_employer}
+                                                        theme="red"
+                                                    />
+                                                </div>
+                                            )}
+
                                             <div className="mt-2 text-xs text-emerald-600 font-bold border-t border-emerald-200 pt-2 text-right">
                                                 {t('income.oneTimeForm.totalOtherDeposit')} {Math.round(parseFloat(formData.grossAmount || 0) * ((otherDepositEmployeePct + otherDepositEmployerPct) / 100)).toLocaleString()} {formData.currency}
                                             </div>
