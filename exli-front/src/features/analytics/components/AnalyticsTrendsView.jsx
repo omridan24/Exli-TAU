@@ -52,16 +52,18 @@ export const AnalyticsTrendsView = ({
                                 <CategoryIcon iconName={c.icon} color={c.color} className="w-6 h-6 flex-shrink-0" />
                                 <span className="text-xs font-bold text-slate-700 text-center line-clamp-2">{getCategoryName(c.name)}</span>
                             </button>
-                        )) : ['neto', 'bruto', 'taxes'].map(type => (
+                        )) : ['neto', 'bruto', 'taxes'].map(type => {
+                            const isTax = type === 'taxes';
+                            return (
                             <button 
                                 key={type} 
                                 onClick={() => setSelectedIncomeType(type)} 
-                                className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-2 ${selectedIncomeType === type ? 'border-emerald-500 bg-emerald-50 shadow-md' : 'border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50 bg-white'}`}
+                                className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-2 ${selectedIncomeType === type ? (isTax ? 'border-red-500 bg-red-50 shadow-md' : 'border-emerald-500 bg-emerald-50 shadow-md') : (isTax ? 'border-slate-200 hover:border-red-300 hover:bg-red-50/50 bg-white' : 'border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50 bg-white')}`}
                             >
-                                <DollarSign className={`w-6 h-6 flex-shrink-0 ${selectedIncomeType === type ? 'text-emerald-600' : 'text-emerald-500'}`} />
+                                <DollarSign className={`w-6 h-6 flex-shrink-0 ${selectedIncomeType === type ? (isTax ? 'text-red-600' : 'text-emerald-600') : (isTax ? 'text-red-500' : 'text-emerald-500')}`} />
                                 <span className="text-xs font-bold text-slate-700 uppercase text-center line-clamp-2">{type === 'taxes' ? t('analytics.tax') : t(type, { defaultValue: type })}</span>
                             </button>
-                        ))}
+                        )})}
                     </div>
                 </div>
                 {trendType === 'income' && jobOptions.length > 2 && (
@@ -143,7 +145,7 @@ export const AnalyticsTrendsView = ({
                         <XAxis dataKey="month" />
                         <YAxis />
                         <Tooltip formatter={(v) => `${dominantCurrency}${v.toLocaleString()}`} />
-                        <Bar dataKey="amount" fill={trendType === 'expense' ? "#3b82f6" : "#10b981"} radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="amount" fill={trendType === 'expense' ? "#3b82f6" : (selectedIncomeType === 'taxes' ? "#ef4444" : "#10b981")} radius={[4, 4, 0, 0]} />
                     </BarChart>
                 </ResponsiveContainer>
             </div>
