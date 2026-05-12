@@ -408,7 +408,7 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
     }, [filteredData.expenses, userId]);
 
     return (
-        <div className="animate-fade-in relative pb-20">
+        <div className="p-4 sm:p-6 max-w-7xl mx-auto animate-fade-in relative pb-20">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <div className="flex items-center gap-4">
                     <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-full text-slate-500"><ArrowLeft className="w-6 h-6" /></button>
