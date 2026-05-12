@@ -36,21 +36,6 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
         try { return new Date(dateStr).toLocaleDateString(); } catch (e) { return dateStr; }
     };
 
-    const formatMonth = (monthStr) => {
-        const parts = monthStr.split('-');
-        if (parts.length === 2) {
-            const monthNum = parseInt(parts[1], 10);
-            const monthNamesEn = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
-            if (monthNum >= 1 && monthNum <= 12) {
-                const enName = monthNamesEn[monthNum - 1];
-                const localizedMonth = t(`datePicker.months.${enName}`, { defaultValue: enName.charAt(0).toUpperCase() + enName.slice(1) });
-                return `${localizedMonth} ${parts[0]}`;
-            }
-        }
-        const date = new Date(monthStr + '-01');
-        return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    };
-
     const formatMonthOnly = (monthStr) => {
         const parts = monthStr.split('-');
         if (parts.length === 2) {
@@ -63,6 +48,15 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
         }
         const date = new Date(monthStr + '-01');
         return date.toLocaleDateString('en-US', { month: 'long' });
+    };
+
+    const formatMonth = (monthStr) => {
+        const parts = monthStr.split('-');
+        if (parts.length === 2) {
+            return `${formatMonthOnly(monthStr)} ${parts[0]}`;
+        }
+        const date = new Date(monthStr + '-01');
+        return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
     };
 
     // Auto-dismiss success messages
