@@ -36,7 +36,25 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
         try { return new Date(dateStr).toLocaleDateString(); } catch (e) { return dateStr; }
     };
 
+    const formatMonthOnly = (monthStr) => {
+        const parts = monthStr.split('-');
+        if (parts.length === 2) {
+            const monthNum = parseInt(parts[1], 10);
+            const monthNamesEn = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+            if (monthNum >= 1 && monthNum <= 12) {
+                const enName = monthNamesEn[monthNum - 1];
+                return t(`datePicker.months.${enName}`, { defaultValue: enName.charAt(0).toUpperCase() + enName.slice(1) });
+            }
+        }
+        const date = new Date(monthStr + '-01');
+        return date.toLocaleDateString('en-US', { month: 'long' });
+    };
+
     const formatMonth = (monthStr) => {
+        const parts = monthStr.split('-');
+        if (parts.length === 2) {
+            return `${formatMonthOnly(monthStr)} ${parts[0]}`;
+        }
         const date = new Date(monthStr + '-01');
         return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
     };
@@ -384,7 +402,7 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
     }, [filteredData.expenses, userId]);
 
     return (
-        <div className="animate-fade-in relative pb-20">
+        <div className="p-4 sm:p-6 max-w-7xl mx-auto animate-fade-in relative pb-20">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <div className="flex items-center gap-4">
                     <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-full text-slate-500"><ArrowLeft className="w-6 h-6" /></button>
@@ -418,7 +436,7 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
                                             : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
                                         }`}
                                 >
-                                    {isForecast && '🔮 '}{m}
+                                    {isForecast && '🔮 '}{formatMonthOnly(m)}
                                 </button>
                                 {hoveredMonth === m && isForecast && (
                                     <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-slate-900 text-white rounded-xl p-3 shadow-2xl z-50 animate-fade-in w-64 text-left">
