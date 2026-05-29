@@ -145,7 +145,8 @@ export const AnalyticsTrendsView = ({
                         <XAxis dataKey="month" />
                         <YAxis />
                         <Tooltip formatter={(v) => `${dominantCurrency}${v.toLocaleString()}`} />
-                        <Bar dataKey="amount" fill={trendType === 'expense' ? "#3b82f6" : (selectedIncomeType === 'taxes' ? "#ef4444" : "#10b981")} radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="amount" stackId="a" fill={trendType === 'expense' ? "#3b82f6" : (selectedIncomeType === 'taxes' ? "#ef4444" : "#10b981")} radius={trendType === 'expense' ? [0, 0, 0, 0] : [4, 4, 0, 0]} />
+                        {trendType === 'expense' && <Bar dataKey="recurringAmount" stackId="a" fill="#9333ea" radius={[4, 4, 0, 0]} />}
                     </BarChart>
                 </ResponsiveContainer>
             </div>

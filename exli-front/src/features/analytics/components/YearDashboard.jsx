@@ -190,8 +190,16 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
         if (trendType === 'expense') {
             const relevantTx = filteredData.expenses.filter(d => (d.assignedCategory || 'Uncategorized') === selectedCategory && !d.isRefund);
             const monthlyAgg = {};
-            relevantTx.forEach(tx => { const m = tx.reportMonth || 'Unknown'; monthlyAgg[m] = (monthlyAgg[m] || 0) + Number(tx.amount); });
-            return Object.entries(monthlyAgg).map(([month, amount]) => ({ month, amount })).sort((a, b) => a.month.localeCompare(b.month));
+            relevantTx.forEach(tx => {
+                const m = tx.reportMonth || 'Unknown';
+                if (!monthlyAgg[m]) monthlyAgg[m] = { amount: 0, recurringAmount: 0 };
+                if (tx.isRecurring) {
+                    monthlyAgg[m].recurringAmount += Number(tx.amount);
+                } else {
+                    monthlyAgg[m].amount += Number(tx.amount);
+                }
+            });
+            return Object.entries(monthlyAgg).map(([month, data]) => ({ month, amount: data.amount, recurringAmount: data.recurringAmount, totalAmount: data.amount + data.recurringAmount })).sort((a, b) => a.month.localeCompare(b.month));
         } else {
             const monthlyAgg = {};
             filteredData.income.forEach(inc => {
@@ -199,14 +207,14 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
                 const m = inc.month || 'Unknown';
                 monthlyAgg[m] = (monthlyAgg[m] || 0) + (Number(inc[selectedIncomeType]) || 0);
             });
-            return Object.entries(monthlyAgg).map(([month, amount]) => ({ month, amount })).sort((a, b) => a.month.localeCompare(b.month));
+            return Object.entries(monthlyAgg).map(([month, amount]) => ({ month, amount, totalAmount: amount })).sort((a, b) => a.month.localeCompare(b.month));
         }
     }, [filteredData, selectedCategory, selectedIncomeType, trendType, selectedJobFilter]);
 
     const trendOverview = useMemo(() => {
-        const total = activeTrendData.reduce((acc, curr) => acc + curr.amount, 0);
+        const total = activeTrendData.reduce((acc, curr) => acc + curr.totalAmount, 0);
         const avg = availableMonths.length > 0 ? total / availableMonths.length : 0;
-        const max = Math.max(...activeTrendData.map(d => d.amount), 0);
+        const max = Math.max(...activeTrendData.map(d => d.totalAmount), 0);
         return { total, avg, max };
     }, [activeTrendData, availableMonths]);
 

@@ -28,7 +28,7 @@ export const AnalyticsNode = ({ data, income, categories, userId }) => {
     }, [years]);
 
     const lifetimeTotals = useMemo(() => {
-        const exp = data.reduce((acc, curr) => acc + (curr.isRefund ? 0 : Number(curr.amount)), 0);
+        const exp = data.reduce((acc, curr) => acc + (curr.isForecast || curr.isRefund ? 0 : Number(curr.amount)), 0);
         const incNet = income.reduce((acc, curr) => acc + (Number(curr.neto) || 0), 0);
         const pension = income.reduce((acc, curr) => acc + (Number(curr.pension) || 0), 0);
         const wealth = (incNet - exp) + pension;

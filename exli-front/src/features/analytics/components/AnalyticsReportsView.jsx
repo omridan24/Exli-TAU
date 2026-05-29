@@ -179,6 +179,30 @@ export const AnalyticsReportsView = ({
             </div>
 
             <div className="mt-8 mb-20 space-y-8">
+                {/* Recurring vs One-Time Breakdown - Shown for both yearly and specific month */}
+                {recurringTotal > 0 && (
+                    <div className="mb-4 flex gap-3">
+                        <div className="flex-1 bg-purple-50 border border-purple-200 rounded-xl p-3 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Repeat className="w-4 h-4 text-purple-600" />
+                                <span className="text-xs font-bold text-purple-900">{t('analytics.recurring')}</span>
+                            </div>
+                            <span className="text-sm font-bold text-purple-600">
+                                {dominantCurrency} {recurringTotal.toLocaleString()}
+                            </span>
+                        </div>
+                        <div className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <DollarSign className="w-4 h-4 text-slate-600" />
+                                <span className="text-xs font-bold text-slate-700">{t('analytics.oneTime')}</span>
+                            </div>
+                            <span className="text-sm font-bold text-slate-600">
+                                {dominantCurrency} {oneTimeTotal.toLocaleString()}
+                            </span>
+                        </div>
+                    </div>
+                )}
+
                 {/* Income Table - Hidden in Yearly Avg */}
                 {selectedMonth !== 'average' && (
                     <div>
