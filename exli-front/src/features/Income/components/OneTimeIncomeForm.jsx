@@ -183,14 +183,12 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
         }
     }, [extractedData]);
 
-    // Progressive form reveal
+    // Progressive Reveal: Show rest of form after workplace is filled
     useEffect(() => {
-        if (formData.workplaceName && formData.grossAmount) {
+        if (formData.workplaceName) {
             setShowFullForm(true);
-        } else {
-            setShowFullForm(false);
         }
-    }, [formData.workplaceName, formData.grossAmount]);
+    }, [formData.workplaceName]);
 
     // Auto-calculate expected tax
     useEffect(() => {
@@ -532,32 +530,10 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                             />
                         </div>
 
-                        {/* Gross Salary - EXACT COPY */}
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">{t('income.oneTimeForm.grossSalary')}</label>
-                            <input
-                                type="number"
-                                step="0.01"
-                                value={formData.grossAmount}
-                                onChange={(e) => setFormData({ ...formData, grossAmount: e.target.value })}
-                                placeholder="e.g., 10000"
-                                className="w-full p-4 border-2 border-slate-300 rounded-xl text-lg font-mono font-bold focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
-                                required
-                            />
-                        </div>
-
-                        {/* Progressive Reveal: Show rest of form after workplace + gross amount filled */}
-                        {!showFullForm && (
-                            <div className="text-center py-6 text-slate-400 text-sm">
-                                {t('income.oneTimeForm.fillToProgress')}
-                            </div>
-                        )}
-
                         {showFullForm && (
                             <>
-                                {/* Tax Calculator - EXACT COPY */}
-                                {parseFloat(formData.grossAmount || 0) > 0 && (
-                                    <div className={`border-2 rounded-xl p-4 transition-colors ${hasTax ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200'}`}>
+                                {/* Tax Calculator */}
+                                <div className={`border-2 rounded-xl p-4 transition-colors ${hasTax ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200'}`}>
                                         <div className="flex items-center justify-between mb-4">
                                             <h4 className={`font-bold flex items-center gap-2 ${hasTax ? 'text-blue-900' : 'text-slate-500'}`}>
                                                 {t('income.oneTimeForm.taxCalculator')}
@@ -716,11 +692,9 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                             </div>
                                         )}
                                     </div>
-                                )}
 
                                 {/* Pension Calculator with No Pension Toggle */}
-                                {parseFloat(formData.grossAmount || 0) > 0 && (
-                                    <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-4">
+                                <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-4">
                                         <div className="flex items-center justify-between mb-4">
                                             <h4 className="font-bold text-purple-900">{t('income.oneTimeForm.pensionCalculator')}</h4>
                                             <button
@@ -745,9 +719,24 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                         {hasPension ? (
                                             <>
                                                 {/* Pension Basis Display */}
-                                                <div className="flex items-center justify-between bg-purple-100/50 p-2 rounded-lg mb-4 text-sm border border-purple-100">
-                                                    <span className="text-purple-800">{t('income.extraction.fields.grossSalaryPension')}</span>
-                                                    <span className="font-bold text-purple-900">{pensionGross.toLocaleString()} {formData.currency}</span>
+                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-purple-100 p-4 rounded-xl mb-4 border border-purple-200 gap-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-purple-900 font-bold text-lg">{t('income.extraction.fields.grossSalaryPension')}</span>
+                                                    </div>
+                                                    <div className="relative flex items-center">
+                                                        <div className="absolute left-3 text-purple-400">
+                                                            ✏️
+                                                        </div>
+                                                        <input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={formData.brutoPension || ''}
+                                                            onChange={(e) => setFormData({ ...formData, brutoPension: e.target.value })}
+                                                            className="w-full sm:w-48 text-right p-3 pl-8 pr-12 rounded-xl border-2 border-purple-300 font-bold text-purple-900 focus:ring-2 focus:ring-purple-500 outline-none bg-white shadow-sm"
+                                                            placeholder={formData.grossAmount || '0'}
+                                                        />
+                                                        <span className="absolute right-4 text-purple-600 font-bold">{formData.currency}</span>
+                                                    </div>
                                                 </div>
 
                                                 <PercentageRow
@@ -849,7 +838,6 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                             </div>
                                         )}
                                     </div>
-                                )}
 
                                 {/* Other Deposits (Keren Hishtalmut, etc.) */}
                                 <div className="bg-emerald-50 border-2 border-emerald-200 rounded-xl p-4">
@@ -872,9 +860,24 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                     {hasOtherDeposits && (
                                         <>
                                             {/* Other Deposits Basis Display */}
-                                            <div className="flex items-center justify-between bg-emerald-100/50 p-2 rounded-lg mb-4 text-sm border border-emerald-100">
-                                                <span className="text-emerald-800">{t('income.extraction.fields.grossSalaryPension')}</span>
-                                                <span className="font-bold text-emerald-900">{pensionGross.toLocaleString()} {formData.currency}</span>
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-emerald-100 p-4 rounded-xl mb-4 border border-emerald-200 gap-3">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-emerald-900 font-bold text-lg">{t('income.extraction.fields.grossSalaryPension')}</span>
+                                                </div>
+                                                <div className="relative flex items-center">
+                                                    <div className="absolute left-3 text-emerald-400">
+                                                        ✏️
+                                                    </div>
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={formData.brutoPension || ''}
+                                                        onChange={(e) => setFormData({ ...formData, brutoPension: e.target.value })}
+                                                        className="w-full sm:w-48 text-right p-3 pl-8 pr-12 rounded-xl border-2 border-emerald-300 font-bold text-emerald-900 focus:ring-2 focus:ring-emerald-500 outline-none bg-white shadow-sm"
+                                                        placeholder={formData.grossAmount || '0'}
+                                                    />
+                                                    <span className="absolute right-4 text-emerald-600 font-bold">{formData.currency}</span>
+                                                </div>
                                             </div>
 
                                             <PercentageRow
@@ -935,7 +938,6 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                 </div>
 
                                 {/* Net Salary - EDITABLE (New Card Design) */}
-                                {parseFloat(formData.grossAmount || 0) > 0 && (
                                     <div>
                                         <div className="bg-white border-2 border-teal-100 rounded-xl p-5 shadow-sm">
                                             <label className="block text-sm font-bold text-teal-900 mb-3 uppercase tracking-wider">
@@ -1101,7 +1103,6 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                             )}
                                         </div>
                                     </div>
-                                )}
                             </>
                         )}
 

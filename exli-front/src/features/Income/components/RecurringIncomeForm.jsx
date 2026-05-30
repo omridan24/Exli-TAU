@@ -792,23 +792,8 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                             />
                         </div>
 
-                        {/* Gross Salary */}
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">Monthly Gross Salary (Bruto) *</label>
-                            <input
-                                type="number"
-                                step="0.01"
-                                value={formData.grossAmount}
-                                onChange={(e) => setFormData({ ...formData, grossAmount: e.target.value })}
-                                className="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none"
-                                required
-                            />
-                            <div className="text-xs text-slate-500 mt-1">Monthly amount (we'll calculate annual for tax)</div>
-                        </div>
-
-                        {/* Tax Calculator - FIXED: Shows for any gross amount, not just high values */}
-                        {formData.grossAmount > 0 && (
-                            <div className={`border-2 rounded-xl p-4 transition-colors ${hasTax ? 'bg-orange-50 border-orange-200' : 'bg-slate-50 border-slate-200'}`}>
+                        {/* Tax Calculator */}
+                        <div className={`border-2 rounded-xl p-4 transition-colors ${hasTax ? 'bg-orange-50 border-orange-200' : 'bg-slate-50 border-slate-200'}`}>
                                 <div className="flex items-center justify-between mb-4">
                                     <h4 className={`font-bold flex items-center gap-2 ${hasTax ? 'text-orange-900' : 'text-slate-500'}`}>
                                         🏛️ Tax Calculator ({userCountry})
@@ -828,9 +813,24 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                 {hasTax ? (
                                     <>
                                         {/* Tax Basis Display */}
-                                        <div className="flex items-center justify-between bg-orange-100/50 p-2 rounded-lg mb-4 text-sm border border-orange-100">
-                                            <span className="text-orange-800">{t('income.extraction.fields.grossSalary')}</span>
-                                            <span className="font-bold text-orange-900">{parseFloat(formData.grossAmount || 0).toLocaleString()} {formData.currency}</span>
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-orange-100 p-4 rounded-xl mb-4 border border-orange-200 gap-3">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-orange-900 font-bold text-lg">{t('income.extraction.fields.grossSalary')}</span>
+                                            </div>
+                                            <div className="relative flex items-center">
+                                                <div className="absolute left-3 text-orange-400">
+                                                    ✏️
+                                                </div>
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    value={formData.grossAmount}
+                                                    onChange={(e) => setFormData({ ...formData, grossAmount: e.target.value })}
+                                                    className="w-full sm:w-48 text-right p-3 pl-8 pr-12 rounded-xl border-2 border-orange-300 font-bold text-orange-900 focus:ring-2 focus:ring-orange-500 outline-none bg-white shadow-sm"
+                                                    placeholder="0"
+                                                />
+                                                <span className="absolute right-4 text-orange-600 font-bold">{formData.currency}</span>
+                                            </div>
                                         </div>
 
                                         {/* Tax Bracket Visual Graph */}
@@ -976,7 +976,6 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                     </div>
                                 )}
                             </div>
-                        )}
 
                         {/* Pension Calculator */}
                         <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-4">
@@ -1006,9 +1005,24 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                             {hasPension ? (
                                 <>
                                     {/* Pension Basis Display */}
-                                    <div className="flex items-center justify-between bg-purple-100/50 p-2 rounded-lg mb-4 text-sm border border-purple-100">
-                                        <span className="text-purple-800">{t('income.extraction.fields.grossSalaryPension')}</span>
-                                        <span className="font-bold text-purple-900">{pensionGross.toLocaleString()} {formData.currency}</span>
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-purple-100 p-4 rounded-xl mb-4 border border-purple-200 gap-3">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-purple-900 font-bold text-lg">{t('income.extraction.fields.grossSalaryPension')}</span>
+                                        </div>
+                                        <div className="relative flex items-center">
+                                            <div className="absolute left-3 text-purple-400">
+                                                ✏️
+                                            </div>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                value={formData.brutoPension || ''}
+                                                onChange={(e) => setFormData({ ...formData, brutoPension: e.target.value })}
+                                                className="w-full sm:w-48 text-right p-3 pl-8 pr-12 rounded-xl border-2 border-purple-300 font-bold text-purple-900 focus:ring-2 focus:ring-purple-500 outline-none bg-white shadow-sm"
+                                                placeholder={formData.grossAmount || '0'}
+                                            />
+                                            <span className="absolute right-4 text-purple-600 font-bold">{formData.currency}</span>
+                                        </div>
                                     </div>
 
                                     <PercentageRow
@@ -1132,9 +1146,24 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                             {hasOtherDeposits && (
                                 <>
                                     {/* Other Deposits Basis Display */}
-                                    <div className="flex items-center justify-between bg-emerald-100/50 p-2 rounded-lg mb-4 text-sm border border-emerald-100">
-                                        <span className="text-emerald-800">{t('income.extraction.fields.grossSalaryPension')}</span>
-                                        <span className="font-bold text-emerald-900">{pensionGross.toLocaleString()} {formData.currency}</span>
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-emerald-100 p-4 rounded-xl mb-4 border border-emerald-200 gap-3">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-emerald-900 font-bold text-lg">{t('income.extraction.fields.grossSalaryPension')}</span>
+                                        </div>
+                                        <div className="relative flex items-center">
+                                            <div className="absolute left-3 text-emerald-400">
+                                                ✏️
+                                            </div>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                value={formData.brutoPension || ''}
+                                                onChange={(e) => setFormData({ ...formData, brutoPension: e.target.value })}
+                                                className="w-full sm:w-48 text-right p-3 pl-8 pr-12 rounded-xl border-2 border-emerald-300 font-bold text-emerald-900 focus:ring-2 focus:ring-emerald-500 outline-none bg-white shadow-sm"
+                                                placeholder={formData.grossAmount || '0'}
+                                            />
+                                            <span className="absolute right-4 text-emerald-600 font-bold">{formData.currency}</span>
+                                        </div>
                                     </div>
 
                                     <PercentageRow
