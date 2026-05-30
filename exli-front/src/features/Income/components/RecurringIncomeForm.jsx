@@ -827,6 +827,11 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
 
                                 {hasTax ? (
                                     <>
+                                        {/* Tax Basis Display */}
+                                        <div className="flex items-center justify-between bg-orange-100/50 p-2 rounded-lg mb-4 text-sm border border-orange-100">
+                                            <span className="text-orange-800">{t('income.extraction.fields.grossSalary')}</span>
+                                            <span className="font-bold text-orange-900">{parseFloat(formData.grossAmount || 0).toLocaleString()} {formData.currency}</span>
+                                        </div>
 
                                         {/* Tax Bracket Visual Graph */}
                                         <TaxBracketGraph
@@ -1000,6 +1005,12 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
 
                             {hasPension ? (
                                 <>
+                                    {/* Pension Basis Display */}
+                                    <div className="flex items-center justify-between bg-purple-100/50 p-2 rounded-lg mb-4 text-sm border border-purple-100">
+                                        <span className="text-purple-800">{t('income.extraction.fields.grossSalaryPension')}</span>
+                                        <span className="font-bold text-purple-900">{pensionGross.toLocaleString()} {formData.currency}</span>
+                                    </div>
+
                                     <PercentageRow
                                         label={t('income.recurringForm.employeeContribution')}
                                         value={formData.employeePct}
@@ -1120,6 +1131,12 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
 
                             {hasOtherDeposits && (
                                 <>
+                                    {/* Other Deposits Basis Display */}
+                                    <div className="flex items-center justify-between bg-emerald-100/50 p-2 rounded-lg mb-4 text-sm border border-emerald-100">
+                                        <span className="text-emerald-800">{t('income.extraction.fields.grossSalaryPension')}</span>
+                                        <span className="font-bold text-emerald-900">{pensionGross.toLocaleString()} {formData.currency}</span>
+                                    </div>
+
                                     <PercentageRow
                                         label={t('income.recurringForm.employeeContribution')}
                                         value={otherDepositEmployeePct}

@@ -576,6 +576,12 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
 
                                         {hasTax ? (
                                             <>
+                                                {/* Tax Basis Display */}
+                                                <div className="flex items-center justify-between bg-blue-100/50 p-2 rounded-lg mb-4 text-sm border border-blue-100">
+                                                    <span className="text-blue-800">{t('income.extraction.fields.grossSalary')}</span>
+                                                    <span className="font-bold text-blue-900">{parseFloat(formData.grossAmount || 0).toLocaleString()} {formData.currency}</span>
+                                                </div>
+
                                                 <TaxBracketGraph
                                                     annualIncome={parseFloat(formData.grossAmount || 0) * 12}
                                                     brackets={getTaxConfig(userCountry)?.brackets || []}
@@ -738,6 +744,12 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
 
                                         {hasPension ? (
                                             <>
+                                                {/* Pension Basis Display */}
+                                                <div className="flex items-center justify-between bg-purple-100/50 p-2 rounded-lg mb-4 text-sm border border-purple-100">
+                                                    <span className="text-purple-800">{t('income.extraction.fields.grossSalaryPension')}</span>
+                                                    <span className="font-bold text-purple-900">{pensionGross.toLocaleString()} {formData.currency}</span>
+                                                </div>
+
                                                 <PercentageRow
                                                     label={t('income.oneTimeForm.employeeContribution')}
                                                     value={formData.employeePct}
@@ -859,6 +871,12 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
 
                                     {hasOtherDeposits && (
                                         <>
+                                            {/* Other Deposits Basis Display */}
+                                            <div className="flex items-center justify-between bg-emerald-100/50 p-2 rounded-lg mb-4 text-sm border border-emerald-100">
+                                                <span className="text-emerald-800">{t('income.extraction.fields.grossSalaryPension')}</span>
+                                                <span className="font-bold text-emerald-900">{pensionGross.toLocaleString()} {formData.currency}</span>
+                                            </div>
+
                                             <PercentageRow
                                                 label={t('income.oneTimeForm.employeeContribution')}
                                                 value={otherDepositEmployeePct}
