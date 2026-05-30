@@ -72,6 +72,16 @@ export const ExpenseStepCategorize = ({
         setIsEditModalOpen(false);
     };
 
+    const applyPercentage = (percentage) => {
+        const newAmount = parseFloat((currentTx.amount * (percentage / 100)).toFixed(2));
+        onUpdateTransaction({
+            description: currentTx.description,
+            amount: newAmount,
+            date: currentTx.date
+        });
+    };
+
+
     // Check if current transaction matches a recurring expense
     // IMPROVED: Uses confidence scoring and priority matching
     const matchingRecurring = useMemo(() => {
@@ -368,6 +378,17 @@ export const ExpenseStepCategorize = ({
                     <button onClick={openEditModal} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 text-slate-600 font-bold text-sm transition-colors text-start border border-transparent hover:border-slate-100">
                         <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center"><Edit2 className="w-4 h-4" /></div> {t('expenses.categorize.editExpense')}
                     </button>
+                    <div className="flex gap-2 px-1 -mt-1 mb-2">
+                        {[25, 50, 75].map(percent => (
+                            <button
+                                key={percent}
+                                onClick={() => applyPercentage(percent)}
+                                className="flex-1 py-1.5 text-[10px] font-black bg-slate-50 text-slate-400 rounded-lg border border-slate-100 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-colors"
+                            >
+                                {percent}%
+                            </button>
+                        ))}
+                    </div>
 
                     <button onClick={() => setIsCreatingCat(true)} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 text-slate-600 font-bold text-sm transition-colors text-start border border-transparent hover:border-slate-100">
                         <div className="w-8 h-8 rounded-full bg-purple-50 text-purple-500 flex items-center justify-center"><Plus className="w-4 h-4" /></div> {t('expenses.categorize.addCategory')}
