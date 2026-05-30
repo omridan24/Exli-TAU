@@ -494,17 +494,24 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
 
     const PercentageRow = ({ label, value, onChange, color, isCustom, setIsCustom, customList, setCustomList }) => {
         const [customInput, setCustomInput] = useState('');
+        const [inputType, setInputType] = useState('%'); // '%' or 'amount'
 
         const handleApproveCustom = () => {
-            const pct = parseFloat(customInput);
-            if (!isNaN(pct) && pct >= 0 && pct <= 100) {
-                // Add to custom list if not already there
-                if (!customList.includes(pct)) {
-                    setCustomList([...customList, pct]);
+            let num = parseFloat(customInput);
+            if (!isNaN(num) && num >= 0) {
+                if (inputType === 'amount' && parseFloat(formData.grossAmount || 0) > 0) {
+                    num = (num / parseFloat(formData.grossAmount)) * 100;
+                    num = parseFloat(num.toFixed(3)); // precision
                 }
-                onChange(pct);
-                setIsCustom(false);
-                setCustomInput('');
+
+                if (num >= 0 && num <= 100) {
+                    if (!customList.includes(num)) {
+                        setCustomList([...customList, num]);
+                    }
+                    onChange(num);
+                    setIsCustom(false);
+                    setCustomInput('');
+                }
             }
         };
 
@@ -515,18 +522,29 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                 </label>
                 {isCustom ? (
                     <div className="flex gap-2 items-center">
-                        <input
-                            type="number"
-                            step="0.1"
-                            min="0"
-                            max="15"
-                            value={customInput}
-                            onChange={(e) => setCustomInput(e.target.value)}
-                            onKeyPress={(e) => e.key === 'Enter' && handleApproveCustom()}
-                            className="flex-1 p-2 border border-slate-300 rounded-lg text-center font-bold"
-                            placeholder="%"
-                            autoFocus
-                        />
+                        <div className="relative flex-1 flex items-center">
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={customInput}
+                                onChange={(e) => setCustomInput(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && handleApproveCustom()}
+                                className="w-full p-2 pr-12 border border-slate-300 rounded-lg text-center font-bold"
+                                placeholder={inputType === '%' ? "%" : formData.currency}
+                                autoFocus
+                            />
+                            <button 
+                                type="button"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    setInputType(inputType === '%' ? 'amount' : '%');
+                                }}
+                                className="absolute right-1 top-1 bottom-1 px-2 bg-slate-100 rounded text-xs font-bold text-slate-500 hover:bg-slate-200 transition-colors"
+                            >
+                                {inputType === '%' ? '%' : formData.currency}
+                            </button>
+                        </div>
                         <button
                             type="button"
                             onClick={handleApproveCustom}
