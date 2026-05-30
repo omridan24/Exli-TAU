@@ -10,6 +10,7 @@ export const ExtractionSummary = ({ extractedData }) => {
 
     const fields = [
         { key: 'bruto', label: t('income.extraction.fields.grossSalary') },
+        { key: 'bruto_pension', label: t('income.extraction.fields.grossSalaryPension') },
         { key: 'neto', label: t('income.extraction.fields.netSalary') },
         { key: 'tax_income', label: t('income.extraction.fields.incomeTax') },
         { key: 'tax_health', label: t('income.extraction.fields.healthInsurance') },

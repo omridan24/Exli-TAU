@@ -76,6 +76,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
         workplaceName: editData?.workplaceName || '',
         occupation: editData?.occupation || '',
         grossAmount: editData?.grossAmount || '',
+        brutoPension: editData?.brutoPension || '',
         netAmount: editData?.netAmount || '',
         currency: editData?.currency || currency || 'ILS',
         employeePct: editData?.employeePct || 6.0,
@@ -91,6 +92,10 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
         workplaceLogo: editData?.workplaceLogo || '',
         workplaceDomain: editData?.workplaceDomain || ''
     });
+
+    // Pension/Other Deposits use pensionable gross (Israeli law: excludes food/travel bonuses)
+    // Falls back to regular gross if bruto_pension was not found in the payslip
+    const pensionGross = parseFloat(formData.brutoPension || formData.grossAmount || 0);
 
     const [isSaving, setIsSaving] = useState(false);
     const [selectedDirection, setSelectedDirection] = useState(editData?.direction || '');
@@ -196,6 +201,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
             setFormData(prev => ({
                 ...prev,
                 grossAmount: extractedData.bruto || prev.grossAmount,
+                brutoPension: extractedData.bruto_pension || '',
             }));
         }
     }, [extractedData, editData]);
@@ -238,20 +244,20 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
     }, [formData.grossAmount, userCountry, taxCreditPoints, hasTax]);
 
     // Auto-calculate expected pension (employee + employer + severance)
+    // Uses pensionGross (bruto for pension) instead of total gross
     useEffect(() => {
         if (formData.grossAmount) {
-            const gross = parseFloat(formData.grossAmount);
             const empPct = parseFloat(formData.employeePct) || 0;
             const workPct = parseFloat(formData.employerPct) || 0;
             const sevPct = parseFloat(formData.severancePct) || 0;
-            const total = Math.round(gross * ((empPct + workPct + sevPct) / 100));
+            const total = Math.round(pensionGross * ((empPct + workPct + sevPct) / 100));
 
             // Only update if different to prevent unnecessary re-renders
             if (total !== formData.expectedPension) {
                 setFormData(prev => ({ ...prev, expectedPension: total }));
             }
         }
-    }, [formData.grossAmount, formData.employeePct, formData.employerPct, formData.severancePct]);
+    }, [formData.grossAmount, formData.brutoPension, formData.employeePct, formData.employerPct, formData.severancePct]);
 
     // Auto-calculate Neto from Bruto - Tax - Employee Pension - Other Deposits
     useEffect(() => {
@@ -266,10 +272,10 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
         if (formData.grossAmount) {
             const gross = parseFloat(formData.grossAmount);
 
-            // 1. Employee Pension
+            // 1. Employee Pension (uses pensionGross - Israeli law)
             const pension = manualOverrides.pension_employee !== undefined
                 ? manualOverrides.pension_employee
-                : Math.round(gross * (formData.employeePct / 100));
+                : Math.round(pensionGross * (formData.employeePct / 100));
 
             // 2. Taxes (Income + Health + National)
             const incomeTax = manualOverrides.tax_income !== undefined ? manualOverrides.tax_income : calculatedTax;
@@ -282,10 +288,10 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
 
             const totalTaxes = incomeTax + healthTax + nationalTax;
 
-            // 3. Other Deposits (Employee Only reduces net)
+            // 3. Other Deposits (Employee Only reduces net) - uses pensionGross
             const otherDeposits = manualOverrides.other_deposit_employee !== undefined
                 ? manualOverrides.other_deposit_employee
-                : Math.round(gross * (otherDepositEmployeePct / 100));
+                : Math.round(pensionGross * (otherDepositEmployeePct / 100));
 
             const totalDeductions = totalTaxes + pension + otherDeposits;
             const autoNeto = Math.max(0, Math.round(gross - totalDeductions));
@@ -295,7 +301,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                 setFormData(prev => ({ ...prev, netAmount: autoNeto }));
             }
         }
-    }, [formData.grossAmount, calculatedTax, additionalTaxes, formData.employeePct, manualOverrides, otherDepositEmployeePct]);
+    }, [formData.grossAmount, formData.brutoPension, calculatedTax, additionalTaxes, formData.employeePct, manualOverrides, otherDepositEmployeePct]);
     // NOTE: NOT including employerPct - employer pension doesn't reduce take-home!
 
     const handleWorkplaceSelect = (workplace) => {
@@ -448,6 +454,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                 workplaceName: formData.workplaceName,
                 occupation: formData.occupation,
                 grossAmount: parseFloat(formData.grossAmount),
+                brutoPension: formData.brutoPension ? parseFloat(formData.brutoPension) : null,
                 netAmount: parseFloat(formData.netAmount),
                 currency: formData.currency,
                 employeePct: parseFloat(formData.employeePct),
@@ -468,7 +475,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                 otherDeposits: {
                     employeePct: otherDepositEmployeePct,
                     employerPct: otherDepositEmployerPct,
-                    totalMonthly: Math.round(formData.grossAmount * ((otherDepositEmployeePct + otherDepositEmployerPct) / 100))
+                    totalMonthly: Math.round(pensionGross * ((otherDepositEmployeePct + otherDepositEmployerPct) / 100))
                 }
             };
 
@@ -499,8 +506,8 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
         const handleApproveCustom = () => {
             let num = parseFloat(customInput);
             if (!isNaN(num) && num >= 0) {
-                if (inputType === 'amount' && parseFloat(formData.grossAmount || 0) > 0) {
-                    num = (num / parseFloat(formData.grossAmount)) * 100;
+                if (inputType === 'amount' && pensionGross > 0) {
+                    num = (num / pensionGross) * 100;
                     num = parseFloat(num.toFixed(3)); // precision
                 }
 
@@ -1008,7 +1015,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                             <MismatchAlert
                                                 label={t('income.recurringForm.employeeContribution')}
                                                 actual={extractedData.pension_employee}
-                                                expected={Math.round(parseFloat(formData.grossAmount || 0) * (formData.employeePct / 100))}
+                                                expected={Math.round(pensionGross * (formData.employeePct / 100))}
                                                 currency={formData.currency}
                                                 fieldKey="pension_employee"
                                                 onResolve={handleMismatchResolution}
@@ -1033,7 +1040,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                             <MismatchAlert
                                                 label={t('income.recurringForm.employerContribution')}
                                                 actual={extractedData.pension_employer}
-                                                expected={Math.round(parseFloat(formData.grossAmount || 0) * (formData.employerPct / 100))}
+                                                expected={Math.round(pensionGross * (formData.employerPct / 100))}
                                                 currency={formData.currency}
                                                 fieldKey="pension_employer"
                                                 onResolve={handleMismatchResolution}
@@ -1058,7 +1065,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                             <MismatchAlert
                                                 label={t('income.recurringForm.severanceEmployerPays')}
                                                 actual={extractedData.pension_severance}
-                                                expected={Math.round(parseFloat(formData.grossAmount || 0) * (formData.severancePct / 100))}
+                                                expected={Math.round(pensionGross * (formData.severancePct / 100))}
                                                 currency={formData.currency}
                                                 fieldKey="pension_severance"
                                                 onResolve={handleMismatchResolution}
@@ -1128,7 +1135,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                             <MismatchAlert
                                                 label={t('income.recurringForm.employeeContribution')}
                                                 actual={extractedData.keren_hishtalmut_employee}
-                                                expected={Math.round(parseFloat(formData.grossAmount || 0) * (otherDepositEmployeePct / 100))}
+                                                expected={Math.round(pensionGross * (otherDepositEmployeePct / 100))}
                                                 currency={formData.currency}
                                                 fieldKey="keren_hishtalmut_employee"
                                                 onResolve={handleMismatchResolution}
@@ -1153,7 +1160,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                             <MismatchAlert
                                                 label={t('income.recurringForm.employerContribution')}
                                                 actual={extractedData.keren_hishtalmut_employer}
-                                                expected={Math.round(parseFloat(formData.grossAmount || 0) * (otherDepositEmployerPct / 100))}
+                                                expected={Math.round(pensionGross * (otherDepositEmployerPct / 100))}
                                                 currency={formData.currency}
                                                 fieldKey="keren_hishtalmut_employer"
                                                 onResolve={handleMismatchResolution}
@@ -1164,7 +1171,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                     )}
 
                                     <div className="mt-2 text-xs text-emerald-600 font-bold border-t border-emerald-200 pt-2 text-right">
-                                        {t('income.recurringForm.totalOtherDeposit')} {Math.round(parseFloat(formData.grossAmount || 0) * ((otherDepositEmployeePct + otherDepositEmployerPct) / 100)).toLocaleString()} {formData.currency}
+                                        {t('income.recurringForm.totalOtherDeposit')} {Math.round(pensionGross * ((otherDepositEmployeePct + otherDepositEmployerPct) / 100)).toLocaleString()} {formData.currency}
                                     </div>
                                 </>
                             )}
@@ -1257,12 +1264,12 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                             className="font-bold cursor-pointer hover:bg-red-50 px-1 rounded border border-transparent hover:border-red-200"
                                             onClick={() => setEditingField('pension')}
                                         >
-                                            -{(manualOverrides.pension_employee !== undefined ? manualOverrides.pension_employee : Math.round(parseFloat(formData.grossAmount || 0) * (formData.employeePct / 100))).toLocaleString()} ✏️
+                                            -{(manualOverrides.pension_employee !== undefined ? manualOverrides.pension_employee : Math.round(pensionGross * (formData.employeePct / 100))).toLocaleString()} ✏️
                                         </span>
                                         {editingField === 'pension' && (
                                             <EditValuePopover
                                                 title={t('income.recurringForm.overridePension')}
-                                                initialValue={manualOverrides.pension_employee !== undefined ? manualOverrides.pension_employee : Math.round(parseFloat(formData.grossAmount || 0) * (formData.employeePct / 100))}
+                                                initialValue={manualOverrides.pension_employee !== undefined ? manualOverrides.pension_employee : Math.round(pensionGross * (formData.employeePct / 100))}
                                                 onCancel={() => setEditingField(null)}
                                                 onSave={(val) => {
                                                     handleMismatchResolution('pension_employee', val);
@@ -1286,7 +1293,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                             >
                                                 -{(manualOverrides.other_deposit_employee !== undefined
                                                     ? manualOverrides.other_deposit_employee
-                                                    : Math.round(parseFloat(formData.grossAmount || 0) * (otherDepositEmployeePct / 100))
+                                                    : Math.round(pensionGross * (otherDepositEmployeePct / 100))
                                                 ).toLocaleString()} ✏️
                                             </span>
                                             {editingField === 'other_deposit' && (
@@ -1294,7 +1301,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                                     title="Override Other Deposit"
                                                     initialValue={manualOverrides.other_deposit_employee !== undefined
                                                         ? manualOverrides.other_deposit_employee
-                                                        : Math.round(parseFloat(formData.grossAmount || 0) * (otherDepositEmployeePct / 100))}
+                                                        : Math.round(pensionGross * (otherDepositEmployeePct / 100))}
                                                     onCancel={() => setEditingField(null)}
                                                     onSave={(val) => {
                                                         handleMismatchResolution('other_deposit_employee', val);
