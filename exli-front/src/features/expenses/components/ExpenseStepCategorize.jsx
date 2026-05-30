@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { CreditCard, RotateCcw, ArrowUp, ArrowDown, Edit2, Check, Plus, XCircle, Trash2, X, Flag, AlertTriangle, Calendar, Type, Repeat, HelpCircle, FileWarning, ShieldAlert, Link, ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button, CategoryIcon } from '../../../components/UI';
@@ -40,6 +40,18 @@ export const ExpenseStepCategorize = ({
 
     // Edit Modal State
     const [editForm, setEditForm] = useState({ description: '', amount: '', date: '' });
+    
+    // Percentage Split State
+    const baseAmountRef = useRef(null);
+    const [selectedSplit, setSelectedSplit] = useState(null);
+
+    // Reset base amount and selection when moving to a new transaction
+    useEffect(() => {
+        if (currentTx) {
+            baseAmountRef.current = currentTx.amount;
+            setSelectedSplit(null);
+        }
+    }, [currentIndex]);
 
     // Suspect Reason Options
     const suspectOptions = [
@@ -64,16 +76,21 @@ export const ExpenseStepCategorize = ({
     };
 
     const saveEdit = () => {
+        const newAmount = parseFloat(editForm.amount);
+        baseAmountRef.current = newAmount;
+        setSelectedSplit(null);
         onUpdateTransaction({
             description: editForm.description,
-            amount: parseFloat(editForm.amount),
+            amount: newAmount,
             date: editForm.date
         });
         setIsEditModalOpen(false);
     };
 
     const applyPercentage = (percentage) => {
-        const newAmount = parseFloat((currentTx.amount * (percentage / 100)).toFixed(2));
+        const base = baseAmountRef.current !== null ? baseAmountRef.current : currentTx.amount;
+        const newAmount = parseFloat((base * (percentage / 100)).toFixed(2));
+        setSelectedSplit(percentage);
         onUpdateTransaction({
             description: currentTx.description,
             amount: newAmount,
@@ -383,7 +400,11 @@ export const ExpenseStepCategorize = ({
                             <button
                                 key={percent}
                                 onClick={() => applyPercentage(percent)}
-                                className="flex-1 py-1.5 text-[10px] font-black bg-slate-50 text-slate-400 rounded-lg border border-slate-100 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-colors"
+                                className={`flex-1 py-1.5 text-[10px] font-black rounded-lg border transition-colors ${
+                                    selectedSplit === percent 
+                                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
+                                        : 'bg-slate-50 text-slate-400 border-slate-100 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200'
+                                }`}
                             >
                                 {percent}%
                             </button>
