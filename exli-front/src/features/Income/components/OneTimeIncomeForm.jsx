@@ -553,10 +553,43 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                         {hasTax ? (
                                             <>
                                                 {/* Tax Basis Display */}
-                                                <div className="flex items-center justify-between bg-blue-100/50 p-2 rounded-lg mb-4 text-sm border border-blue-100">
-                                                    <span className="text-blue-800">{t('income.extraction.fields.grossSalary')}</span>
-                                                    <span className="font-bold text-blue-900">{parseFloat(formData.grossAmount || 0).toLocaleString()} {formData.currency}</span>
-                                                </div>
+                                                {editingField === 'grossAmount' ? (
+                                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-blue-100 p-4 rounded-xl mb-4 border border-blue-200 gap-3">
+                                                        <span className="text-blue-900 font-bold text-lg">{t('income.extraction.fields.grossSalary')}</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="relative flex items-center">
+                                                                <input
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    value={formData.grossAmount}
+                                                                    onChange={(e) => setFormData({ ...formData, grossAmount: e.target.value })}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === 'Enter') {
+                                                                            e.preventDefault();
+                                                                            setEditingField(null);
+                                                                        }
+                                                                    }}
+                                                                    className="w-full sm:w-48 text-right p-3 rounded-xl border-2 border-blue-300 font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 outline-none bg-white shadow-sm"
+                                                                    placeholder="0"
+                                                                    autoFocus
+                                                                />
+                                                            </div>
+                                                            <button type="button" onClick={() => setEditingField(null)} className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-sm transition-colors">✓</button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-blue-50 p-4 rounded-xl mb-4 border border-blue-100 gap-3 transition-colors hover:bg-blue-100/50">
+                                                        <span className="text-blue-800 font-bold text-lg">{t('income.extraction.fields.grossSalary')}</span>
+                                                        <div className="flex items-center gap-4">
+                                                            <span className="font-black text-2xl text-blue-900">
+                                                                {parseFloat(formData.grossAmount || 0).toLocaleString()} <span className="text-lg text-blue-700">{formData.currency}</span>
+                                                            </span>
+                                                            <button type="button" onClick={() => setEditingField('grossAmount')} className="p-2 text-blue-500 hover:text-blue-700 hover:bg-blue-200/50 rounded-lg transition-colors cursor-pointer" title="Edit Gross Salary">
+                                                                ✏️
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
 
                                                 <TaxBracketGraph
                                                     annualIncome={parseFloat(formData.grossAmount || 0) * 12}
@@ -719,25 +752,43 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                         {hasPension ? (
                                             <>
                                                 {/* Pension Basis Display */}
-                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-purple-100 p-4 rounded-xl mb-4 border border-purple-200 gap-3">
-                                                    <div className="flex items-center gap-2">
+                                                {editingField === 'brutoPension' ? (
+                                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-purple-100 p-4 rounded-xl mb-4 border border-purple-200 gap-3">
                                                         <span className="text-purple-900 font-bold text-lg">{t('income.extraction.fields.grossSalaryPension')}</span>
-                                                    </div>
-                                                    <div className="relative flex items-center">
-                                                        <div className="absolute left-3 text-purple-400">
-                                                            ✏️
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="relative flex items-center">
+                                                                <input
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    value={formData.brutoPension || ''}
+                                                                    onChange={(e) => setFormData({ ...formData, brutoPension: e.target.value })}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === 'Enter') {
+                                                                            e.preventDefault();
+                                                                            setEditingField(null);
+                                                                        }
+                                                                    }}
+                                                                    className="w-full sm:w-48 text-right p-3 rounded-xl border-2 border-purple-300 font-bold text-purple-900 focus:ring-2 focus:ring-purple-500 outline-none bg-white shadow-sm"
+                                                                    placeholder={formData.grossAmount || '0'}
+                                                                    autoFocus
+                                                                />
+                                                            </div>
+                                                            <button type="button" onClick={() => setEditingField(null)} className="p-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 shadow-sm transition-colors">✓</button>
                                                         </div>
-                                                        <input
-                                                            type="number"
-                                                            step="0.01"
-                                                            value={formData.brutoPension || ''}
-                                                            onChange={(e) => setFormData({ ...formData, brutoPension: e.target.value })}
-                                                            className="w-full sm:w-48 text-right p-3 pl-8 pr-12 rounded-xl border-2 border-purple-300 font-bold text-purple-900 focus:ring-2 focus:ring-purple-500 outline-none bg-white shadow-sm"
-                                                            placeholder={formData.grossAmount || '0'}
-                                                        />
-                                                        <span className="absolute right-4 text-purple-600 font-bold">{formData.currency}</span>
                                                     </div>
-                                                </div>
+                                                ) : (
+                                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-purple-50 p-4 rounded-xl mb-4 border border-purple-100 gap-3 transition-colors hover:bg-purple-100/50">
+                                                        <span className="text-purple-800 font-bold text-lg">{t('income.extraction.fields.grossSalaryPension')}</span>
+                                                        <div className="flex items-center gap-4">
+                                                            <span className="font-black text-2xl text-purple-900">
+                                                                {pensionGross.toLocaleString()} <span className="text-lg text-purple-700">{formData.currency}</span>
+                                                            </span>
+                                                            <button type="button" onClick={() => setEditingField('brutoPension')} className="p-2 text-purple-500 hover:text-purple-700 hover:bg-purple-200/50 rounded-lg transition-colors cursor-pointer" title="Edit Pension Gross Salary">
+                                                                ✏️
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
 
                                                 <PercentageRow
                                                     label={t('income.oneTimeForm.employeeContribution')}
@@ -860,25 +911,43 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                     {hasOtherDeposits && (
                                         <>
                                             {/* Other Deposits Basis Display */}
-                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-emerald-100 p-4 rounded-xl mb-4 border border-emerald-200 gap-3">
-                                                <div className="flex items-center gap-2">
+                                            {editingField === 'brutoPensionOther' ? (
+                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-emerald-100 p-4 rounded-xl mb-4 border border-emerald-200 gap-3">
                                                     <span className="text-emerald-900 font-bold text-lg">{t('income.extraction.fields.grossSalaryPension')}</span>
-                                                </div>
-                                                <div className="relative flex items-center">
-                                                    <div className="absolute left-3 text-emerald-400">
-                                                        ✏️
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="relative flex items-center">
+                                                            <input
+                                                                type="number"
+                                                                step="0.01"
+                                                                value={formData.brutoPension || ''}
+                                                                onChange={(e) => setFormData({ ...formData, brutoPension: e.target.value })}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') {
+                                                                        e.preventDefault();
+                                                                        setEditingField(null);
+                                                                    }
+                                                                }}
+                                                                className="w-full sm:w-48 text-right p-3 rounded-xl border-2 border-emerald-300 font-bold text-emerald-900 focus:ring-2 focus:ring-emerald-500 outline-none bg-white shadow-sm"
+                                                                placeholder={formData.grossAmount || '0'}
+                                                                autoFocus
+                                                            />
+                                                        </div>
+                                                        <button type="button" onClick={() => setEditingField(null)} className="p-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 shadow-sm transition-colors">✓</button>
                                                     </div>
-                                                    <input
-                                                        type="number"
-                                                        step="0.01"
-                                                        value={formData.brutoPension || ''}
-                                                        onChange={(e) => setFormData({ ...formData, brutoPension: e.target.value })}
-                                                        className="w-full sm:w-48 text-right p-3 pl-8 pr-12 rounded-xl border-2 border-emerald-300 font-bold text-emerald-900 focus:ring-2 focus:ring-emerald-500 outline-none bg-white shadow-sm"
-                                                        placeholder={formData.grossAmount || '0'}
-                                                    />
-                                                    <span className="absolute right-4 text-emerald-600 font-bold">{formData.currency}</span>
                                                 </div>
-                                            </div>
+                                            ) : (
+                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-emerald-50 p-4 rounded-xl mb-4 border border-emerald-100 gap-3 transition-colors hover:bg-emerald-100/50">
+                                                    <span className="text-emerald-800 font-bold text-lg">{t('income.extraction.fields.grossSalaryPension')}</span>
+                                                    <div className="flex items-center gap-4">
+                                                        <span className="font-black text-2xl text-emerald-900">
+                                                            {pensionGross.toLocaleString()} <span className="text-lg text-emerald-700">{formData.currency}</span>
+                                                        </span>
+                                                        <button type="button" onClick={() => setEditingField('brutoPensionOther')} className="p-2 text-emerald-500 hover:text-emerald-700 hover:bg-emerald-200/50 rounded-lg transition-colors cursor-pointer" title="Edit Pension Gross Salary">
+                                                            ✏️
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
 
                                             <PercentageRow
                                                 label={t('income.oneTimeForm.employeeContribution')}
