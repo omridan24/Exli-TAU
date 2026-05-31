@@ -270,7 +270,8 @@ def extract_payslip_data(file_bytes, mime_type="application/pdf"):
     Extract these exact fields into a valid JSON object.
     
     ### FIELDS TO EXTRACT:
-    - "bruto": Gross Salary (Sahar Bruto / Sahar LeMis / Sahar Hoshva). ONLY THE MONTHLY GROSS.
+    - "bruto": Gross Salary for TAX purposes (Sahar Bruto / Bruto LeMas). This is the TOTAL gross including all bonuses, food, travel, etc. ONLY THE MONTHLY GROSS.
+    - "bruto_pension": Gross Salary for PENSION purposes (Bruto LePensiya / Sahar Pensioney). This is typically LOWER than bruto because it excludes food/travel/bonus allowances. It is the base salary used for pension and keren hishtalmut calculations. If not found, return null.
     - "neto": Net Salary (Neto LeTashlum / Sahar Neto).
     - "pension_employee": Employee's pension deposit (Tagmulim Oved / Kupat Gemel Oved).
     - "pension_employer": Employer's pension deposit (Tagmulim Maavid / Kupat Gemel Maavid).
@@ -285,10 +286,12 @@ def extract_payslip_data(file_bytes, mime_type="application/pdf"):
     2. All amounts should be numbers (floats).
     3. **CRITICAL**: Do NOT sum different tax types together. Keep them separate.
     4. **CRITICAL**: If multiple values are found for a field (e.g. multiple "Income Tax" lines), do NOT sum them. Choose the single most likely "Total" value.
-    5. Return ONLY the JSON object.
+    5. **CRITICAL**: "bruto" and "bruto_pension" are DIFFERENT numbers. "bruto" is the full taxable gross. "bruto_pension" is the pensionable salary base (often lower). Do NOT use the same value for both unless the payslip clearly shows only one gross figure.
+    6. Return ONLY the JSON object.
 
     ### FIELD MAPPING & HEBREW EXAMPLES:
-    - **bruto**: "שכר יסוד", "משכורת", "סהכ תשלומים", "ברוטו למס"
+    - **bruto**: "סהכ תשלומים", "ברוטו למס", "שכר ברוטו", "ברוטו"
+    - **bruto_pension**: "ברוטו לפנסיה", "שכר פנסיוני", "בסיס לפנסיה", "שכר לגמל", "ברוטו לגמל"
     - **neto**: "נטו לתשלום", "לפירעון", "סכום לתשלום"
     - **tax_income**: "מס הכנסה", "מ.הכנסה"
     - **tax_health**: "מס בריאות", "ביטוח בריאות", "בריאות"
@@ -299,7 +302,8 @@ def extract_payslip_data(file_bytes, mime_type="application/pdf"):
     
     ### OUTPUT:
     {{ 
-      "bruto": null, 
+      "bruto": null,
+      "bruto_pension": null,
       "neto": null, 
       "pension_employee": null, 
       "pension_employer": null, 

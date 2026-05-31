@@ -4,7 +4,7 @@ import {
     HelpCircle, Star, Briefcase, Gift, Plane, Coffee, Zap, Wifi, GraduationCap, PawPrint
 } from 'lucide-react';
 
-export const Button = ({ children, onClick, variant = 'primary', className = '', disabled = false }) => {
+export const Button = ({ children, onClick, type, variant = 'primary', className = '', disabled = false }) => {
     const baseStyle = "px-6 py-3 rounded-xl font-bold transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2";
     const variants = {
         primary: "bg-slate-900 text-white hover:bg-slate-800 shadow-lg hover:shadow-xl",
@@ -14,7 +14,7 @@ export const Button = ({ children, onClick, variant = 'primary', className = '',
     };
 
     return (
-        <button onClick={onClick} disabled={disabled} className={`${baseStyle} ${variants[variant]} ${className}`}>
+        <button type={type} onClick={onClick} disabled={disabled} className={`${baseStyle} ${variants[variant]} ${className}`}>
             {children}
         </button>
     );

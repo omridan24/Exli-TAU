@@ -447,7 +447,8 @@
             "notFound": "Not found",
             "verifyNote": "* Verify these values against your actual payslip file.",
             "fields": {
-                "grossSalary": "Gross Salary",
+                "grossSalary": "Gross Salary (for Tax)",
+                "grossSalaryPension": "Gross Salary (for Pension)",
                 "netSalary": "Net Salary",
                 "incomeTax": "Income Tax",
                 "healthInsurance": "Health Insurance",

@@ -449,7 +449,8 @@
             "notFound": "לא נמצא",
             "verifyNote": "* אמת את הערכים מול תלוש השכר בפועל.",
             "fields": {
-                "grossSalary": "שכר ברוטו",
+                "grossSalary": "שכר ברוטו (למס)",
+                "grossSalaryPension": "שכר ברוטו (לפנסיה)",
                 "netSalary": "שכר נטו",
                 "incomeTax": "מס הכנסה",
                 "healthInsurance": "ביטוח בריאות",

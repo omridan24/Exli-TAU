@@ -68,6 +68,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
         workplaceName: '',
         occupation: '',
         grossAmount: '',
+        brutoPension: '',
         netAmount: '',
         currency: currency || 'ILS',
         employeePct: 6.0,
@@ -77,6 +78,10 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
         workplaceLogo: '',
         workplaceDomain: ''
     });
+
+    // Pension/Other Deposits use pensionable gross (Israeli law: excludes food/travel bonuses)
+    // Falls back to regular gross if bruto_pension was not found in the payslip
+    const pensionGross = parseFloat(formData.brutoPension || formData.grossAmount || 0);
 
     const [isSaving, setIsSaving] = useState(false);
     const [validationError, setValidationError] = useState('');
@@ -173,20 +178,17 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
             setFormData(prev => ({
                 ...prev,
                 grossAmount: extractedData.bruto || prev.grossAmount,
-                // We keep calculated neto as the default, but user can see the mismatch
-                // If they want to force neto from payslip, they can edit it.
+                brutoPension: extractedData.bruto_pension || '',
             }));
         }
     }, [extractedData]);
 
-    // Progressive form reveal
+    // Progressive Reveal: Show rest of form after workplace is filled
     useEffect(() => {
-        if (formData.workplaceName && formData.grossAmount) {
+        if (formData.workplaceName) {
             setShowFullForm(true);
-        } else {
-            setShowFullForm(false);
         }
-    }, [formData.workplaceName, formData.grossAmount]);
+    }, [formData.workplaceName]);
 
     // Auto-calculate expected tax
     useEffect(() => {
@@ -230,19 +232,19 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
     }, [formData.grossAmount, userCountry]);
 
     // Auto-calculate expected pension (employee + employer + severance)
+    // Uses pensionGross (bruto for pension) instead of total gross
     useEffect(() => {
         if (formData.grossAmount) {
-            const gross = parseFloat(formData.grossAmount);
             const empPct = parseFloat(formData.employeePct) || 0;
             const workPct = parseFloat(formData.employerPct) || 0;
             const sevPct = parseFloat(formData.severancePct) || 0;
-            const total = Math.round(gross * ((empPct + workPct + sevPct) / 100));
+            const total = Math.round(pensionGross * ((empPct + workPct + sevPct) / 100));
 
             if (total !== formData.expectedPension) {
                 setFormData(prev => ({ ...prev, expectedPension: total }));
             }
         }
-    }, [formData.grossAmount, formData.employeePct, formData.employerPct, formData.severancePct]);
+    }, [formData.grossAmount, formData.brutoPension, formData.employeePct, formData.employerPct, formData.severancePct]);
 
     // Auto-calculate Neto from Bruto - Tax - Employee Pension - Other Deposits
     useEffect(() => {
@@ -257,10 +259,10 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
         if (formData.grossAmount) {
             const gross = parseFloat(formData.grossAmount);
 
-            // 1. Employee Pension
+            // 1. Employee Pension (uses pensionGross - Israeli law)
             const pension = manualOverrides.pension_employee !== undefined
                 ? manualOverrides.pension_employee
-                : Math.round(gross * (formData.employeePct / 100));
+                : Math.round(pensionGross * (formData.employeePct / 100));
 
             // 2. Taxes (Income + Health + National)
             const incomeTax = manualOverrides.tax_income !== undefined ? manualOverrides.tax_income : calculatedTax;
@@ -273,10 +275,10 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
 
             const totalTaxes = incomeTax + healthTax + nationalTax;
 
-            // 3. Other Deposits (Employee Only reduces net)
+            // 3. Other Deposits (Employee Only reduces net) - uses pensionGross
             const otherDeposits = manualOverrides.other_deposit_employee !== undefined
                 ? manualOverrides.other_deposit_employee
-                : Math.round(gross * (otherDepositEmployeePct / 100));
+                : Math.round(pensionGross * (otherDepositEmployeePct / 100));
 
             const totalDeductions = totalTaxes + pension + otherDeposits;
             const autoNeto = Math.max(0, Math.round(gross - totalDeductions));
@@ -285,7 +287,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                 setFormData(prev => ({ ...prev, netAmount: autoNeto }));
             }
         }
-    }, [formData.grossAmount, calculatedTax, additionalTaxes, formData.employeePct, manualOverrides, otherDepositEmployeePct]);
+    }, [formData.grossAmount, formData.brutoPension, calculatedTax, additionalTaxes, formData.employeePct, manualOverrides, otherDepositEmployeePct]);
 
     const handleWorkplaceSelect = (workplace) => {
         setFormData({
@@ -320,7 +322,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                 taxes: (manualOverrides.tax_income ?? calculatedTax) +
                     (manualOverrides.tax_health ?? (additionalTaxes.breakdown.find(t => t.name.includes('Health'))?.amount || 0)) +
                     (manualOverrides.tax_national ?? (additionalTaxes.breakdown.find(t => t.name.includes('National'))?.amount || 0)),
-                pension: manualOverrides.pension_employee ?? Math.round(parseFloat(formData.grossAmount) * (formData.employeePct / 100)),
+                pension: manualOverrides.pension_employee ?? Math.round(pensionGross * (formData.employeePct / 100)),
                 currency: formData.currency,
                 type: 'one-time',
                 isRecurring: false,
@@ -332,7 +334,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                 otherDeposits: {
                     employeePct: otherDepositEmployeePct,
                     employerPct: otherDepositEmployerPct,
-                    totalMonthly: Math.round(formData.grossAmount * ((otherDepositEmployeePct + otherDepositEmployerPct) / 100))
+                    totalMonthly: Math.round(pensionGross * ((otherDepositEmployeePct + otherDepositEmployerPct) / 100))
                 }
             };
 
@@ -347,40 +349,61 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
         }
     };
 
-    // Reusable Percentage Row Component (EXACT COPY from RecurringIncomeForm)
+    // Reusable Percentage Row Component
     const PercentageRow = ({ label, value, onChange, color, isCustom, setIsCustom, customList, setCustomList }) => {
         const [customInput, setCustomInput] = useState('');
+        const [inputType, setInputType] = useState('%'); // '%' or 'amount'
 
         const handleApproveCustom = () => {
-            const num = parseFloat(customInput);
-            if (!isNaN(num) && num >= 0 && num <= 100) {
-                if (!customList.includes(num)) {
-                    setCustomList([...customList, num]);
+            let num = parseFloat(customInput);
+            if (!isNaN(num) && num >= 0) {
+                if (inputType === 'amount' && pensionGross > 0) {
+                    num = (num / pensionGross) * 100;
+                    num = parseFloat(num.toFixed(3)); // precision
                 }
-                onChange(num);
-                setIsCustom(false);
-                setCustomInput('');
+
+                if (num >= 0 && num <= 100) {
+                    if (!customList.includes(num)) {
+                        setCustomList([...customList, num]);
+                    }
+                    onChange(num);
+                    setIsCustom(false);
+                    setCustomInput('');
+                }
             }
         };
 
         return (
             <div className="mb-4">
-                <label className="block text-sm font-medium text-slate-700 mb-2">{label}</label>
+                <label className={`block text-sm font-medium mb-2 ${color || 'text-slate-700'}`}>
+                    {label} ({value}%)
+                </label>
 
                 {isCustom ? (
                     <div className="flex gap-2 items-center">
-                        <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            max="100"
-                            value={customInput}
-                            onChange={(e) => setCustomInput(e.target.value)}
-                            onKeyPress={(e) => e.key === 'Enter' && handleApproveCustom()}
-                            className="w-24 p-2 border border-slate-300 rounded-lg text-center font-bold"
-                            placeholder="%"
-                            autoFocus
-                        />
+                        <div className="relative flex-1 flex items-center">
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={customInput}
+                                onChange={(e) => setCustomInput(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && handleApproveCustom()}
+                                className="w-full p-2 pr-12 border border-slate-300 rounded-lg text-center font-bold"
+                                placeholder={inputType === '%' ? "%" : formData.currency}
+                                autoFocus
+                            />
+                            <button 
+                                type="button"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    setInputType(inputType === '%' ? 'amount' : '%');
+                                }}
+                                className="absolute right-1 top-1 bottom-1 px-2 bg-slate-100 rounded text-xs font-bold text-slate-500 hover:bg-slate-200 transition-colors"
+                            >
+                                {inputType === '%' ? '%' : formData.currency}
+                            </button>
+                        </div>
                         <button
                             type="button"
                             onClick={handleApproveCustom}
@@ -507,32 +530,10 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                             />
                         </div>
 
-                        {/* Gross Salary - EXACT COPY */}
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">{t('income.oneTimeForm.grossSalary')}</label>
-                            <input
-                                type="number"
-                                step="0.01"
-                                value={formData.grossAmount}
-                                onChange={(e) => setFormData({ ...formData, grossAmount: e.target.value })}
-                                placeholder="e.g., 10000"
-                                className="w-full p-4 border-2 border-slate-300 rounded-xl text-lg font-mono font-bold focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
-                                required
-                            />
-                        </div>
-
-                        {/* Progressive Reveal: Show rest of form after workplace + gross amount filled */}
-                        {!showFullForm && (
-                            <div className="text-center py-6 text-slate-400 text-sm">
-                                {t('income.oneTimeForm.fillToProgress')}
-                            </div>
-                        )}
-
                         {showFullForm && (
                             <>
-                                {/* Tax Calculator - EXACT COPY */}
-                                {parseFloat(formData.grossAmount || 0) > 0 && (
-                                    <div className={`border-2 rounded-xl p-4 transition-colors ${hasTax ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200'}`}>
+                                {/* Tax Calculator */}
+                                <div className={`border-2 rounded-xl p-4 transition-colors ${hasTax ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200'}`}>
                                         <div className="flex items-center justify-between mb-4">
                                             <h4 className={`font-bold flex items-center gap-2 ${hasTax ? 'text-blue-900' : 'text-slate-500'}`}>
                                                 {t('income.oneTimeForm.taxCalculator')}
@@ -551,6 +552,45 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
 
                                         {hasTax ? (
                                             <>
+                                                {/* Tax Basis Display */}
+                                                {editingField === 'grossAmount' ? (
+                                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-blue-100 p-4 rounded-xl mb-4 border border-blue-200 gap-3">
+                                                        <span className="text-blue-900 font-bold text-lg">{t('income.extraction.fields.grossSalary')}</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="relative flex items-center">
+                                                                <input
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    value={formData.grossAmount}
+                                                                    onChange={(e) => setFormData({ ...formData, grossAmount: e.target.value })}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === 'Enter') {
+                                                                            e.preventDefault();
+                                                                            setEditingField(null);
+                                                                        }
+                                                                    }}
+                                                                    className="w-full sm:w-48 text-right p-3 rounded-xl border-2 border-blue-300 font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 outline-none bg-white shadow-sm"
+                                                                    placeholder="0"
+                                                                    autoFocus
+                                                                />
+                                                            </div>
+                                                            <button type="button" onClick={() => setEditingField(null)} className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-sm transition-colors">✓</button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-blue-50 p-4 rounded-xl mb-4 border border-blue-100 gap-3 transition-colors hover:bg-blue-100/50">
+                                                        <span className="text-blue-800 font-bold text-lg">{t('income.extraction.fields.grossSalary')}</span>
+                                                        <div className="flex items-center gap-4">
+                                                            <span className="font-black text-2xl text-blue-900">
+                                                                {parseFloat(formData.grossAmount || 0).toLocaleString()} <span className="text-lg text-blue-700">{formData.currency}</span>
+                                                            </span>
+                                                            <button type="button" onClick={() => setEditingField('grossAmount')} className="p-2 text-blue-500 hover:text-blue-700 hover:bg-blue-200/50 rounded-lg transition-colors cursor-pointer" title="Edit Gross Salary">
+                                                                ✏️
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+
                                                 <TaxBracketGraph
                                                     annualIncome={parseFloat(formData.grossAmount || 0) * 12}
                                                     brackets={getTaxConfig(userCountry)?.brackets || []}
@@ -685,11 +725,9 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                             </div>
                                         )}
                                     </div>
-                                )}
 
                                 {/* Pension Calculator with No Pension Toggle */}
-                                {parseFloat(formData.grossAmount || 0) > 0 && (
-                                    <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-4">
+                                <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-4">
                                         <div className="flex items-center justify-between mb-4">
                                             <h4 className="font-bold text-purple-900">{t('income.oneTimeForm.pensionCalculator')}</h4>
                                             <button
@@ -713,6 +751,45 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
 
                                         {hasPension ? (
                                             <>
+                                                {/* Pension Basis Display */}
+                                                {editingField === 'brutoPension' ? (
+                                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-purple-100 p-4 rounded-xl mb-4 border border-purple-200 gap-3">
+                                                        <span className="text-purple-900 font-bold text-lg">{t('income.extraction.fields.grossSalaryPension')}</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="relative flex items-center">
+                                                                <input
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    value={formData.brutoPension || ''}
+                                                                    onChange={(e) => setFormData({ ...formData, brutoPension: e.target.value })}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === 'Enter') {
+                                                                            e.preventDefault();
+                                                                            setEditingField(null);
+                                                                        }
+                                                                    }}
+                                                                    className="w-full sm:w-48 text-right p-3 rounded-xl border-2 border-purple-300 font-bold text-purple-900 focus:ring-2 focus:ring-purple-500 outline-none bg-white shadow-sm"
+                                                                    placeholder={formData.grossAmount || '0'}
+                                                                    autoFocus
+                                                                />
+                                                            </div>
+                                                            <button type="button" onClick={() => setEditingField(null)} className="p-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 shadow-sm transition-colors">✓</button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-purple-50 p-4 rounded-xl mb-4 border border-purple-100 gap-3 transition-colors hover:bg-purple-100/50">
+                                                        <span className="text-purple-800 font-bold text-lg">{t('income.extraction.fields.grossSalaryPension')}</span>
+                                                        <div className="flex items-center gap-4">
+                                                            <span className="font-black text-2xl text-purple-900">
+                                                                {pensionGross.toLocaleString()} <span className="text-lg text-purple-700">{formData.currency}</span>
+                                                            </span>
+                                                            <button type="button" onClick={() => setEditingField('brutoPension')} className="p-2 text-purple-500 hover:text-purple-700 hover:bg-purple-200/50 rounded-lg transition-colors cursor-pointer" title="Edit Pension Gross Salary">
+                                                                ✏️
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+
                                                 <PercentageRow
                                                     label={t('income.oneTimeForm.employeeContribution')}
                                                     value={formData.employeePct}
@@ -728,7 +805,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                                         <MismatchAlert
                                                             label={t('income.oneTimeForm.employeeContribution')}
                                                             actual={extractedData.pension_employee}
-                                                            expected={Math.round(parseFloat(formData.grossAmount || 0) * (formData.employeePct / 100))}
+                                                            expected={Math.round(pensionGross * (formData.employeePct / 100))}
                                                             currency={formData.currency}
                                                             fieldKey="pension_employee"
                                                             onResolve={handleMismatchResolution}
@@ -753,7 +830,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                                         <MismatchAlert
                                                             label={t('income.oneTimeForm.employerContribution')}
                                                             actual={extractedData.pension_employer}
-                                                            expected={Math.round(parseFloat(formData.grossAmount || 0) * (formData.employerPct / 100))}
+                                                            expected={Math.round(pensionGross * (formData.employerPct / 100))}
                                                             currency={formData.currency}
                                                             fieldKey="pension_employer"
                                                             onResolve={handleMismatchResolution}
@@ -778,7 +855,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                                         <MismatchAlert
                                                             label={t('income.oneTimeForm.severanceEmployerPays')}
                                                             actual={extractedData.pension_severance}
-                                                            expected={Math.round(parseFloat(formData.grossAmount || 0) * (formData.severancePct / 100))}
+                                                            expected={Math.round(pensionGross * (formData.severancePct / 100))}
                                                             currency={formData.currency}
                                                             fieldKey="pension_severance"
                                                             onResolve={handleMismatchResolution}
@@ -812,7 +889,6 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                             </div>
                                         )}
                                     </div>
-                                )}
 
                                 {/* Other Deposits (Keren Hishtalmut, etc.) */}
                                 <div className="bg-emerald-50 border-2 border-emerald-200 rounded-xl p-4">
@@ -834,6 +910,45 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
 
                                     {hasOtherDeposits && (
                                         <>
+                                            {/* Other Deposits Basis Display */}
+                                            {editingField === 'brutoPensionOther' ? (
+                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-emerald-100 p-4 rounded-xl mb-4 border border-emerald-200 gap-3">
+                                                    <span className="text-emerald-900 font-bold text-lg">{t('income.extraction.fields.grossSalaryPension')}</span>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="relative flex items-center">
+                                                            <input
+                                                                type="number"
+                                                                step="0.01"
+                                                                value={formData.brutoPension || ''}
+                                                                onChange={(e) => setFormData({ ...formData, brutoPension: e.target.value })}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') {
+                                                                        e.preventDefault();
+                                                                        setEditingField(null);
+                                                                    }
+                                                                }}
+                                                                className="w-full sm:w-48 text-right p-3 rounded-xl border-2 border-emerald-300 font-bold text-emerald-900 focus:ring-2 focus:ring-emerald-500 outline-none bg-white shadow-sm"
+                                                                placeholder={formData.grossAmount || '0'}
+                                                                autoFocus
+                                                            />
+                                                        </div>
+                                                        <button type="button" onClick={() => setEditingField(null)} className="p-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 shadow-sm transition-colors">✓</button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-emerald-50 p-4 rounded-xl mb-4 border border-emerald-100 gap-3 transition-colors hover:bg-emerald-100/50">
+                                                    <span className="text-emerald-800 font-bold text-lg">{t('income.extraction.fields.grossSalaryPension')}</span>
+                                                    <div className="flex items-center gap-4">
+                                                        <span className="font-black text-2xl text-emerald-900">
+                                                            {pensionGross.toLocaleString()} <span className="text-lg text-emerald-700">{formData.currency}</span>
+                                                        </span>
+                                                        <button type="button" onClick={() => setEditingField('brutoPensionOther')} className="p-2 text-emerald-500 hover:text-emerald-700 hover:bg-emerald-200/50 rounded-lg transition-colors cursor-pointer" title="Edit Pension Gross Salary">
+                                                            ✏️
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+
                                             <PercentageRow
                                                 label={t('income.oneTimeForm.employeeContribution')}
                                                 value={otherDepositEmployeePct}
@@ -849,7 +964,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                                     <MismatchAlert
                                                         label={t('income.oneTimeForm.employeeContribution')}
                                                         actual={extractedData.keren_hishtalmut_employee}
-                                                        expected={Math.round(parseFloat(formData.grossAmount || 0) * (otherDepositEmployeePct / 100))}
+                                                        expected={Math.round(pensionGross * (otherDepositEmployeePct / 100))}
                                                         currency={formData.currency}
                                                         fieldKey="keren_hishtalmut_employee"
                                                         onResolve={handleMismatchResolution}
@@ -874,7 +989,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                                     <MismatchAlert
                                                         label={t('income.oneTimeForm.employerContribution')}
                                                         actual={extractedData.keren_hishtalmut_employer}
-                                                        expected={Math.round(parseFloat(formData.grossAmount || 0) * (otherDepositEmployerPct / 100))}
+                                                        expected={Math.round(pensionGross * (otherDepositEmployerPct / 100))}
                                                         currency={formData.currency}
                                                         fieldKey="keren_hishtalmut_employer"
                                                         onResolve={handleMismatchResolution}
@@ -885,14 +1000,13 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                             )}
 
                                             <div className="mt-2 text-xs text-emerald-600 font-bold border-t border-emerald-200 pt-2 text-right">
-                                                {t('income.oneTimeForm.totalOtherDeposit')} {Math.round(parseFloat(formData.grossAmount || 0) * ((otherDepositEmployeePct + otherDepositEmployerPct) / 100)).toLocaleString()} {formData.currency}
+                                                {t('income.oneTimeForm.totalOtherDeposit')} {Math.round(pensionGross * ((otherDepositEmployeePct + otherDepositEmployerPct) / 100)).toLocaleString()} {formData.currency}
                                             </div>
                                         </>
                                     )}
                                 </div>
 
                                 {/* Net Salary - EDITABLE (New Card Design) */}
-                                {parseFloat(formData.grossAmount || 0) > 0 && (
                                     <div>
                                         <div className="bg-white border-2 border-teal-100 rounded-xl p-5 shadow-sm">
                                             <label className="block text-sm font-bold text-teal-900 mb-3 uppercase tracking-wider">
@@ -981,12 +1095,12 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                                         className="font-bold cursor-pointer hover:bg-red-50 px-1 rounded border border-transparent hover:border-red-200"
                                                         onClick={() => setEditingField('pension')}
                                                     >
-                                                        -{(manualOverrides.pension_employee !== undefined ? manualOverrides.pension_employee : Math.round(parseFloat(formData.grossAmount || 0) * (formData.employeePct / 100))).toLocaleString()} ✏️
+                                                        -{(manualOverrides.pension_employee !== undefined ? manualOverrides.pension_employee : Math.round(pensionGross * (formData.employeePct / 100))).toLocaleString()} ✏️
                                                     </span>
                                                     {editingField === 'pension' && (
                                                         <EditValuePopover
                                                             title={t('income.oneTimeForm.overridePension')}
-                                                            initialValue={manualOverrides.pension_employee !== undefined ? manualOverrides.pension_employee : Math.round(parseFloat(formData.grossAmount || 0) * (formData.employeePct / 100))}
+                                                            initialValue={manualOverrides.pension_employee !== undefined ? manualOverrides.pension_employee : Math.round(pensionGross * (formData.employeePct / 100))}
                                                             onCancel={() => setEditingField(null)}
                                                             onSave={(val) => {
                                                                 handleMismatchResolution('pension_employee', val);
@@ -1010,7 +1124,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                                         >
                                                             -{(manualOverrides.other_deposit_employee !== undefined
                                                                 ? manualOverrides.other_deposit_employee
-                                                                : Math.round(parseFloat(formData.grossAmount || 0) * (otherDepositEmployeePct / 100))
+                                                                : Math.round(pensionGross * (otherDepositEmployeePct / 100))
                                                             ).toLocaleString()} ✏️
                                                         </span>
                                                         {editingField === 'other_deposit' && (
@@ -1018,7 +1132,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                                                 title={t('income.oneTimeForm.overrideOtherDeposit')}
                                                                 initialValue={manualOverrides.other_deposit_employee !== undefined
                                                                     ? manualOverrides.other_deposit_employee
-                                                                    : Math.round(parseFloat(formData.grossAmount || 0) * (otherDepositEmployeePct / 100))}
+                                                                    : Math.round(pensionGross * (otherDepositEmployeePct / 100))}
                                                                 onCancel={() => setEditingField(null)}
                                                                 onSave={(val) => {
                                                                     handleMismatchResolution('other_deposit_employee', val);
@@ -1058,7 +1172,6 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                             )}
                                         </div>
                                     </div>
-                                )}
                             </>
                         )}
 
