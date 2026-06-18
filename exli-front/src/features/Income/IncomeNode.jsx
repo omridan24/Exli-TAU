@@ -257,10 +257,21 @@ export const IncomeNode = ({ userId, onComplete }) => {
             {step === 4 && (
                 <IncomeBatchReview
                     batchResults={batchResults}
+                    workplaces={workplaces}
+                    onUpdateRow={(idx, updates) => {
+                        setBatchResults(prev => {
+                            const newRes = [...prev];
+                            newRes[idx] = {
+                                ...newRes[idx],
+                                data: { ...newRes[idx].data, ...updates }
+                            };
+                            return newRes;
+                        });
+                    }}
                     onRowClick={(idx) => {
                         setSelectedResultIndex(idx);
                         setExtractedData(batchResults[idx].data);
-                        if (batchResults[idx].data.pay_month) {
+                        if (batchResults[idx].data?.pay_month) {
                             setReportMonth(batchResults[idx].data.pay_month);
                         }
                         setShowOneTimeForm(true);

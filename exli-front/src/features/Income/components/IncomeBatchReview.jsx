@@ -1,12 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FileText, CheckCircle2, AlertCircle, ArrowRight, Wallet, Edit2 } from 'lucide-react';
+import { FileText, CheckCircle2, AlertCircle, ArrowRight, Wallet, Edit2, Check, X } from 'lucide-react';
 import { Button } from '../../../components/UI.jsx';
+import { MonthYearPickerModal } from '../../../components/MonthYearPickerModal.jsx';
 
 export const IncomeBatchReview = ({
     batchResults,
     onRowClick,
-    onComplete
+    onComplete,
+    workplaces = [],
+    onUpdateRow
 }) => {
     const { t } = useTranslation();
 
@@ -15,6 +18,11 @@ export const IncomeBatchReview = ({
     const completedCount = batchResults.filter(res => res.status === 'saved').length;
     const pendingCount = batchResults.length - completedCount;
     const allCompleted = completedCount === batchResults.length;
+
+    // Inline edit state
+    const [editingMonthIdx, setEditingMonthIdx] = useState(null);
+    const [editingEmployerIdx, setEditingEmployerIdx] = useState(null);
+    const [employerInput, setEmployerInput] = useState('');
 
     return (
         <div className="space-y-6 animate-fade-in">
@@ -87,20 +95,67 @@ export const IncomeBatchReview = ({
                                             'hover:bg-slate-50 cursor-pointer'
                                         }`}
                                     >
-                                        <td className="p-4">
+                                        <td className="p-4 group">
                                             <div className="flex items-center gap-3">
                                                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isSaved ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
                                                     <FileText className="w-4 h-4" />
                                                 </div>
-                                                <div className="font-bold text-slate-700">
-                                                    {res.data?.pay_month || t('income.batchReview.unknownMonth', 'Unknown Month')}
+                                                <div className="font-bold text-slate-700 flex items-center gap-2">
+                                                    {res.data?.pay_month ? res.data.pay_month : (
+                                                        <span className="text-amber-600 font-medium flex items-center gap-1">
+                                                            {t('income.batchReview.unknownMonth', 'Unknown Month')}
+                                                        </span>
+                                                    )}
+                                                    {!isSaved && !isError && (
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); setEditingMonthIdx(idx); }}
+                                                            className={`p-1 rounded transition-colors ${!res.data?.pay_month ? 'text-amber-600 hover:bg-amber-50' : 'text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 opacity-0 group-hover:opacity-100'}`}
+                                                        >
+                                                            <Edit2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="p-4">
-                                            <div className="font-medium text-slate-600">
-                                                {res.data?.employer_name || t('income.batchReview.unknownEmployer', 'Unknown')}
-                                            </div>
+                                        <td className="p-4 group">
+                                            {editingEmployerIdx === idx ? (
+                                                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                                    <input 
+                                                        type="text" 
+                                                        list="workplaces-list"
+                                                        value={employerInput}
+                                                        onChange={(e) => setEmployerInput(e.target.value)}
+                                                        className="border border-slate-300 rounded px-2 py-1 text-sm w-32 focus:ring-2 focus:ring-emerald-500 outline-none"
+                                                        autoFocus
+                                                    />
+                                                    <button onClick={() => { onUpdateRow(idx, { employer_name: employerInput }); setEditingEmployerIdx(null); }} className="text-emerald-600 hover:bg-emerald-50 p-1 rounded">
+                                                        <Check className="w-4 h-4" />
+                                                    </button>
+                                                    <button onClick={() => setEditingEmployerIdx(null)} className="text-slate-400 hover:bg-slate-50 p-1 rounded">
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="font-medium text-slate-600 flex items-center gap-2">
+                                                    {res.data?.employer_name ? res.data.employer_name : (
+                                                        <span className="text-amber-600">
+                                                            {t('income.batchReview.unknownEmployer', 'Unknown')}
+                                                        </span>
+                                                    )}
+                                                    {!isSaved && !isError && (
+                                                        <button 
+                                                            onClick={(e) => { 
+                                                                e.stopPropagation(); 
+                                                                setEmployerInput(res.data?.employer_name || ''); 
+                                                                setEditingEmployerIdx(idx); 
+                                                            }}
+                                                            className={`p-1 rounded transition-colors ${!res.data?.employer_name ? 'text-amber-600 hover:bg-amber-50' : 'text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 opacity-0 group-hover:opacity-100'}`}
+                                                        >
+                                                            <Edit2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
                                             <div className="text-xs text-slate-400 mt-0.5 truncate max-w-[150px]" title={res.filename}>
                                                 {res.filename}
                                             </div>
@@ -164,6 +219,23 @@ export const IncomeBatchReview = ({
                         : t('income.batchReview.completeAllToFinish', 'Review all to finish')}
                 </Button>
             </div>
+            <datalist id="workplaces-list">
+                {workplaces.map((wp, idx) => (
+                    <option key={idx} value={wp.name} />
+                ))}
+            </datalist>
+
+            <MonthYearPickerModal
+                isOpen={editingMonthIdx !== null}
+                onClose={() => setEditingMonthIdx(null)}
+                value={editingMonthIdx !== null ? batchResults[editingMonthIdx]?.data?.pay_month || new Date().toISOString().slice(0, 7) : new Date().toISOString().slice(0, 7)}
+                onSave={(v) => { 
+                    if (editingMonthIdx !== null) {
+                        onUpdateRow(editingMonthIdx, { pay_month: v }); 
+                    }
+                    setEditingMonthIdx(null); 
+                }}
+            />
         </div>
     );
 };
