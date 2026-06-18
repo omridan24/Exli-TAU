@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { FileText, CheckCircle2, AlertCircle, ArrowRight, Wallet } from 'lucide-react';
-import { Button } from '../../../../components/UI.jsx';
+import { Button } from '../../../components/UI.jsx';
 
 export const IncomeBatchReview = ({
     batchResults,
