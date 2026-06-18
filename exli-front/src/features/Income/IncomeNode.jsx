@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Wallet, Receipt, Repeat, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { collection, addDoc, serverTimestamp, doc, getDoc, getDocs } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, getDoc, getDocs, updateDoc } from 'firebase/firestore';
 import { db, CLOUD_RUN_URL } from '../../config/firebase.js';
 import { CURRENCIES } from '../../config/constants.js';
 
@@ -258,6 +258,22 @@ export const IncomeNode = ({ userId, onComplete }) => {
                 <IncomeBatchReview
                     batchResults={batchResults}
                     workplaces={workplaces}
+                    onAddWorkplace={async (company) => {
+                        // Avoid duplicates
+                        if (!workplaces.find(w => w.name === company.name)) {
+                            const newWorkplaces = [...workplaces, company];
+                            setWorkplaces(newWorkplaces);
+                            if (userId) {
+                                try {
+                                    await updateDoc(doc(db, 'users', userId), {
+                                        'profile.workplaces': newWorkplaces
+                                    });
+                                } catch (e) {
+                                    console.error('Failed to update workplaces in DB', e);
+                                }
+                            }
+                        }
+                    }}
                     onUpdateRow={(idx, updates) => {
                         setBatchResults(prev => {
                             const newRes = [...prev];

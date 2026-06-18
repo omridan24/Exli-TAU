@@ -10,7 +10,8 @@ export const IncomeBatchReview = ({
     onRowClick,
     onComplete,
     workplaces = [],
-    onUpdateRow
+    onUpdateRow,
+    onAddWorkplace
 }) => {
     const { t } = useTranslation();
 
@@ -89,11 +90,10 @@ export const IncomeBatchReview = ({
                                 return (
                                     <tr 
                                         key={idx} 
-                                        onClick={() => !isError && !isSaved && onRowClick(idx)}
                                         className={`transition-colors ${
-                                            isError ? 'bg-red-50/50 cursor-not-allowed' :
+                                            isError ? 'bg-red-50/50' :
                                             isSaved ? 'bg-emerald-50/10' : 
-                                            'hover:bg-slate-50 cursor-pointer'
+                                            'hover:bg-slate-50'
                                         }`}
                                     >
                                         <td className="p-4 group">
@@ -173,10 +173,13 @@ export const IncomeBatchReview = ({
                                                         </button>
                                                     </div>
                                                 ) : (
-                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors">
+                                                    <button 
+                                                        onClick={() => onRowClick(idx)}
+                                                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
+                                                    >
                                                         {t('income.batchReview.review', 'Review')}
                                                         <ArrowRight className="w-3.5 h-3.5" />
-                                                    </span>
+                                                    </button>
                                                 )}
                                             </div>
                                         </td>
@@ -247,6 +250,9 @@ export const IncomeBatchReview = ({
                 onSelect={(company) => {
                     if (editingEmployerIdx !== null) {
                         onUpdateRow(editingEmployerIdx, { employer_name: company.name });
+                        if (onAddWorkplace) {
+                            onAddWorkplace(company);
+                        }
                     }
                     setShowWorkplacePicker(false);
                     setEditingEmployerIdx(null);
