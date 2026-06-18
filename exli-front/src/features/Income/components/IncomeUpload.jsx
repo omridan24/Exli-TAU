@@ -5,7 +5,7 @@ import { Button } from '../../../components/UI.jsx';
 import { ProgressBar } from '../../expenses/components/ProgressBar.jsx';
 
 export const IncomeUpload = ({
-    file,
+    files = [],
     onFileChange,
     onRemoveFile,
     onManualConfig,
@@ -24,6 +24,7 @@ export const IncomeUpload = ({
                 <div className="flex-1 border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center hover:bg-slate-50 transition-colors relative flex flex-col items-center justify-center min-h-[200px]">
                     <input
                         type="file"
+                        multiple
                         accept=".pdf, .jpg, .jpeg, .png, .webp"
                         onChange={onFileChange}
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
@@ -47,25 +48,29 @@ export const IncomeUpload = ({
                 </div>
             </div>
 
-            {/* Selected file display */}
-            {file && (
-                <div className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-xl shadow-sm">
-                    <div className="flex items-center gap-3 overflow-hidden">
-                        <div className="w-10 h-10 bg-emerald-50 rounded-lg flex items-center justify-center text-emerald-600 shrink-0">
-                            <FileText className="w-5 h-5" />
+            {/* Selected files display */}
+            {files.length > 0 && (
+                <div className="space-y-2">
+                    {files.map((file, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-xl shadow-sm">
+                            <div className="flex items-center gap-3 overflow-hidden">
+                                <div className="w-10 h-10 bg-emerald-50 rounded-lg flex items-center justify-center text-emerald-600 shrink-0">
+                                    <FileText className="w-5 h-5" />
+                                </div>
+                                <div className="min-w-0">
+                                    <div className="font-bold text-slate-700 truncate text-sm">{file.name}</div>
+                                    <div className="text-xs text-slate-400">{(file.size / 1024).toFixed(0)} KB</div>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => onRemoveFile(idx)}
+                                className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-lg transition-colors"
+                                disabled={isLoading}
+                            >
+                                <Trash2 className="w-4 h-4" />
+                            </button>
                         </div>
-                        <div className="min-w-0">
-                            <div className="font-bold text-slate-700 truncate text-sm">{file.name}</div>
-                            <div className="text-xs text-slate-400">{(file.size / 1024).toFixed(0)} KB</div>
-                        </div>
-                    </div>
-                    <button
-                        onClick={onRemoveFile}
-                        className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-lg transition-colors"
-                        disabled={isLoading}
-                    >
-                        <Trash2 className="w-4 h-4" />
-                    </button>
+                    ))}
                 </div>
             )}
 
@@ -86,8 +91,8 @@ export const IncomeUpload = ({
                 </div>
             )}
 
-            {/* Analyze button - only show when file is selected */}
-            {file && (
+            {/* Analyze button - only show when files are selected */}
+            {files.length > 0 && (
                 <div className="flex justify-end">
                     <Button
                         onClick={onAnalyze}

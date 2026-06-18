@@ -270,6 +270,8 @@ def extract_payslip_data(file_bytes, mime_type="application/pdf"):
     Extract these exact fields into a valid JSON object.
     
     ### FIELDS TO EXTRACT:
+    - "pay_month": The month and year the payslip is for (format YYYY-MM). Usually found near the top, e.g. "תלוש שכר לחודש 04/2026".
+    - "employer_name": The name of the company or employer issuing the payslip.
     - "bruto": Gross Salary for TAX purposes (Sahar Bruto / Bruto LeMas). This is the TOTAL gross including all bonuses, food, travel, etc. ONLY THE MONTHLY GROSS.
     - "bruto_pension": Gross Salary for PENSION purposes (Bruto LePensiya / Sahar Pensioney). This is typically LOWER than bruto because it excludes food/travel/bonus allowances. It is the base salary used for pension and keren hishtalmut calculations. If not found, return null.
     - "neto": Net Salary (Neto LeTashlum / Sahar Neto).
@@ -290,6 +292,8 @@ def extract_payslip_data(file_bytes, mime_type="application/pdf"):
     6. Return ONLY the JSON object.
 
     ### FIELD MAPPING & HEBREW EXAMPLES:
+    - **pay_month**: "תלוש משכורת לחודש 05/2026" -> "2026-05"
+    - **employer_name**: "שם החברה", "שם המעסיק", "מעסיק"
     - **bruto**: "סהכ תשלומים", "ברוטו למס", "שכר ברוטו", "ברוטו"
     - **bruto_pension**: "ברוטו לפנסיה", "שכר פנסיוני", "בסיס לפנסיה", "שכר לגמל", "ברוטו לגמל"
     - **neto**: "נטו לתשלום", "לפירעון", "סכום לתשלום"
@@ -302,6 +306,8 @@ def extract_payslip_data(file_bytes, mime_type="application/pdf"):
     
     ### OUTPUT:
     {{ 
+      "pay_month": null,
+      "employer_name": null,
       "bruto": null,
       "bruto_pension": null,
       "neto": null, 

@@ -12,6 +12,7 @@ import { IncomeSuccess } from './components/IncomeSuccess';
 import { RecurringIncomeCard } from './components/RecurringIncomeCard';
 import { RecurringIncomeForm } from './components/RecurringIncomeForm';
 import { OneTimeIncomeForm } from './components/OneTimeIncomeForm';
+import { IncomeBatchReview } from './components/IncomeBatchReview';
 
 export const IncomeNode = ({ userId, onComplete }) => {
     const { t } = useTranslation();
@@ -19,7 +20,9 @@ export const IncomeNode = ({ userId, onComplete }) => {
     const [reportMonth, setReportMonth] = useState(new Date().toISOString().slice(0, 7));
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [file, setFile] = useState(null);
+    const [files, setFiles] = useState([]);
+    const [batchResults, setBatchResults] = useState([]);
+    const [selectedResultIndex, setSelectedResultIndex] = useState(null);
     const [currency, setCurrency] = useState('USD');
     const [workplaces, setWorkplaces] = useState([]);
     const [incomeData, setIncomeData] = useState({
@@ -81,31 +84,30 @@ export const IncomeNode = ({ userId, onComplete }) => {
     }, [pollingInterval]);
 
     const handleFileChange = (e) => {
-        if (e.target.files[0]) {
-            setFile(e.target.files[0]);
-            setShowManualSelector(true);
+        if (e.target.files && e.target.files.length > 0) {
+            setFiles(Array.from(e.target.files));
         }
     };
 
     const handleInputChange = (field, val) => setIncomeData(prev => ({ ...prev, [field]: val }));
 
-    const handleAnalyzeIncome = async (uploadedFile, type = 'one-time') => {
-        const f = uploadedFile || file;
-        if (!f) return;
+    const handleAnalyzeBatch = async (uploadedFiles) => {
+        const fs = uploadedFiles && uploadedFiles.length > 0 ? uploadedFiles : files;
+        if (!fs || fs.length === 0) return;
 
         setIsLoading(true);
         setError(null);
         setUploadProgress(null);
 
         // Start progress estimation
-        const estimatedSeconds = 25;
+        const estimatedSeconds = 30; // slightly longer for batch
         let elapsed = 0;
         const progressInterval = setInterval(() => {
             elapsed += 1;
             const percent = Math.min(95, Math.floor((elapsed / estimatedSeconds) * 100));
             setUploadProgress({
                 progress_percent: percent,
-                current_step: t('income.upload.analyzingPayslip'),
+                current_step: t('income.upload.analyzingPayslip', 'Analyzing payslips...'),
                 estimated_seconds_remaining: Math.max(0, estimatedSeconds - elapsed)
             });
         }, 1000);
@@ -113,7 +115,7 @@ export const IncomeNode = ({ userId, onComplete }) => {
         setPollingInterval(progressInterval);
 
         const formData = new FormData();
-        formData.append('file', f);
+        fs.forEach(f => formData.append('files', f));
         formData.append('userId', userId);
 
         try {
@@ -121,8 +123,7 @@ export const IncomeNode = ({ userId, onComplete }) => {
                 throw new Error("Backend URL not configured.");
             }
 
-            // Using the new analyze-payslip endpoint for detailed extraction
-            const response = await fetch(`${CLOUD_RUN_URL}/analyze-payslip`, { method: 'POST', body: formData });
+            const response = await fetch(`${CLOUD_RUN_URL}/analyze-payslips-batch`, { method: 'POST', body: formData });
             if (!response.ok) throw new Error(`Server Error: ${response.statusText}`);
 
             const res = await response.json();
@@ -134,24 +135,23 @@ export const IncomeNode = ({ userId, onComplete }) => {
 
             await new Promise(resolve => setTimeout(resolve, 800));
 
-            if (res.status === 'success' && res.data) {
-                setExtractedData(res.data);
+            if (res.status === 'success' && res.results) {
+                // Pre-process results: status from backend is "success" or "error", map to pending for UI review
+                const processedResults = res.results.map(r => ({
+                    ...r,
+                    status: r.status === 'success' ? 'pending' : 'error'
+                }));
+                setBatchResults(processedResults);
                 setUploadProgress(null);
-
-                // Open the correct form based on selection
-                if (type === 'recurring') {
-                    setShowRecurringForm(true);
-                } else {
-                    setShowOneTimeForm(true);
-                }
+                setStep(4); // Go to batch review
             } else {
-                throw new Error("AI could not extract detailed data from this payslip.");
+                throw new Error("AI could not extract detailed data from these payslips.");
             }
         } catch (err) {
             clearInterval(progressInterval);
             setPollingInterval(null);
             setUploadProgress(null);
-            setError(err.message || "Failed to analyze payslip.");
+            setError(err.message || "Failed to analyze payslips.");
         } finally {
             setIsLoading(false);
         }
@@ -168,7 +168,7 @@ export const IncomeNode = ({ userId, onComplete }) => {
                 ...incomeData,
                 bruto: Number(incomeData.bruto), neto: Number(incomeData.neto), taxes: Number(incomeData.taxes),
                 pension: Number(incomeData.pension), other_deposits: Number(incomeData.other_deposits),
-                month: reportMonth, currency: currency, createdAt: serverTimestamp(), source: file ? 'ai_scan' : 'manual'
+                month: reportMonth, currency: currency, createdAt: serverTimestamp(), source: 'manual'
             });
             setStep(3);
         } catch (err) { setError("Failed to save income data."); } finally { setIsLoading(false); }
@@ -176,7 +176,9 @@ export const IncomeNode = ({ userId, onComplete }) => {
 
     const resetForAnother = () => {
         setIncomeData({ source_name: '', bruto: '', neto: '', taxes: '', pension: '', other_deposits: '' });
-        setFile(null);
+        setFiles([]);
+        setBatchResults([]);
+        setSelectedResultIndex(null);
         setStep(1);
     };
 
@@ -205,13 +207,15 @@ export const IncomeNode = ({ userId, onComplete }) => {
                     {/* Left: Upload & Manual Entry */}
                     <div className="lg:col-span-2">
                         <IncomeUpload
-                            file={file}
+                            files={files}
                             onFileChange={handleFileChange}
-                            onRemoveFile={() => { setFile(null); setExtractedData(null); }}
+                            onRemoveFile={(idx) => { 
+                                setFiles(prev => prev.filter((_, i) => i !== idx)); 
+                            }}
                             onManualConfig={() => setShowManualSelector(true)}
                             isLoading={isLoading}
                             uploadProgress={uploadProgress}
-                            onAnalyze={() => setShowManualSelector(true)}
+                            onAnalyze={() => handleAnalyzeBatch()}
                             error={error}
                             onBack={() => setStep(0)}
                         />
@@ -250,6 +254,24 @@ export const IncomeNode = ({ userId, onComplete }) => {
                 />
             )}
 
+            {step === 4 && (
+                <IncomeBatchReview
+                    batchResults={batchResults}
+                    onRowClick={(idx) => {
+                        setSelectedResultIndex(idx);
+                        setExtractedData(batchResults[idx].data);
+                        if (batchResults[idx].data.pay_month) {
+                            setReportMonth(batchResults[idx].data.pay_month);
+                        }
+                        setShowOneTimeForm(true);
+                    }}
+                    onComplete={() => {
+                        setFiles([]);
+                        setStep(3); // Show success screen
+                    }}
+                />
+            )}
+
             {/* Manual Entry Type Selector Modal */}
             {showManualSelector && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fade-in">
@@ -279,7 +301,7 @@ export const IncomeNode = ({ userId, onComplete }) => {
                                     {t('income.typeSelector.oneTime')}
                                 </div>
                                 <div className="text-sm text-slate-600">
-                                    {file ? t('income.typeSelector.oneTimeDescWithFile') : t('income.typeSelector.oneTimeDescNoFile')}
+                                    {t('income.typeSelector.oneTimeDescNoFile')}
                                 </div>
                             </button>
 
@@ -300,7 +322,7 @@ export const IncomeNode = ({ userId, onComplete }) => {
                                     {t('income.typeSelector.recurring')}
                                 </div>
                                 <div className="text-sm text-slate-600">
-                                    {file ? t('income.typeSelector.recurringDescWithFile') : t('income.typeSelector.recurringDescNoFile')}
+                                    {t('income.typeSelector.recurringDescNoFile')}
                                 </div>
                             </button>
                         </div>
@@ -318,7 +340,7 @@ export const IncomeNode = ({ userId, onComplete }) => {
                     onSave={() => {
                         setShowRecurringForm(false);
                         setExtractedData(null);
-                        setFile(null);
+                        setFiles([]);
                         fetchRecurringIncome();
                     }}
                     onCancel={() => { setShowRecurringForm(false); setExtractedData(null); }}
@@ -333,13 +355,24 @@ export const IncomeNode = ({ userId, onComplete }) => {
                     currency={currency}
                     reportMonth={reportMonth}
                     extractedData={extractedData}
-                    onSave={() => {
                         setShowOneTimeForm(false);
                         setExtractedData(null);
-                        setFile(null);
-                        setStep(3); // Go to success screen
+                        if (step === 4 && selectedResultIndex !== null) {
+                            setBatchResults(prev => {
+                                const newRes = [...prev];
+                                newRes[selectedResultIndex] = { ...newRes[selectedResultIndex], status: 'saved' };
+                                return newRes;
+                            });
+                        } else {
+                            setFiles([]);
+                            setStep(3); // Go to success screen
+                        }
                     }}
-                    onCancel={() => { setShowOneTimeForm(false); setExtractedData(null); }}
+                    onCancel={() => { 
+                        setShowOneTimeForm(false); 
+                        setExtractedData(null);
+                        setSelectedResultIndex(null);
+                    }}
                 />
             )}
         </div>
