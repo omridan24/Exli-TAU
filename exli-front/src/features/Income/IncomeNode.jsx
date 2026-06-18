@@ -355,6 +355,7 @@ export const IncomeNode = ({ userId, onComplete }) => {
                     currency={currency}
                     reportMonth={reportMonth}
                     extractedData={extractedData}
+                    onSave={() => {
                         setShowOneTimeForm(false);
                         setExtractedData(null);
                         if (step === 4 && selectedResultIndex !== null) {
