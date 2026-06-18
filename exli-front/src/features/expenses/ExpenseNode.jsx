@@ -5,15 +5,15 @@ import { collection, addDoc, serverTimestamp, doc, setDoc, getDocs } from 'fireb
 import { db, CLOUD_RUN_URL, logUserAction } from '../../config/firebase.js';
 import { DEFAULT_CATEGORIES } from '../../config/constants.js';
 
-import { ExpenseMonthSelector } from './components/ExpenseMonthSelector';
 import { ExpenseUpload } from './components/ExpenseUpload';
 import { ExpenseManualForm } from './components/ExpenseManualForm';
-import { ExpenseStepVerify } from './components/ExpenseStepVerify';
 import { ExpenseStepCategorize } from './components/ExpenseStepCategorize';
 import { ExpenseSuccess } from './components/ExpenseSuccess';
 import { ProgressBar } from './components/ProgressBar';
 import { RecurringCard } from './components/RecurringCard';
 import { RecurringForm } from './components/RecurringForm';
+import { AutoManualModal } from './components/AutoManualModal';
+import { ExpenseAutoReview } from './components/ExpenseAutoReview';
 
 export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, onComplete }) => {
   const { t } = useTranslation();
@@ -45,6 +45,8 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
   const [showRecurringForm, setShowRecurringForm] = useState(false);
   const [pollingInterval, setPollingInterval] = useState(null);
   const [recurringExpenses, setRecurringExpenses] = useState([]);
+  const [showAutoManualModal, setShowAutoManualModal] = useState(false);
+  const [autoReviewData, setAutoReviewData] = useState(null);
 
   useEffect(() => {
     const handleBeforeUnload = (e) => {
@@ -139,64 +141,17 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
     setFiles(files.filter((_, i) => i !== idx));
   };
 
-  const pollUploadStatus = async (jobId) => {
-    const interval = setInterval(async () => {
-      try {
-        const response = await fetch(`${CLOUD_RUN_URL}/upload-status?job_id=${jobId}`);
-        if (!response.ok) {
-          clearInterval(interval);
-          throw new Error(`Polling failed: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-
-        // Update progress
-        if (data.progress) {
-          setUploadProgress(data.progress);
-        }
-
-        // Check if completed
-        if (data.status === 'completed' && data.result) {
-          clearInterval(interval);
-          setPollingInterval(null);
-          setUploadProgress(null);
-
-          // Process result same as sync
-          const initProcessed = data.result.files.map(f => ({
-            ...f,
-            columnMapping: mapBackendToIndices(f.suggested_mapping, f.columns)
-          }));
-
-          setProcessedFiles(initProcessed);
-          setIsLoading(false);
-          setStep(2);
-          logUserAction(userId, 'FILE_ANALYSIS', `Analyzed ${files.length} files (async)`);
-        } else if (data.status === 'failed') {
-          clearInterval(interval);
-          setPollingInterval(null);
-          setUploadProgress(null);
-          setIsLoading(false);
-          setError(data.progress?.current_step || "Processing failed");
-          logUserAction(userId, 'ANALYSIS_ERROR', `Async job failed`);
-        }
-      } catch (err) {
-        clearInterval(interval);
-        setPollingInterval(null);
-        setUploadProgress(null);
-        setIsLoading(false);
-        setError(err.message || "Failed to poll status");
-      }
-    }, 1500); // Poll every 1.5 seconds
-
-    setPollingInterval(interval);
+  const handleUploadClick = () => {
+    setShowAutoManualModal(true);
   };
 
-  const handleUploadAndAnalyze = async () => {
+  const startBackendAnalysis = async (mode) => {
     if (files.length === 0) return;
 
     setIsLoading(true);
     setError(null);
     setUploadProgress(null);
+    setShowAutoManualModal(false);
 
     // Start estimated progress animation
     const hasPdf = files.some(f => f.name.toLowerCase().endsWith('.pdf'));
@@ -225,7 +180,8 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
     try {
       if (!CLOUD_RUN_URL || CLOUD_RUN_URL.includes("YOUR_CLOUD_RUN")) throw new Error("Backend URL not configured.");
 
-      const response = await fetch(`${CLOUD_RUN_URL}/analyze-file`, { method: 'POST', body: formData });
+      const endpoint = mode === 'auto' ? '/analyze-file-auto' : '/analyze-file';
+      const response = await fetch(`${CLOUD_RUN_URL}${endpoint}`, { method: 'POST', body: formData });
       if (!response.ok) throw new Error(`Server Error: ${response.statusText}`);
 
       const data = await response.json();
@@ -239,15 +195,46 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
       // Small delay to show 100%
       await new Promise(resolve => setTimeout(resolve, 500));
 
-      const initProcessed = data.files.map(f => ({
-        ...f,
-        columnMapping: mapBackendToIndices(f.suggested_mapping, f.columns)
-      }));
+      if (mode === 'auto') {
+        setAutoReviewData({ summary: data.summary, transactions: data.auto_categorized });
+        setUploadProgress(null);
+        setStep(5);
+      } else {
+        const initProcessed = data.files.map(f => ({
+          ...f,
+          columnMapping: mapBackendToIndices(f.suggested_mapping, f.columns)
+        }));
 
-      setProcessedFiles(initProcessed);
-      setUploadProgress(null);
-      setStep(2);
-      logUserAction(userId, 'FILE_ANALYSIS', `Analyzed ${files.length} files`);
+        setProcessedFiles(initProcessed);
+        setUploadProgress(null);
+        
+        let queue = [];
+        initProcessed.forEach(file => {
+          const { all_data, columnMapping, card_info } = file;
+          const fileTx = all_data.map(row => {
+            let rawAmount = row[columnMapping.amount];
+            let amount = parseFloat(String(rawAmount).replace(/[^0-9.-]+/g, ""));
+            if (isNaN(amount)) amount = 0;
+
+            return {
+              date: parseDate(row[columnMapping.date]),
+              description: row[columnMapping.description] || "Unknown",
+              amount: Math.abs(amount),
+              originalCategory: row[columnMapping.category] || "Uncategorized",
+              currency: row[columnMapping.currency] || "ILS",
+              sourceCard: card_info
+            };
+          });
+          queue = [...queue, ...fileTx];
+        });
+
+        setAllTransactions(queue);
+        setCurrentIndex(0);
+        setProcessedTransactions([]);
+        setStep(3); // Skip step 2 (verify) and go straight to categorize
+      }
+
+      logUserAction(userId, 'FILE_ANALYSIS', `Analyzed ${files.length} files (${mode})`);
     } catch (err) {
       clearInterval(progressInterval);
       setPollingInterval(null);
@@ -472,6 +459,39 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
     }
   };
 
+  const handleSaveAutoReview = async (finalTransactions) => {
+    setIsLoading(true);
+    try {
+      const expensesRef = collection(db, 'users', userId, 'expenses');
+      for (const tx of finalTransactions) {
+        // Map category ID to Name since the rest of the app relies on Name
+        const categoryName = categories.find(c => c.id === tx.assignedCategory)?.name || tx.assignedCategory;
+
+        await addDoc(expensesRef, {
+          date: tx.date || new Date().toISOString(),
+          description: tx.description,
+          amount: parseFloat(tx.amount),
+          currency: tx.currency || 'ILS',
+          assignedCategory: categoryName,
+          originalCategory: tx.originalCategory || null,
+          reportMonth: tx.reportMonth || reportMonth,
+          isRefund: tx.isRefund || false,
+          isSuspect: tx.isSuspect || false,
+          source: 'auto',
+          status: 'active',
+          createdAt: serverTimestamp()
+        });
+      }
+      logUserAction(userId, 'AUTO_CATEGORIZE', `Saved ${finalTransactions.length} auto-categorized expenses`);
+      setStep(4);
+    } catch (err) {
+      console.error(err);
+      setError("Failed to save auto-categorized expenses.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const currentTx = allTransactions[currentIndex];
   const suggestedCategoryId = useMemo(() => {
     if (isManualMode) return null;
@@ -484,7 +504,7 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
   const currentFileData = processedFiles[currentFileIndex];
 
   return (
-    <div className="p-6 max-w-4xl mx-auto animate-fade-in min-h-[600px]">
+    <div className={`p-6 mx-auto animate-fade-in min-h-[600px] ${step === 5 ? "w-full" : "max-w-4xl"}`}>
       <div className="flex items-center justify-between mb-8">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2"><Upload className="w-6 h-6 text-emerald-600" /> {t('expenses.title')}</h2>
@@ -495,14 +515,6 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
       </div>
 
       {step === 0 && !isManualMode && (
-        <ExpenseMonthSelector
-          reportMonth={reportMonth}
-          setReportMonth={setReportMonth}
-          onContinue={() => setStep(1)}
-        />
-      )}
-
-      {step === 1 && !isManualMode && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left: Upload Files (2 columns on large screens) */}
@@ -513,9 +525,9 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
                 onRemoveFile={removeFile}
                 onManualConfig={() => setShowManualTypeSelector(true)}
                 error={error}
-                onBack={() => setStep(0)}
+                onBack={() => {}}
                 processingTimeEstimate={processingTimeEstimate}
-                onAnalyze={handleUploadAndAnalyze}
+                onAnalyze={handleUploadClick}
                 isLoading={isLoading}
               />
             </div>
@@ -543,6 +555,38 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
         </div>
       )}
 
+      {showAutoManualModal && (
+        <AutoManualModal
+          onSelectAuto={() => startBackendAnalysis('auto')}
+          onSelectManual={() => startBackendAnalysis('manual')}
+          onClose={() => setShowAutoManualModal(false)}
+        />
+      )}
+
+      {step === 5 && autoReviewData && (
+          <ExpenseAutoReview 
+            data={autoReviewData.transactions} 
+            summary={autoReviewData.summary}
+            categories={sortedCategories}
+            isLoading={isLoading}
+            onSave={handleSaveAutoReview}
+            onCancel={() => {
+              setAutoReviewData(null);
+              setFiles([]);
+              setStep(0); // Go back to main screen
+            }}
+            onAddCategory={async (name) => {
+              const catId = name.toLowerCase().replace(/\s+/g, '-');
+              const newCat = { id: catId, name, icon: 'Tag', color: 'text-slate-500' };
+              const updated = [...sortedCategories, newCat];
+              onUpdateCategories(updated);
+              await setDoc(doc(db, 'users', userId), {
+                customCategories: updated.filter(c => !DEFAULT_CATEGORIES.find(dc => dc.id === c.id))
+              }, { merge: true });
+              return catId; // Return ID so AutoReview can immediately select it
+            }}
+          />)}
+
       {isManualMode && !isCreatingCat && (
         <ExpenseManualForm
           manualData={manualData}
@@ -554,18 +598,6 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
         />
       )}
 
-      {step === 2 && currentFileData && (
-        <ExpenseStepVerify
-          currentFileIndex={currentFileIndex}
-          totalFiles={processedFiles.length}
-          fileData={currentFileData}
-          onPrevFile={() => setCurrentFileIndex(prev => prev - 1)}
-          onNextFile={() => setCurrentFileIndex(prev => prev + 1)}
-          onUpdateMapping={updateMapping}
-          onBack={() => setStep(1)}
-          onStartCategorizing={startSorting}
-        />
-      )}
 
       {(step === 3 || (isManualMode && isCreatingCat)) && (
         <ExpenseStepCategorize

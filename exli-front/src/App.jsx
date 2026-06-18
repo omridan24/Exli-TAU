@@ -81,7 +81,7 @@ export default function App() {
           <button onClick={() => signOut(auth)} className="text-slate-400 hover:text-slate-600"><LogOut className="w-5 h-5" /></button>
         </div>
       </header>
-      <main className="max-w-6xl mx-auto p-6">
+      <main className={`mx-auto p-6 transition-all duration-300 ${activeNode === 'dashboard' ? 'max-w-6xl' : 'max-w-[1600px] w-full'}`}>
         {activeNode === 'dashboard' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
             {/* Active Modules */}

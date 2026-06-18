@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from config import logger, Config
 import os
-from services.data_service import process_uploaded_files
+from services.data_service import process_uploaded_files, process_uploaded_files_auto
 from services.ai_service import analyze_income_statement, extract_payslip_data
 from services.stock_service import search_symbol, get_stock_details
 from services.quota_service import check_and_increment_quota
@@ -106,6 +106,53 @@ def analyze_file():
 
     # Process all files synchronously
     result = process_uploaded_files(uploaded_files)
+    
+    if result["status"] == "error":
+        return jsonify({"error": result["message"]}), 500
+    
+    return jsonify(result)
+
+# --- Auto-Categorized Expense Processing ---
+@app.route('/analyze-file-auto', methods=['POST'])
+@limiter.limit(Config.RATE_LIMIT_AI)
+def analyze_file_auto():
+    """
+    Processes uploaded expense files with AUTO-CATEGORIZATION.
+    Same file upload as /analyze-file but returns auto-categorized transactions
+    with month detection and category matching via dictionary.
+    """
+    uploaded_files = request.files.getlist('files')
+    
+    # Fallback if single 'file' was sent
+    if not uploaded_files and 'file' in request.files:
+        uploaded_files = [request.files['file']]
+
+    if not uploaded_files or uploaded_files[0].filename == '':
+        logger.warning("Analyze file auto: No files uploaded")
+        return jsonify({"error": "No files uploaded"}), 400
+    
+    # Validate file sizes
+    try:
+        validate_uploaded_files(uploaded_files)
+    except ValueError as e:
+        logger.warning(f"File size validation failed: {e}")
+        return jsonify({"error": str(e)}), 413
+
+    # --- Security & Quota Checks ---
+    user_id = request.form.get('userId')
+    if not user_id:
+        logger.warning("Analyze file auto: Missing userId")
+        return jsonify({"error": "Missing userId"}), 400
+
+    # 1. Check Quota
+    check_and_increment_quota(user_id)
+
+    # 2. Check Security (Magic Numbers)
+    for f in uploaded_files:
+        validate_file_safety(f)
+
+    # Process with auto-categorization
+    result = process_uploaded_files_auto(uploaded_files)
     
     if result["status"] == "error":
         return jsonify({"error": result["message"]}), 500

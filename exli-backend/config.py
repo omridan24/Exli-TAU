@@ -18,7 +18,7 @@ class Config:
     DOCAI_PROCESSOR_ID = os.environ.get("DOCAI_PROCESSOR_ID")
 
     # Security & Quota Configs
-    QUOTA_FREE_TIER_MONTHLY = 20
+    QUOTA_FREE_TIER_MONTHLY = 100
     QUOTA_PRO_TIER_MONTHLY = 100
     RATE_LIMIT_GLOBAL = "1000 per day"
     RATE_LIMIT_AI = "20 per minute"

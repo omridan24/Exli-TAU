@@ -115,6 +115,8 @@
             "fraud": "הונאה אפשרית",
             "fraudNote": "חשד להונאה"
         },
+        "suspectTitle": "מדוע זה חשוד?",
+        "suspectDesc": "בחר את הסיבה שמתארת את הבעיה הכי טוב:",
         "recurring": {
             "title": "הוצאות קבועות",
             "count": "{{count}} קבועות",
@@ -240,6 +242,26 @@
             "spotify": "ספוטיפי",
             "icloud": "אחסון iCloud",
             "custom": "מותאם אישית"
+        },
+        "auto": {
+            "modalTitle": "איך תרצה לסווג?",
+            "modalAutoTitle": "אוטומטי",
+            "modalAutoDesc": "AI מסווג את ההוצאות שלך באופן מיידי. בדוק ואשר.",
+            "modalManualTitle": "ידני",
+            "modalManualDesc": "סווג כל הוצאה אחת-אחת לשליטה מלאה.",
+            "reviewTitle": "סקירת הוצאות",
+            "summaryTotal": "{{count}} סה\"כ",
+            "summaryCategorized": "{{count}} סווגו",
+            "summaryNeedAttention": "{{count}} דורשים תשומת לב",
+            "needAttentionAlert": "{{count}} הוצאות לא סווגו אוטומטית. אנא בחר קטגוריה עבור כל אחת.",
+            "allCategorized": "כל ההוצאות סווגו! מוכן לשמירה.",
+            "approveAndSave": "אשר ושמור הכל",
+            "saving": "שומר...",
+            "changeCategory": "שנה",
+            "selectCategory": "בחר קטגוריה",
+            "cardOriginal": "מקורי: {{category}}",
+            "uncategorized": "לא מסווג",
+            "monthGroup": "{{month}}"
         }
     },
     "income": {

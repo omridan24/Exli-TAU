@@ -112,7 +112,7 @@ def convert_pdf_to_data(file_bytes):
     
     ### RULES:
     1. **Context**: Because the text is sorted by Y-coordinate, the Amount will be immediately before or after the Description.
-    2. **Anchor**: Find the Date first.
+    2. **Anchor**: Find the Date first. Prefer the Charge/Billing Date ("תאריך חיוב", "מועד חיוב") over the Purchase Date ("תאריך רכישה").
     3. **Positive Only**: Return absolute values.
     4. **Installments**: If "Payment X of Y", use the monthly charged amount.
     5. **CURRENCY VALIDATION (CRITICAL)**: 
@@ -171,7 +171,7 @@ def analyze_multiple_files_structure(file_samples):
     ### RULES:
     1. **Header Row**: Which row index contains the headers? (0-based)
     2. **Mapping Indices**: 
-       - "date": Index of Date column
+       - "date": Index of the Charge/Billing Date column (e.g. "תאריך חיוב", "מועד חיוב"). If not available, fallback to Purchase Date ("תאריך רכישה", "תאריך קניה").
        - "amount": Index of Amount/Billing/Debit column (Use the local currency billing amount)
        - "description": Index of Payee/Business Name
        - "currency": Index of Currency symbol (optional, if exists)

@@ -115,6 +115,8 @@
             "fraud": "Potential Fraud",
             "fraudNote": "Potential Fraud"
         },
+        "suspectTitle": "Why is this suspicious?",
+        "suspectDesc": "Select the reason that best describes the issue:",
         "recurring": {
             "title": "Recurring Expenses",
             "count": "{{count}} recurring",
@@ -240,6 +242,26 @@
             "spotify": "Spotify",
             "icloud": "iCloud Storage",
             "custom": "Custom"
+        },
+        "auto": {
+            "modalTitle": "How would you like to categorize?",
+            "modalAutoTitle": "Automatic",
+            "modalAutoDesc": "AI categorizes your expenses instantly. Review and approve.",
+            "modalManualTitle": "Manual",
+            "modalManualDesc": "Categorize each expense one-by-one for full control.",
+            "reviewTitle": "Review Expenses",
+            "summaryTotal": "{{count}} Total",
+            "summaryCategorized": "{{count}} Categorized",
+            "summaryNeedAttention": "{{count}} Need Attention",
+            "needAttentionAlert": "{{count}} expenses couldn't be auto-categorized. Please select a category for each.",
+            "allCategorized": "All expenses are categorized! Ready to save.",
+            "approveAndSave": "Approve & Save All",
+            "saving": "Saving...",
+            "changeCategory": "Change",
+            "selectCategory": "Select Category",
+            "cardOriginal": "Original: {{category}}",
+            "uncategorized": "Uncategorized",
+            "monthGroup": "{{month}}"
         }
     },
     "income": {
