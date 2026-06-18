@@ -1,4 +1,5 @@
 import json
+import time
 import warnings
 # Suppress Google deprecation warnings
 warnings.filterwarnings("ignore", category=FutureWarning, module="google.generativeai")
@@ -74,8 +75,19 @@ def extract_text_with_google_docai(file_bytes, mime_type="application/pdf"):
         name = client.processor_path(Config.GCP_PROJECT_ID, Config.GCP_LOCATION, Config.DOCAI_PROCESSOR_ID)
         raw_document = documentai.RawDocument(content=file_bytes, mime_type=mime_type)
         request = documentai.ProcessRequest(name=name, raw_document=raw_document)
-        result = client.process_document(request=request)
-        return result.document  
+        
+        # Retry loop for intermittent 500 errors
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                result = client.process_document(request=request)
+                return result.document
+            except Exception as e:
+                if "500 Internal error encountered" in str(e) and attempt < max_retries - 1:
+                    logger.warning(f"DocAI 500 error, retrying attempt {attempt + 1}/{max_retries} in 2 seconds...")
+                    time.sleep(2)
+                else:
+                    raise e
     except Exception as e:
         logger.error(f"Document AI Failed: {e}",exc_info=True)
         return None

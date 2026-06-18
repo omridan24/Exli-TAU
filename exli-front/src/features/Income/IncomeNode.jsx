@@ -16,7 +16,7 @@ import { IncomeBatchReview } from './components/IncomeBatchReview';
 
 export const IncomeNode = ({ userId, onComplete }) => {
     const { t } = useTranslation();
-    const [step, setStep] = useState(0);
+    const [step, setStep] = useState(1);
     const [reportMonth, setReportMonth] = useState(new Date().toISOString().slice(0, 7));
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -355,13 +355,19 @@ export const IncomeNode = ({ userId, onComplete }) => {
                     currency={currency}
                     reportMonth={reportMonth}
                     extractedData={extractedData}
-                    onSave={() => {
+                    existingId={selectedResultIndex !== null ? batchResults[selectedResultIndex].savedData?.id : undefined}
+                    savedData={selectedResultIndex !== null ? batchResults[selectedResultIndex].savedData : undefined}
+                    onSave={(savedId, savedIncomeData) => {
                         setShowOneTimeForm(false);
                         setExtractedData(null);
                         if (step === 4 && selectedResultIndex !== null) {
                             setBatchResults(prev => {
                                 const newRes = [...prev];
-                                newRes[selectedResultIndex] = { ...newRes[selectedResultIndex], status: 'saved' };
+                                newRes[selectedResultIndex] = { 
+                                    ...newRes[selectedResultIndex], 
+                                    status: 'saved',
+                                    savedData: savedIncomeData
+                                };
                                 return newRes;
                             });
                         } else {

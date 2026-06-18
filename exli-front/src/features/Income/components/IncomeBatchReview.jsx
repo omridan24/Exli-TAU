@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { FileText, CheckCircle2, AlertCircle, ArrowRight, Wallet } from 'lucide-react';
+import { FileText, CheckCircle2, AlertCircle, ArrowRight, Wallet, Edit2 } from 'lucide-react';
 import { Button } from '../../../components/UI.jsx';
 
 export const IncomeBatchReview = ({
@@ -80,10 +80,10 @@ export const IncomeBatchReview = ({
                                 return (
                                     <tr 
                                         key={idx} 
-                                        onClick={() => !isError && onRowClick(idx)}
+                                        onClick={() => !isError && !isSaved && onRowClick(idx)}
                                         className={`transition-colors ${
                                             isError ? 'bg-red-50/50 cursor-not-allowed' :
-                                            isSaved ? 'bg-emerald-50/30 hover:bg-emerald-50/60 cursor-pointer' : 
+                                            isSaved ? 'bg-emerald-50/10' : 
                                             'hover:bg-slate-50 cursor-pointer'
                                         }`}
                                     >
@@ -123,10 +123,19 @@ export const IncomeBatchReview = ({
                                                         {t('income.batchReview.error', 'Error')}
                                                     </span>
                                                 ) : isSaved ? (
-                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">
-                                                        <CheckCircle2 className="w-3.5 h-3.5" />
-                                                        {t('income.batchReview.saved', 'Saved')}
-                                                    </span>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">
+                                                            <CheckCircle2 className="w-3.5 h-3.5" />
+                                                            {t('income.batchReview.saved', 'Saved')}
+                                                        </span>
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); onRowClick(idx); }}
+                                                            className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
+                                                            title={t('common.edit', 'Edit')}
+                                                        >
+                                                            <Edit2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
                                                 ) : (
                                                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors">
                                                         {t('income.batchReview.review', 'Review')}
