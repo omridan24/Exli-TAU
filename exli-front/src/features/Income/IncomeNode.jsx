@@ -315,11 +315,7 @@ export const IncomeNode = ({ userId, onComplete }) => {
                             <button
                                 onClick={() => {
                                     setShowManualSelector(false);
-                                    if (file) {
-                                        handleAnalyzeIncome(file, 'one-time');
-                                    } else {
-                                        setShowOneTimeForm(true);
-                                    }
+                                    setShowOneTimeForm(true);
                                 }}
                                 className="p-6 rounded-xl border-2 border-slate-200 hover:border-blue-500 hover:bg-blue-50 transition-all text-left group"
                             >
@@ -336,11 +332,7 @@ export const IncomeNode = ({ userId, onComplete }) => {
                             <button
                                 onClick={() => {
                                     setShowManualSelector(false);
-                                    if (file) {
-                                        handleAnalyzeIncome(file, 'recurring');
-                                    } else {
-                                        setShowRecurringForm(true);
-                                    }
+                                    setShowRecurringForm(true);
                                 }}
                                 className="p-6 rounded-xl border-2 border-slate-200 hover:border-teal-500 hover:bg-teal-50 transition-all text-left group"
                             >
