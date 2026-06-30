@@ -12,6 +12,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # --- 0. PIN NODE VERSION (workaround for premature close errors) ---
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       # --- 1. BUILD STEP (With Secrets) ---
       - name: Build
         run: npm ci && npm run build
