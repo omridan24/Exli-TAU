@@ -17,10 +17,10 @@ export const ExpenseMonthSelector = ({ reportMonth, setReportMonth, onContinue }
         const monthName = t(`datePicker.months.${monthKeys[parseInt(month) - 1]}`);
         return `${monthName} ${year}`;
     };
-    //test commit
     return (
         <div className="max-w-md mx-auto bg-white p-8 rounded-2xl shadow-sm border border-slate-100 text-center">
-            <h3 className="text-lg font-bold text-slate-800 mb-6">{t('expenses.monthSelector.title')}</h3>
+            <h3 className="text-lg font-bold text-slate-800 mb-2">{t('expenses.monthSelector.title')}</h3>
+            <p className="text-sm text-slate-400 mb-6">{t('expenses.monthSelector.subtitle', '')}</p>
             <button
                 onClick={() => setShowPicker(true)}
                 className="w-full p-4 border-2 border-slate-200 rounded-xl flex justify-between items-center font-bold hover:bg-slate-50 hover:border-emerald-300 transition-all text-lg mb-6 group"
