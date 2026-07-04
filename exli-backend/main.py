@@ -250,6 +250,56 @@ def analyze_payslip():
         logger.error(f"Payslip API Error: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/analyze-payslips-batch', methods=['POST'])
+@limiter.limit(Config.RATE_LIMIT_AI)
+def analyze_payslips_batch():
+    if 'files' not in request.files:
+        logger.warning("Analyze payslips batch: No 'files' key in request.files")
+        return jsonify({"error": "No files part"}), 400
+    
+    uploaded_files = request.files.getlist('files')
+    if not uploaded_files or all(f.filename == '' for f in uploaded_files):
+        logger.warning("Analyze payslips batch: No selected files")
+        return jsonify({"error": "No selected files"}), 400
+        
+    user_id = request.form.get('userId')
+    if not user_id:
+        logger.warning("Analyze payslips batch: Missing userId")
+        return jsonify({"error": "Missing userId"}), 400
+
+    check_and_increment_quota(user_id)
+    
+    results = []
+    allowed_types = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
+    
+    for file in uploaded_files:
+        if file.filename == '': continue
+        validate_file_safety(file)
+        
+        mime_type = file.content_type
+        if mime_type not in allowed_types:
+            if file.filename.lower().endswith('.pdf'): mime_type = 'application/pdf'
+            elif file.filename.lower().endswith(('.jpg', '.jpeg')): mime_type = 'image/jpeg'
+            elif file.filename.lower().endswith('.png'): mime_type = 'image/png'
+            else:
+                results.append({"filename": file.filename, "error": "Unsupported file type"})
+                continue
+                
+        try:
+            file_bytes = file.read()
+            # This calls the Gemini endpoint which could take time, maybe process concurrently?
+            # For simplicity and rate limits, we'll process them sequentially here.
+            extracted = extract_payslip_data(file_bytes, mime_type)
+            if extracted:
+                results.append({"filename": file.filename, "data": extracted, "status": "success"})
+            else:
+                results.append({"filename": file.filename, "error": "AI could not extract data", "status": "error"})
+        except Exception as e:
+            logger.error(f"Batch payslip error for {file.filename}: {e}", exc_info=True)
+            results.append({"filename": file.filename, "error": str(e), "status": "error"})
+            
+    return jsonify({"status": "success", "results": results})
+
 # --- Investment Endpoints ---
 @app.route('/stock/search', methods=['GET'])
 def stock_search():

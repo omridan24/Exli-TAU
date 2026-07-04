@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, AlertCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { collection, addDoc, serverTimestamp, getDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, getDoc, doc, setDoc } from 'firebase/firestore';
 import { db } from '../../../config/firebase.js';
 import { Button } from '../../../components/UI.jsx';
 import { LogoImage } from './LogoImage.jsx';
@@ -62,21 +62,21 @@ const EditValuePopover = ({ initialValue, onSave, onCancel, title }) => {
     );
 };
 
-export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, onSave, onCancel, extractedData }) => {
+export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, onSave, onCancel, extractedData, existingId, savedData }) => {
     const { t } = useTranslation();
     const [formData, setFormData] = useState({
-        workplaceName: '',
-        occupation: '',
-        grossAmount: '',
-        brutoPension: '',
-        netAmount: '',
-        currency: currency || 'ILS',
-        employeePct: 6.0,
-        employerPct: 6.5,
+        workplaceName: savedData?.source_name || '',
+        occupation: savedData?.occupation || '',
+        grossAmount: savedData?.bruto || '',
+        brutoPension: savedData?.bruto_pension || '',
+        netAmount: savedData?.neto || '',
+        currency: savedData?.currency || currency || 'ILS',
+        employeePct: savedData?.otherDeposits?.employeePct || 6.0,
+        employerPct: savedData?.otherDeposits?.employerPct || 6.5,
         severancePct: 8.33,
         expectedPension: 0,
-        workplaceLogo: '',
-        workplaceDomain: ''
+        workplaceLogo: savedData?.workplaceLogo || '',
+        workplaceDomain: savedData?.workplaceDomain || ''
     });
 
     // Pension/Other Deposits use pensionable gross (Israeli law: excludes food/travel bonuses)
@@ -101,12 +101,12 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
     const [hasOtherDeposits, setHasOtherDeposits] = useState(false);
     const [hasTax, setHasTax] = useState(true);
     const [showFullForm, setShowFullForm] = useState(false);
-    const [manualOverrides, setManualOverrides] = useState({});
+    const [manualOverrides, setManualOverrides] = useState(savedData?.manualOverrides || {});
     const [editingField, setEditingField] = useState(null);
 
     // Other Deposits State
-    const [otherDepositEmployeePct, setOtherDepositEmployeePct] = useState(0);
-    const [otherDepositEmployerPct, setOtherDepositEmployerPct] = useState(0);
+    const [otherDepositEmployeePct, setOtherDepositEmployeePct] = useState(savedData?.otherDeposits?.employeePct || 0);
+    const [otherDepositEmployerPct, setOtherDepositEmployerPct] = useState(savedData?.otherDeposits?.employerPct || 0);
     const [otherEmployeeCustom, setOtherEmployeeCustom] = useState(false);
     const [otherEmployerCustom, setOtherEmployerCustom] = useState(false);
     const [customOtherEmployeePcts, setCustomOtherEmployeePcts] = useState([]);
@@ -172,16 +172,39 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
         if (userId) fetchUserTaxSettings();
     }, [userId]);
 
-    // Pre-fill from extractedData
+    // Pre-fill from extractedData if NOT editing a saved item
     useEffect(() => {
-        if (extractedData) {
+        if (extractedData && !savedData) {
+            let matchedWorkplace = '';
+            let matchedOccupation = '';
+            let matchedLogo = '';
+            let matchedDomain = '';
+            
+            const employerName = extractedData.employer_name || '';
+            if (employerName) {
+                const lowerName = employerName.toLowerCase();
+                const match = workplaces.find(w => w.name.toLowerCase() === lowerName || lowerName.includes(w.name.toLowerCase()));
+                if (match) {
+                    matchedWorkplace = match.name;
+                    matchedOccupation = match.occupation || '';
+                    matchedLogo = match.logo || '';
+                    matchedDomain = match.domain || '';
+                } else {
+                    matchedWorkplace = employerName;
+                }
+            }
+
             setFormData(prev => ({
                 ...prev,
+                workplaceName: matchedWorkplace || prev.workplaceName,
+                occupation: matchedOccupation || prev.occupation,
+                workplaceLogo: matchedLogo || prev.workplaceLogo,
+                workplaceDomain: matchedDomain || prev.workplaceDomain,
                 grossAmount: extractedData.bruto || prev.grossAmount,
-                brutoPension: extractedData.bruto_pension || '',
+                brutoPension: extractedData.bruto_pension || prev.brutoPension,
             }));
         }
-    }, [extractedData]);
+    }, [extractedData, workplaces]);
 
     // Progressive Reveal: Show rest of form after workplace is filled
     useEffect(() => {
@@ -338,9 +361,15 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                 }
             };
 
-            await addDoc(collection(db, 'users', userId, 'income'), incomeData);
+            if (existingId) {
+                await setDoc(doc(db, 'users', userId, 'income', existingId), incomeData, { merge: true });
+            } else {
+                const docRef = await addDoc(collection(db, 'users', userId, 'income'), incomeData);
+                incomeData.id = docRef.id; // Optional: pass back the new ID if needed
+            }
 
-            await onSave();
+            // Also pass the saved/updated data back in onSave if the parent needs it
+            await onSave(existingId, incomeData);
         } catch (err) {
             console.error('Save failed:', err);
             setValidationError(t('income.oneTimeForm.validation.saveFailed'));

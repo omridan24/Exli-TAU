@@ -1,4 +1,5 @@
 import json
+import time
 import warnings
 # Suppress Google deprecation warnings
 warnings.filterwarnings("ignore", category=FutureWarning, module="google.generativeai")
@@ -74,8 +75,19 @@ def extract_text_with_google_docai(file_bytes, mime_type="application/pdf"):
         name = client.processor_path(Config.GCP_PROJECT_ID, Config.GCP_LOCATION, Config.DOCAI_PROCESSOR_ID)
         raw_document = documentai.RawDocument(content=file_bytes, mime_type=mime_type)
         request = documentai.ProcessRequest(name=name, raw_document=raw_document)
-        result = client.process_document(request=request)
-        return result.document  
+        
+        # Retry loop for intermittent 500 errors
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                result = client.process_document(request=request)
+                return result.document
+            except Exception as e:
+                if "500 Internal error encountered" in str(e) and attempt < max_retries - 1:
+                    logger.warning(f"DocAI 500 error, retrying attempt {attempt + 1}/{max_retries} in 2 seconds...")
+                    time.sleep(2)
+                else:
+                    raise e
     except Exception as e:
         logger.error(f"Document AI Failed: {e}",exc_info=True)
         return None
@@ -270,6 +282,8 @@ def extract_payslip_data(file_bytes, mime_type="application/pdf"):
     Extract these exact fields into a valid JSON object.
     
     ### FIELDS TO EXTRACT:
+    - "pay_month": The month and year the payslip is for (format YYYY-MM). Usually found near the top, e.g. "תלוש שכר לחודש 04/2026".
+    - "employer_name": The name of the company or employer issuing the payslip.
     - "bruto": Gross Salary for TAX purposes (Sahar Bruto / Bruto LeMas). This is the TOTAL gross including all bonuses, food, travel, etc. ONLY THE MONTHLY GROSS.
     - "bruto_pension": Gross Salary for PENSION purposes (Bruto LePensiya / Sahar Pensioney). This is typically LOWER than bruto because it excludes food/travel/bonus allowances. It is the base salary used for pension and keren hishtalmut calculations. If not found, return null.
     - "neto": Net Salary (Neto LeTashlum / Sahar Neto).
@@ -290,6 +304,8 @@ def extract_payslip_data(file_bytes, mime_type="application/pdf"):
     6. Return ONLY the JSON object.
 
     ### FIELD MAPPING & HEBREW EXAMPLES:
+    - **pay_month**: "תלוש משכורת לחודש 05/2026" -> "2026-05"
+    - **employer_name**: "שם החברה", "שם המעסיק", "מעסיק"
     - **bruto**: "סהכ תשלומים", "ברוטו למס", "שכר ברוטו", "ברוטו"
     - **bruto_pension**: "ברוטו לפנסיה", "שכר פנסיוני", "בסיס לפנסיה", "שכר לגמל", "ברוטו לגמל"
     - **neto**: "נטו לתשלום", "לפירעון", "סכום לתשלום"
@@ -302,6 +318,8 @@ def extract_payslip_data(file_bytes, mime_type="application/pdf"):
     
     ### OUTPUT:
     {{ 
+      "pay_month": null,
+      "employer_name": null,
       "bruto": null,
       "bruto_pension": null,
       "neto": null, 
