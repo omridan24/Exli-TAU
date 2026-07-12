@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FileText, CheckCircle2, AlertCircle, ArrowRight, Wallet, Edit2, Check, X, Plus } from 'lucide-react';
+import { FileText, CheckCircle2, AlertCircle, ArrowRight, Wallet, Edit2, Check, X, Plus, Trash2 } from 'lucide-react';
 import { Button } from '../../../components/UI.jsx';
 import { MonthYearPickerModal } from '../../../components/MonthYearPickerModal.jsx';
 import { WorkplacePickerModal } from '../../settings/components/WorkplacePickerModal.jsx';
@@ -11,7 +11,8 @@ export const IncomeBatchReview = ({
     onComplete,
     workplaces = [],
     onUpdateRow,
-    onAddWorkplace
+    onAddWorkplace,
+    onDeleteRow
 }) => {
     const { t } = useTranslation();
 
@@ -34,7 +35,7 @@ export const IncomeBatchReview = ({
                     <Wallet className="w-8 h-8 text-emerald-600" />
                     {t('income.batchReview.title', 'Review Payslips')}
                 </h2>
-                
+
                 <div className="flex flex-wrap gap-4 mb-4">
                     <div className="bg-white px-4 py-3 rounded-xl shadow-sm border border-slate-100 flex-1 min-w-[120px]">
                         <div className="text-xs font-bold text-slate-400 mb-1">
@@ -44,7 +45,7 @@ export const IncomeBatchReview = ({
                             {totalGross.toLocaleString()}
                         </div>
                     </div>
-                    
+
                     <div className={`px-4 py-3 rounded-xl border flex-1 min-w-[120px] ${pendingCount === 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
                         <div className={`text-xs font-bold mb-1 ${pendingCount === 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
                             {t('income.batchReview.summaryCompleted', 'Completed')}
@@ -54,7 +55,7 @@ export const IncomeBatchReview = ({
                             {pendingCount === 0 && <CheckCircle2 className="w-5 h-5" />}
                         </div>
                     </div>
-                    
+
                     {pendingCount > 0 && (
                         <div className="bg-amber-50 px-4 py-3 rounded-xl border border-amber-200 flex-1 min-w-[120px]">
                             <div className="text-xs font-bold text-amber-600 mb-1">
@@ -86,15 +87,14 @@ export const IncomeBatchReview = ({
                             {batchResults.map((res, idx) => {
                                 const isSaved = res.status === 'saved';
                                 const isError = res.status === 'error';
-                                
+
                                 return (
-                                    <tr 
-                                        key={idx} 
-                                        className={`transition-colors ${
-                                            isError ? 'bg-red-50/50' :
-                                            isSaved ? 'bg-emerald-50/10' : 
-                                            'hover:bg-slate-50'
-                                        }`}
+                                    <tr
+                                        key={idx}
+                                        className={`transition-colors ${isError ? 'bg-red-50/50' :
+                                                isSaved ? 'bg-emerald-50/10' :
+                                                    'hover:bg-slate-50'
+                                            }`}
                                     >
                                         <td className="p-4 group">
                                             <div className="flex items-center gap-3">
@@ -108,7 +108,7 @@ export const IncomeBatchReview = ({
                                                         </span>
                                                     )}
                                                     {!isSaved && !isError && (
-                                                        <button 
+                                                        <button
                                                             onClick={(e) => { e.stopPropagation(); setEditingMonthIdx(idx); }}
                                                             className={`p-1 rounded transition-colors ${!res.data?.pay_month ? 'text-amber-600 hover:bg-amber-50' : 'text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 opacity-0 group-hover:opacity-100'}`}
                                                         >
@@ -126,10 +126,10 @@ export const IncomeBatchReview = ({
                                                     </span>
                                                 )}
                                                 {!isSaved && !isError && (
-                                                    <button 
-                                                        onClick={(e) => { 
-                                                            e.stopPropagation(); 
-                                                            setEditingEmployerIdx(idx); 
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setEditingEmployerIdx(idx);
                                                         }}
                                                         className={`p-1 rounded transition-colors ${!res.data?.employer_name ? 'text-amber-600 hover:bg-amber-50' : 'text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 opacity-0 group-hover:opacity-100'}`}
                                                     >
@@ -152,7 +152,7 @@ export const IncomeBatchReview = ({
                                             </div>
                                         </td>
                                         <td className="p-4">
-                                            <div className="flex justify-center">
+                                            <div className="flex justify-center items-center gap-2">
                                                 {isError ? (
                                                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">
                                                         <AlertCircle className="w-3.5 h-3.5" />
@@ -181,6 +181,14 @@ export const IncomeBatchReview = ({
                                                         <ArrowRight className="w-3.5 h-3.5" />
                                                     </button>
                                                 )}
+                                                
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); onDeleteRow && onDeleteRow(idx); }}
+                                                    className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                                    title={t('common.delete', 'Delete')}
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -190,15 +198,15 @@ export const IncomeBatchReview = ({
                     </table>
                 </div>
             </div>
-            
+
             {/* Action Bar */}
             <div className="flex justify-end pt-4">
-                <Button 
-                    onClick={onComplete} 
+                <Button
+                    onClick={onComplete}
                     disabled={!allCompleted}
                     className={allCompleted ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
                 >
-                    {allCompleted 
+                    {allCompleted
                         ? <><CheckCircle2 className="w-4 h-4 mr-2" /> {t('income.batchReview.finish', 'Finish Import')}</>
                         : t('income.batchReview.completeAllToFinish', 'Review all to finish')}
                 </Button>
@@ -210,13 +218,13 @@ export const IncomeBatchReview = ({
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="text-xl font-black text-slate-800 uppercase">{t('income.batchReview.selectEmployer', 'Select Employer')}</h3>
                             <button onClick={() => setEditingEmployerIdx(null)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
-                                <X className="w-5 h-5"/>
+                                <X className="w-5 h-5" />
                             </button>
                         </div>
-                        
+
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                             {workplaces.map(wp => (
-                                <button 
+                                <button
                                     key={wp.name}
                                     onClick={() => {
                                         onUpdateRow(editingEmployerIdx, { employer_name: wp.name });
@@ -228,14 +236,14 @@ export const IncomeBatchReview = ({
                                     {wp.domain && <div className="text-xs text-slate-400 truncate">{wp.domain}</div>}
                                 </button>
                             ))}
-                            
+
                             <button
                                 onClick={() => {
                                     setShowWorkplacePicker(true);
                                 }}
                                 className="p-4 border-2 border-dashed border-emerald-200 rounded-2xl hover:bg-emerald-50 text-emerald-600 flex flex-col items-center justify-center gap-2 transition-all"
                             >
-                                <Plus className="w-6 h-6"/>
+                                <Plus className="w-6 h-6" />
                                 <span className="font-bold text-sm">{t('income.batchReview.addNew', 'Add New')}</span>
                             </button>
                         </div>
@@ -243,7 +251,7 @@ export const IncomeBatchReview = ({
                 </div>
             )}
 
-            <WorkplacePickerModal 
+            <WorkplacePickerModal
                 isOpen={showWorkplacePicker}
                 occupationName={t('income.batchReview.employer', 'Employer')}
                 onClose={() => setShowWorkplacePicker(false)}
@@ -263,11 +271,11 @@ export const IncomeBatchReview = ({
                 isOpen={editingMonthIdx !== null}
                 onClose={() => setEditingMonthIdx(null)}
                 value={editingMonthIdx !== null ? batchResults[editingMonthIdx]?.data?.pay_month || new Date().toISOString().slice(0, 7) : new Date().toISOString().slice(0, 7)}
-                onSave={(v) => { 
+                onSave={(v) => {
                     if (editingMonthIdx !== null) {
-                        onUpdateRow(editingMonthIdx, { pay_month: v }); 
+                        onUpdateRow(editingMonthIdx, { pay_month: v });
                     }
-                    setEditingMonthIdx(null); 
+                    setEditingMonthIdx(null);
                 }}
             />
         </div>

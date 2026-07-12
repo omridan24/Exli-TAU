@@ -5,7 +5,6 @@ import { collection, addDoc, serverTimestamp, doc, getDoc, getDocs, updateDoc } 
 import { db, CLOUD_RUN_URL } from '../../config/firebase.js';
 import { CURRENCIES } from '../../config/constants.js';
 
-import { IncomeMonthSelector } from './components/IncomeMonthSelector';
 import { IncomeUpload } from './components/IncomeUpload';
 import { IncomeForm } from './components/IncomeForm';
 import { IncomeSuccess } from './components/IncomeSuccess';
@@ -14,7 +13,7 @@ import { RecurringIncomeForm } from './components/RecurringIncomeForm';
 import { OneTimeIncomeForm } from './components/OneTimeIncomeForm';
 import { IncomeBatchReview } from './components/IncomeBatchReview';
 
-export const IncomeNode = ({ userId, onComplete }) => {
+export const IncomeNode = ({ userId, onComplete, compact = false }) => {
     const { t } = useTranslation();
     const [step, setStep] = useState(1);
     const [reportMonth, setReportMonth] = useState(new Date().toISOString().slice(0, 7));
@@ -183,7 +182,7 @@ export const IncomeNode = ({ userId, onComplete }) => {
     };
 
     return (
-        <div className="p-6 animate-fade-in max-w-4xl mx-auto">
+        <div className={`animate-fade-in ${compact ? '' : 'p-6 max-w-4xl mx-auto'}`}>
             <div className="flex items-center justify-between mb-8">
                 <div>
                     <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
@@ -194,35 +193,26 @@ export const IncomeNode = ({ userId, onComplete }) => {
 
             </div>
 
-            {step === 0 && (
-                <IncomeMonthSelector
-                    reportMonth={reportMonth}
-                    setReportMonth={setReportMonth}
-                    onContinue={() => setStep(1)}
-                />
-            )}
-
             {step === 1 && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className={`grid grid-cols-1 ${compact ? '' : 'lg:grid-cols-3'} gap-6`}>
                     {/* Left: Upload & Manual Entry */}
-                    <div className="lg:col-span-2">
+                    <div className={compact ? '' : 'lg:col-span-2'}>
                         <IncomeUpload
                             files={files}
                             onFileChange={handleFileChange}
-                            onRemoveFile={(idx) => { 
-                                setFiles(prev => prev.filter((_, i) => i !== idx)); 
+                            onRemoveFile={(idx) => {
+                                setFiles(prev => prev.filter((_, i) => i !== idx));
                             }}
                             onManualConfig={() => setShowManualSelector(true)}
                             isLoading={isLoading}
                             uploadProgress={uploadProgress}
                             onAnalyze={() => handleAnalyzeBatch()}
                             error={error}
-                            onBack={() => setStep(0)}
                         />
                     </div>
 
                     {/* Right: Recurring Income Dashboard */}
-                    <div className="lg:col-span-1">
+                    <div className={compact ? 'mt-6' : 'lg:col-span-1'}>
                         <RecurringIncomeCard
                             userId={userId}
                             workplaces={workplaces}
@@ -295,6 +285,16 @@ export const IncomeNode = ({ userId, onComplete }) => {
                     onComplete={() => {
                         setFiles([]);
                         setStep(3); // Show success screen
+                    }}
+                    onDeleteRow={(idx) => {
+                        setBatchResults(prev => {
+                            const newRes = prev.filter((_, i) => i !== idx);
+                            if (newRes.length === 0) {
+                                setFiles([]);
+                                setStep(1); // Go back to start
+                            }
+                            return newRes;
+                        });
                     }}
                 />
             )}
@@ -382,8 +382,8 @@ export const IncomeNode = ({ userId, onComplete }) => {
                         if (step === 4 && selectedResultIndex !== null) {
                             setBatchResults(prev => {
                                 const newRes = [...prev];
-                                newRes[selectedResultIndex] = { 
-                                    ...newRes[selectedResultIndex], 
+                                newRes[selectedResultIndex] = {
+                                    ...newRes[selectedResultIndex],
                                     status: 'saved',
                                     savedData: savedIncomeData
                                 };
@@ -394,8 +394,8 @@ export const IncomeNode = ({ userId, onComplete }) => {
                             setStep(3); // Go to success screen
                         }
                     }}
-                    onCancel={() => { 
-                        setShowOneTimeForm(false); 
+                    onCancel={() => {
+                        setShowOneTimeForm(false);
                         setExtractedData(null);
                         setSelectedResultIndex(null);
                     }}

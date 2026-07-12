@@ -9,7 +9,6 @@ export const ExpenseUpload = ({
     onRemoveFile,
     onManualConfig,
     error,
-    onBack,
     processingTimeEstimate,
     onAnalyze,
     isLoading
@@ -70,10 +69,6 @@ export const ExpenseUpload = ({
                     </Button>
                 </div>
             )}
-            {/* Back button only */}
-            <div className="flex justify-start">
-                <Button variant="secondary" onClick={onBack}>{t('common.back')}</Button>
-            </div>
         </div>
     );
 };

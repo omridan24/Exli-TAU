@@ -14,7 +14,7 @@
         },
         "analytics": {
             "title": "מרכז הנתונים שלי",
-            "description":"כל המידע, מסודר במקום אחד"
+            "description": "כל המידע, מסודר במקום אחד"
         },
         "settings": {
             "title": "הגדרות",
@@ -501,6 +501,27 @@
             "breakdownLineFirst": "על ה-{{amount}} הראשונים לחודש היית אמור לשלם <rate>{{rate}}%</rate> שהם: <result>{{tax}}</result>",
             "breakdownLineNext": "על ה-{{amount}} הנוספים היית אמור לשלם <rate>{{rate}}%</rate> שהם: <result>{{tax}}</result>"
         }
+    },
+    "onboarding": {
+        "welcome": "ברוכים הבאים ל-Exli!",
+        "startMessage": "בואו נתחיל להכיר אותך.",
+        "prepareRecommendation": "בשביל חוויה מיטבית, אנו ממליצים להכין מראש דוחות הוצאות ותלושי שכר של עד שנה אחורה.",
+        "languagePreference": "העדפת שפה",
+        "english": "English",
+        "hebrew": "עברית",
+        "fullNamePlaceholder": "לדוגמה: ישראל ישראלי",
+        "selectBirthdate": "בחר תאריך לידה",
+        "selectStatus": "בחר סטטוס",
+        "workTitle": "תפקיד",
+        "selectOccupations": "בחר תפקידים",
+        "next": "הבא",
+        "taxCreditDesc": "זה עוזר לנו לחשב את ההכנסה נטו שלך במדויק. תוכל לדלג על זה ולהגדיר מאוחר יותר בהגדרות.",
+        "previous": "הקודם",
+        "skip": "דלג",
+        "allSet": "הכל מוכן!",
+        "profileCreated": "הפרופיל שלך נוצר. לחץ למטה כדי לסיים את תהליך ההצטרפות ולהיכנס למסך הראשי.",
+        "finishing": "מסיים...",
+        "complete": "סיים תהליך הצטרפות"
     },
     "settings": {
         "title": "הגדרות",

@@ -12,8 +12,7 @@ export const IncomeUpload = ({
     isLoading,
     uploadProgress,
     onAnalyze,
-    error,
-    onBack
+    error
 }) => {
     const { t } = useTranslation();
 
@@ -62,13 +61,14 @@ export const IncomeUpload = ({
                                     <div className="text-xs text-slate-400">{(file.size / 1024).toFixed(0)} KB</div>
                                 </div>
                             </div>
-                            <button
-                                onClick={() => onRemoveFile(idx)}
-                                className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-lg transition-colors"
-                                disabled={isLoading}
-                            >
-                                <Trash2 className="w-4 h-4" />
-                            </button>
+                            {!isLoading && (
+                                <button
+                                    onClick={() => onRemoveFile(idx)}
+                                    className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-lg transition-colors"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            )}
                         </div>
                     ))}
                 </div>
@@ -107,10 +107,6 @@ export const IncomeUpload = ({
                 </div>
             )}
 
-            {/* Back button always visible */}
-            <div className="flex justify-start">
-                <Button variant="secondary" onClick={onBack} disabled={isLoading}>{t('common.back')}</Button>
-            </div>
         </div>
     );
 };

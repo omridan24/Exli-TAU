@@ -15,7 +15,7 @@ import { RecurringForm } from './components/RecurringForm';
 import { AutoManualModal } from './components/AutoManualModal';
 import { ExpenseAutoReview } from './components/ExpenseAutoReview';
 
-export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, onComplete }) => {
+export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, onComplete, compact = false }) => {
   const { t } = useTranslation();
   const [step, setStep] = useState(0);
   const [reportMonth, setReportMonth] = useState(new Date().toISOString().slice(0, 7));
@@ -504,7 +504,7 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
   const currentFileData = processedFiles[currentFileIndex];
 
   return (
-    <div className={`p-6 mx-auto animate-fade-in min-h-[600px] ${step === 5 ? "w-full" : "max-w-4xl"}`}>
+    <div className={`animate-fade-in ${compact ? '' : `p-6 mx-auto min-h-[600px] ${step === 5 ? "w-full" : "max-w-4xl"}`}`}>
       <div className="flex items-center justify-between mb-8">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2"><Upload className="w-6 h-6 text-emerald-600" /> {t('expenses.title')}</h2>
@@ -525,7 +525,6 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
                 onRemoveFile={removeFile}
                 onManualConfig={() => setShowManualTypeSelector(true)}
                 error={error}
-                onBack={() => {}}
                 processingTimeEstimate={processingTimeEstimate}
                 onAnalyze={handleUploadClick}
                 isLoading={isLoading}

@@ -13,6 +13,7 @@ import { ExpenseNode } from './features/expenses/ExpenseNode';
 import { IncomeNode } from './features/Income/IncomeNode';
 import { AnalyticsNode } from './features/analytics/AnalyticsNode';
 import { SettingsNode } from './features/settings/SettingsNode';
+import OnboardingScreen from './features/onboarding/OnboardingScreen';
 import { ExliLogo } from './components/UI';
 
 export default function App() {
@@ -23,6 +24,7 @@ export default function App() {
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
   const [activeNode, setActiveNode] = useState('dashboard');
   const [isWhitelisted, setIsWhitelisted] = useState(null);
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(null);
 
   // Initialize language hook at app level for RTL/LTR switching
   const { isRTL } = useLanguage(user?.uid);
@@ -59,18 +61,25 @@ export default function App() {
 
   useEffect(() => {
     if (!user || !isWhitelisted) return;
-    const loadCats = async () => {
+    const loadUserData = async () => {
       const snap = await getDoc(doc(db, 'users', user.uid));
-      if (snap.exists() && snap.data().customCategories) {
-        setCategories([...DEFAULT_CATEGORIES, ...snap.data().customCategories]);
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.customCategories) {
+          setCategories([...DEFAULT_CATEGORIES, ...data.customCategories]);
+        }
+        setHasCompletedOnboarding(data.hasCompletedOnboarding === true);
+      } else {
+        setHasCompletedOnboarding(false);
       }
     };
-    loadCats();
+    loadUserData();
   }, [user, isWhitelisted]);
 
   if (!user) return <LoginScreen />;
   if (isWhitelisted === null) return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-400 animate-pulse">{t('app.verifying')}</div>;
   if (isWhitelisted === false) return <AccessDeniedScreen email={user.email} onLogout={() => signOut(auth)} onRetry={() => window.location.reload()} />;
+  if (hasCompletedOnboarding === null) return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-400 animate-pulse">Loading...</div>;
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
@@ -154,6 +163,16 @@ export default function App() {
           </div>
         )}
       </main>
+      
+      {hasCompletedOnboarding === false && (
+        <OnboardingScreen 
+          user={user} 
+          categories={categories}
+          onUpdateCategories={setCategories}
+          expenses={expenses}
+          onComplete={() => setHasCompletedOnboarding(true)} 
+        />
+      )}
     </div>
   );
 }

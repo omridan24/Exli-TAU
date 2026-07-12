@@ -1,7 +1,10 @@
 import { useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
+
+// Track if we've already loaded the preference for a user to avoid redundant fetches and race conditions
+const loadedUsers = new Set();
 
 /**
  * Custom hook for managing language preferences with Firebase sync.
@@ -27,7 +30,8 @@ export const useLanguage = (userId) => {
     // 2. Sync with Firebase on Login - Load saved preference
     useEffect(() => {
         const loadPreference = async () => {
-            if (userId) {
+            if (userId && !loadedUsers.has(userId)) {
+                loadedUsers.add(userId);
                 try {
                     const ref = doc(db, 'users', userId);
                     const snap = await getDoc(ref);
@@ -39,6 +43,7 @@ export const useLanguage = (userId) => {
                     }
                 } catch (e) {
                     console.error('Error loading language preference:', e);
+                    loadedUsers.delete(userId); // Retry on next mount if failed
                 }
             }
         };
@@ -51,7 +56,7 @@ export const useLanguage = (userId) => {
 
         if (userId) {
             try {
-                await updateDoc(doc(db, 'users', userId), { language: lng });
+                await setDoc(doc(db, 'users', userId), { language: lng }, { merge: true });
             } catch (e) {
                 console.error('Error saving language preference:', e);
             }

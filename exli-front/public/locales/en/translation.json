@@ -500,6 +500,27 @@
             "breakdownLineNext": "On the next {{amount}} you were supposed to pay <rate>{{rate}}%</rate> which is <result>{{tax}}</result>"
         }
     },
+    "onboarding": {
+        "welcome": "Welcome to Exli!",
+        "startMessage": "Let's start by getting to know you.",
+        "prepareRecommendation": "For the best experience, we recommend preparing up to a year's worth of expense reports and payslips in advance.",
+        "languagePreference": "Language Preference",
+        "english": "English",
+        "hebrew": "עברית",
+        "fullNamePlaceholder": "e.g., Jane Doe",
+        "selectBirthdate": "Select Birthdate",
+        "selectStatus": "Select Status",
+        "workTitle": "Work Title",
+        "selectOccupations": "Select Occupations",
+        "next": "Next",
+        "taxCreditDesc": "This helps us calculate your net income accurately. You can skip this and configure it later in settings.",
+        "previous": "Previous",
+        "skip": "Skip",
+        "allSet": "You're all set!",
+        "profileCreated": "Your profile has been created. Click below to finish the onboarding and enter the dashboard.",
+        "finishing": "Finishing...",
+        "complete": "Complete Onboarding"
+    },
     "settings": {
         "title": "Settings",
         "tabs": {
