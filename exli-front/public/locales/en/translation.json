@@ -34,7 +34,50 @@
         },
         "wishlist": {
             "title": "Wish List",
-            "description": "The gifts I want to get for myself"
+            "description": "The gifts I want to get for myself",
+            "subtitle": "Track items you want to buy, budget for them, and turn your financial goals into reality.",
+            "badge": "Feature Preview",
+            "placeholderNotice": "This feature is currently under active development. Here is an interactive preview of how your Wish List will work!",
+            "addWish": "Add New Wish",
+            "stats": {
+                "totalItems": "Target Items",
+                "totalValue": "Estimated Total",
+                "savedAmount": "Saved So Far",
+                "highPriority": "High Priority"
+            },
+            "tabs": {
+                "overview": "Overview",
+                "items": "Sample Wishes",
+                "upcoming": "Upcoming Features"
+            },
+            "priority": {
+                "high": "High Priority",
+                "medium": "Medium Priority",
+                "low": "Low Priority"
+            },
+            "mockItems": {
+                "laptop": {
+                    "title": "MacBook Pro M3",
+                    "category": "Electronics"
+                },
+                "vacation": {
+                    "title": "Summer Trip to Japan",
+                    "category": "Travel"
+                },
+                "watch": {
+                    "title": "Smart Fitness Watch",
+                    "category": "Gadgets"
+                }
+            },
+            "upcomingFeatures": {
+                "title": "What's Coming to Wish List",
+                "targetDate": "Target Date Savings",
+                "targetDateDesc": "Set target dates for your goals and calculate exact monthly savings needed.",
+                "priceTracker": "Price & Deal Tracker",
+                "priceTrackerDesc": "Track item prices across major stores and receive notifications when prices drop.",
+                "smartPriority": "Smart Priority System",
+                "smartPriorityDesc": "Prioritize your wishlist items based on your real-time available monthly spare cash."
+            }
         },
         "comingSoon": "Coming Soon"
     },
