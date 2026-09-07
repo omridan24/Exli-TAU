@@ -34,7 +34,21 @@
         },
         "wishlist": {
             "title": "Wish List",
-            "description": "The gifts I want to get for myself"
+            "description": "The gifts I want to get for myself",
+            "subtitle": "Track, organize, and plan your future purchases.",
+            "placeholder": {
+                "badge": "Under Construction",
+                "title": "Wish List Feature Coming Soon",
+                "description": "We are designing a smart wish list experience to help you prioritize desired items, track pricing, and plan your savings goal.",
+                "featureTeasers": {
+                    "tracking": "Price Tracking & Priorities",
+                    "trackingDesc": "Rank items by necessity and keep track of price changes over time.",
+                    "savings": "Dedicated Savings Goals",
+                    "savingsDesc": "Set aside funds specifically allocated towards your wishlist dreams.",
+                    "smartBudget": "Smart Budget Allocation",
+                    "smartBudgetDesc": "Analyze how purchases fit into your monthly cashflow before buying."
+                }
+            }
         },
         "comingSoon": "Coming Soon"
     },
