@@ -1,8 +1,9 @@
 import React from 'react';
-import { Gift } from 'lucide-react';
+import { Gift, Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { Button } from '../../../components/UI';
 
-export const WishlistHeader = () => {
+export const WishlistHeader = ({ onAddItem }) => {
   const { t } = useTranslation();
 
   return (
@@ -16,6 +17,16 @@ export const WishlistHeader = () => {
           <p className="text-sm text-slate-500 mt-0.5">{t('dashboard.wishlist.subtitle')}</p>
         </div>
       </div>
+
+      {onAddItem && (
+        <Button
+          onClick={onAddItem}
+          className="bg-pink-600 hover:bg-pink-700 text-white shadow-pink-200/80 shrink-0"
+        >
+          <Plus className="w-4 h-4 me-1" />
+          <span>{t('wishlist.addItem')}</span>
+        </Button>
+      )}
     </div>
   );
 };

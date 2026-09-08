@@ -159,7 +159,7 @@ export default function App() {
               {activeNode === 'income' && <IncomeNode userId={user?.uid} onComplete={() => setActiveNode('dashboard')} />}
               {activeNode === 'analytics' && <AnalyticsNode data={expenses} income={income} categories={categories} userId={user?.uid} />}
               {activeNode === 'settings' && <SettingsNode userId={user?.uid} categories={categories} onUpdateCategories={setCategories} />}
-              {activeNode === 'wishlist' && <WishlistNode />}
+              {activeNode === 'wishlist' && <WishlistNode userId={user?.uid} categories={categories} />}
             </div>
           </div>
         )}
