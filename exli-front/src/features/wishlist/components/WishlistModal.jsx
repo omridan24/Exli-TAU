@@ -54,9 +54,9 @@ export const WishlistModal = ({ isOpen, onClose, onSave, itemToEdit, categories 
 
   const validate = () => {
     const errs = {};
-    if (!formData.name.trim()) errs.name = t('wishlist.name') + ' is required';
+    if (!formData.name.trim()) errs.name = t('wishlist.validation.nameRequired');
     if (!formData.price || isNaN(formData.price) || Number(formData.price) < 0) {
-      errs.price = t('wishlist.price') + ' must be a valid positive number';
+      errs.price = t('wishlist.validation.validPrice');
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -255,7 +255,7 @@ export const WishlistModal = ({ isOpen, onClose, onSave, itemToEdit, categories 
                   }}
                 />
                 <div className="text-xs text-slate-500 truncate flex-1">
-                  <span className="font-semibold text-slate-700 block">Preview Image</span>
+                  <span className="font-semibold text-slate-700 block">{t('wishlist.previewImage')}</span>
                   <span className="truncate block text-[11px] text-slate-400">{formData.imageUrl}</span>
                 </div>
               </div>

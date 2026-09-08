@@ -94,7 +94,7 @@ export const WishlistCard = ({ item, categories = DEFAULT_CATEGORIES, onEdit, on
             {item.imageUrl && imgError && (
               <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-1">
                 <ImageOff className="w-3.5 h-3.5" />
-                <span>Image unavailable</span>
+                <span>{t('wishlist.imageUnavailable')}</span>
               </div>
             )}
           </div>

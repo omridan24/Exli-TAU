@@ -54,14 +54,17 @@
             },
             "dateAdded": "תאריך הוספה",
             "imageUrl": "קישור לתמונה (רשות)",
-            "imageUrlPlaceholder": "https://images.unsplash.com/...",
-            "descriptionLabel": "תיאור / הערות (רשות)",
-            "descriptionPlaceholder": "קישור, מידה, צבע, פרטים נוספים...",
+            "imageUrlPlaceholder": "https://example.com/item-photo.jpg",
+            "descriptionLabel": "תיאור והערות (רשות)",
+            "descriptionPlaceholder": "קישור לחנות, מפרט המוצר, מידה או צבע מועדף...",
             "saveItem": "שמור פריט",
             "updateItem": "עדכן פריט",
             "updating": "מעדכן...",
             "saving": "שומר...",
             "addedOn": "נוסף ב-{{date}}",
+            "imageUnavailable": "תמונה לא זמינה",
+            "previewImage": "תצוגה מקדימה לתמונה",
+            "clearFilters": "ניקוי מסננים",
             "emptyTitle": "רשימת המשאלות שלך ריקה",
             "emptySubtitle": "התחל להוסיף פריטים שברצונך לקנות בעתיד!",
             "confirmDeleteTitle": "מחיקת פריט מרשימת המשאלות",
@@ -71,18 +74,9 @@
             "filterCategory": "כל הקטגוריות",
             "filterImportance": "כל רמות החשיבות",
             "searchPlaceholder": "חיפוש ברשימת המשאלות...",
-            "placeholder": {
-                "badge": "בפיתוח",
-                "title": "רשימת משאלות בקרוב",
-                "description": "אנחנו שוקדים על חווית רשימת משאלות חכמה שתעזור לכם לתעדף פריטים רצויים, לעקוב אחר מחירים ולתכנן את יעדי החיסכון שלכם.",
-                "featureTeasers": {
-                    "tracking": "מעקב מחירים ועדיפויות",
-                    "trackingDesc": "דרגו פריטים לפי נחיצות ועקבו אחר שינויי מחיר לאורך זמן.",
-                    "savings": "יעדי חיסכון ייעודיים",
-                    "savingsDesc": "הפרישו כספים המיועדים במיוחד להגשמת חלומות ברשימת המשאלות.",
-                    "smartBudget": "הקצאת תקציב חכמה",
-                    "smartBudgetDesc": "בחנו כיצד רכישות משתלבות בתזרים המזומנים החודשי שלכם לפני הקנייה."
-                }
+            "validation": {
+                "nameRequired": "אנא הזן שם פריט",
+                "validPrice": "אנא הזן סכום מחיר תקין"
             }
         },
         "comingSoon": "בקרוב"

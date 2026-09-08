@@ -222,7 +222,7 @@ export const WishlistNode = ({ userId, categories = DEFAULT_CATEGORIES }) => {
                   }}
                   className="mt-3 text-xs font-bold text-pink-600 hover:text-pink-700 underline"
                 >
-                  Clear Filters
+                  {t('wishlist.clearFilters')}
                 </button>
               </div>
             )}

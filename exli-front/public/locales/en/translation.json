@@ -54,14 +54,17 @@
             },
             "dateAdded": "Date Added",
             "imageUrl": "Image URL (Optional)",
-            "imageUrlPlaceholder": "https://images.unsplash.com/...",
-            "descriptionLabel": "Description / Notes (Optional)",
-            "descriptionPlaceholder": "Link, size, color options, details...",
+            "imageUrlPlaceholder": "https://example.com/item-photo.jpg",
+            "descriptionLabel": "Description & Notes (Optional)",
+            "descriptionPlaceholder": "Store link, product specs, preferred color or size...",
             "saveItem": "Save Item",
             "updateItem": "Update Item",
             "updating": "Updating...",
             "saving": "Saving...",
             "addedOn": "Added {{date}}",
+            "imageUnavailable": "Image unavailable",
+            "previewImage": "Image Preview",
+            "clearFilters": "Clear Filters",
             "emptyTitle": "Your Wishlist is Empty",
             "emptySubtitle": "Start adding items you plan or hope to buy in the future!",
             "confirmDeleteTitle": "Remove Wishlist Item",
@@ -71,18 +74,9 @@
             "filterCategory": "All Categories",
             "filterImportance": "All Importance",
             "searchPlaceholder": "Search wishlist items...",
-            "placeholder": {
-                "badge": "Under Construction",
-                "title": "Wish List Feature Coming Soon",
-                "description": "We are designing a smart wish list experience to help you prioritize desired items, track pricing, and plan your savings goal.",
-                "featureTeasers": {
-                    "tracking": "Price Tracking & Priorities",
-                    "trackingDesc": "Rank items by necessity and keep track of price changes over time.",
-                    "savings": "Dedicated Savings Goals",
-                    "savingsDesc": "Set aside funds specifically allocated towards your wishlist dreams.",
-                    "smartBudget": "Smart Budget Allocation",
-                    "smartBudgetDesc": "Analyze how purchases fit into your monthly cashflow before buying."
-                }
+            "validation": {
+                "nameRequired": "Please enter an item name",
+                "validPrice": "Please enter a valid price amount"
             }
         },
         "comingSoon": "Coming Soon"
