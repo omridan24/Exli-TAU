@@ -75,7 +75,7 @@ export const WishlistShareModal = ({
       maximumFractionDigits: 2
     })}`;
 
-    lines.push(`*${item.name}* - ${priceFormatted}`);
+    lines.push(`🎁 *${item.name}* - ${priceFormatted}`);
 
     // Optional description
     if (item.description && item.description.trim()) {
@@ -86,6 +86,9 @@ export const WishlistShareModal = ({
     if (hasStoreUrl) {
       lines.push(formatStoreUrl(item.storeUrl.trim()));
     }
+
+    // Exli wishlist personal disclosure
+    lines.push(t('wishlist.whatsappShareDisclosure', '✨ An item from my wishlist on Exli'));
 
     const message = lines.filter(Boolean).join('\n\n');
     const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
