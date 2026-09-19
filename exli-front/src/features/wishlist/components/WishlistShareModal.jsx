@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
-import { X, Share2, Copy, Mail, Check, Link2, ExternalLink } from 'lucide-react';
+import { X, Share2, Mail, Link2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { CategoryIcon } from '../../../components/UI';
+import { Button } from '../../../components/UI';
 import { DEFAULT_CATEGORIES } from '../../../config/constants';
 import { getCurrencySymbol, formatStoreUrl } from './WishlistCard';
+import { WishlistMiniPreview } from './WishlistMiniPreview';
+import { ShareLinkBar } from './ShareLinkBar';
+import { ShareChannelButton } from './ShareChannelButton';
 
 // WhatsApp brand SVG icon
 const WhatsAppIcon = ({ className = "w-4 h-4" }) => (
@@ -41,30 +44,61 @@ export const WishlistShareModal = ({
 
   if (!isOpen || !item) return null;
 
-  // Find category details for preview
-  const catDetails =
-    categories.find((c) => c.id === item.category) ||
-    DEFAULT_CATEGORIES.find((c) => c.id === item.category) || {
-      id: 'other',
-      name: item.category || 'Other',
-      color: '#ec4899',
-      icon: 'Gift'
-    };
-
   const hasStoreUrl = Boolean(item.storeUrl && item.storeUrl.trim());
   const itemLink = hasStoreUrl
     ? formatStoreUrl(item.storeUrl.trim())
     : t('wishlist.noStoreUrlProvided', 'No store link was provided');
 
-  const handleCopyLink = (e) => {
-    e.preventDefault();
-    // Do not include sharing functionality per specification, but optionally show subtle feedback or no-op
-    // Specification: "-do not include sharing funcionability (clicking "whatsapp" should do nothing)"
+  const handleCopyLink = async (e) => {
+    if (e) e.preventDefault();
+    if (!hasStoreUrl) return;
+    try {
+      await navigator.clipboard.writeText(itemLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy to clipboard:', err);
+    }
   };
 
-  const handleShareClick = (e) => {
-    e.preventDefault();
-    // Specification: clicking sharing options should do nothing
+  const handleWhatsAppShare = () => {
+    const lines = [];
+
+    // Optional user note
+    if (note.trim()) {
+      lines.push(note.trim());
+    }
+
+    // Formatted item line
+    const priceFormatted = `${getCurrencySymbol(item.currency)}${Number(item.price || 0).toLocaleString(undefined, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    })}`;
+
+    lines.push(`*${item.name}* - ${priceFormatted}`);
+
+    // Optional description
+    if (item.description && item.description.trim()) {
+      lines.push(item.description.trim());
+    }
+
+    // Store link if present
+    if (hasStoreUrl) {
+      lines.push(formatStoreUrl(item.storeUrl.trim()));
+    }
+
+    const message = lines.filter(Boolean).join('\n\n');
+    const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleChannelClick = (channelId) => {
+    if (channelId === 'whatsapp') {
+      handleWhatsAppShare();
+    } else if (channelId === 'copy') {
+      handleCopyLink();
+    }
+    // Other channels remain no-op per specification
   };
 
   const shareChannels = [
@@ -131,94 +165,18 @@ export const WishlistShareModal = ({
           </button>
         </div>
 
-        {/* Item mini-preview */}
-        <div className="flex items-center justify-between p-3.5 bg-slate-50/90 rounded-2xl border border-slate-100 gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            {item.imageUrl ? (
-              <img
-                src={item.imageUrl}
-                alt={item.name}
-                className="w-12 h-12 rounded-xl object-cover shrink-0 border border-slate-200/60"
-              />
-            ) : (
-              <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
-                style={{ backgroundColor: `${catDetails.color}15`, color: catDetails.color }}
-              >
-                <CategoryIcon iconName={catDetails.icon} className="w-6 h-6" color={catDetails.color} />
-              </div>
-            )}
-            <div className="min-w-0">
-              <h4 className="text-sm font-bold text-slate-800 truncate">
-                {item.name}
-              </h4>
-              <span className="text-[11px] text-slate-500 block truncate">
-                {catDetails.name || item.category}
-              </span>
-              {item.storeUrl && (
-                <a
-                  href={formatStoreUrl(item.storeUrl)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-pink-600 hover:text-pink-700 hover:underline mt-0.5"
-                >
-                  <ExternalLink className="w-3 h-3 shrink-0" />
-                  <span className="truncate">{t('wishlist.visitStore', 'Visit online store')}</span>
-                </a>
-              )}
-            </div>
-          </div>
-
-          <div className="text-end shrink-0 ps-2">
-            <div className="text-base font-extrabold text-slate-900 font-mono">
-              <span className="text-pink-600 me-0.5">{getCurrencySymbol(item.currency)}</span>
-              {Number(item.price || 0).toLocaleString(undefined, {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 2
-              })}
-            </div>
-            <span className="text-[10px] text-slate-400 uppercase font-semibold">
-              {item.currency || 'ILS'}
-            </span>
-          </div>
-        </div>
+        {/* Item mini-preview using reusable WishlistMiniPreview */}
+        <WishlistMiniPreview item={item} categories={categories} />
 
         {/* Form Body */}
         <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
-          {/* Shareable Link Bar */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              {t('wishlist.shareLink', 'Item link')}
-            </label>
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <input
-                  type="text"
-                  readOnly
-                  value={itemLink}
-                  className={`w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none truncate transition-colors ${
-                    hasStoreUrl
-                      ? 'text-slate-600 font-mono select-all focus:border-pink-300'
-                      : 'text-slate-400 italic cursor-default'
-                  }`}
-                />
-              </div>
-              <button
-                type="button"
-                onClick={handleShareClick}
-                disabled={!hasStoreUrl}
-                className={`px-3.5 py-2.5 rounded-xl border font-bold text-xs flex items-center gap-1.5 transition-colors shrink-0 shadow-xs ${
-                  hasStoreUrl
-                    ? 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 cursor-pointer'
-                    : 'border-slate-200/60 bg-slate-100 text-slate-400 cursor-not-allowed opacity-75'
-                }`}
-                title={hasStoreUrl ? t('wishlist.copyLink', 'Copy link') : t('wishlist.noStoreUrlProvided', 'No store link was provided')}
-              >
-                <Copy className="w-3.5 h-3.5" />
-                <span>{t('wishlist.copyLink', 'Copy link')}</span>
-              </button>
-            </div>
-          </div>
+          {/* Shareable Link Bar using reusable ShareLinkBar */}
+          <ShareLinkBar
+            link={itemLink}
+            hasLink={hasStoreUrl}
+            copied={copied}
+            onCopy={handleCopyLink}
+          />
 
           {/* Optional Note / Message */}
           <div>
@@ -234,45 +192,38 @@ export const WishlistShareModal = ({
             />
           </div>
 
-          {/* Sharing Channels Grid */}
+          {/* Sharing Channels Grid using reusable ShareChannelButton */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-2">
               {t('wishlist.shareVia', 'Share via')}
             </label>
             <div className="grid grid-cols-2 gap-2.5">
-              {shareChannels.map((channel) => {
-                const IconComponent = channel.icon;
-                return (
-                  <button
-                    key={channel.id}
-                    type="button"
-                    onClick={handleShareClick}
-                    className={`flex items-center gap-3 p-2.5 rounded-2xl border border-slate-200/80 bg-white text-slate-700 ${channel.hoverBorder} transition-all duration-200 text-start group shadow-xs hover:shadow-sm`}
-                  >
-                    <div
-                      className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-xs ${channel.iconBg} group-hover:scale-105 transition-transform`}
-                    >
-                      <IconComponent className="w-4 h-4" />
-                    </div>
-                    <span className="text-xs font-bold text-slate-700 group-hover:text-slate-900 truncate">
-                      {channel.name}
-                    </span>
-                  </button>
-                );
-              })}
+              {shareChannels.map((channel) => (
+                <ShareChannelButton
+                  key={channel.id}
+                  name={channel.name}
+                  icon={channel.icon}
+                  iconBg={channel.iconBg}
+                  hoverBorder={channel.hoverBorder}
+                  isCopied={channel.id === 'copy' && copied}
+                  copiedText={t('wishlist.copied', 'Copied!')}
+                  onClick={() => handleChannelClick(channel.id)}
+                />
+              ))}
             </div>
           </div>
         </form>
 
-        {/* Modal Footer / Close Button */}
+        {/* Modal Footer / Close Button using existing Button component */}
         <div className="pt-2">
-          <button
+          <Button
             type="button"
+            variant="secondary"
             onClick={onClose}
-            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition-colors"
+            className="w-full justify-center py-2.5 text-xs text-slate-600 hover:text-slate-800"
           >
             {t('common.cancel', 'Cancel')}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

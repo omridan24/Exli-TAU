@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { Edit2, Trash2, Calendar, Tag, ImageOff, Flame, Zap, Droplet, Share2, ExternalLink } from 'lucide-react';
+import { Edit2, Trash2, Calendar, Tag, ImageOff, Flame, Zap, Droplet, Share2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Card, CategoryIcon } from '../../../components/UI';
 import { DEFAULT_CATEGORIES } from '../../../config/constants';
+
+import { StoreLink, formatStoreUrl } from './StoreLink';
 
 export const getCurrencySymbol = (currency) => {
   switch (currency) {
@@ -14,10 +16,7 @@ export const getCurrencySymbol = (currency) => {
   }
 };
 
-export const formatStoreUrl = (url) => {
-  if (!url) return '';
-  return url.startsWith('http://') || url.startsWith('https://') ? url : `https://${url}`;
-};
+export { formatStoreUrl };
 
 export const WishlistCard = ({ item, categories = DEFAULT_CATEGORIES, onEdit, onDelete, onShare }) => {
   const { t } = useTranslation();
@@ -159,16 +158,7 @@ export const WishlistCard = ({ item, categories = DEFAULT_CATEGORIES, onEdit, on
           {/* Online Store Link */}
           {item.storeUrl && (
             <div className="pt-0.5">
-              <a
-                href={formatStoreUrl(item.storeUrl)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-pink-600 hover:text-pink-700 hover:underline transition-colors"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <ExternalLink className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">{t('wishlist.visitStore', 'Visit online store')}</span>
-              </a>
+              <StoreLink url={item.storeUrl} />
             </div>
           )}
         </div>
