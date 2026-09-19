@@ -17,6 +17,7 @@ export const WishlistModal = ({ isOpen, onClose, onSave, itemToEdit, categories 
     importance: 'medium',
     dateAdded: getTodayISO(),
     imageUrl: '',
+    storeUrl: '',
     description: ''
   });
 
@@ -33,6 +34,7 @@ export const WishlistModal = ({ isOpen, onClose, onSave, itemToEdit, categories 
         importance: itemToEdit.importance || 'medium',
         dateAdded: itemToEdit.dateAdded || getTodayISO(),
         imageUrl: itemToEdit.imageUrl || '',
+        storeUrl: itemToEdit.storeUrl || '',
         description: itemToEdit.description || ''
       });
     } else {
@@ -44,6 +46,7 @@ export const WishlistModal = ({ isOpen, onClose, onSave, itemToEdit, categories 
         importance: 'medium',
         dateAdded: getTodayISO(),
         imageUrl: '',
+        storeUrl: '',
         description: ''
       });
     }
@@ -260,6 +263,20 @@ export const WishlistModal = ({ isOpen, onClose, onSave, itemToEdit, categories 
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Store URL */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+              {t('wishlist.storeUrl')}
+            </label>
+            <input
+              type="url"
+              value={formData.storeUrl}
+              onChange={(e) => setFormData({ ...formData, storeUrl: e.target.value })}
+              placeholder={t('wishlist.storeUrlPlaceholder')}
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 font-medium outline-none focus:bg-white focus:border-pink-500 transition-all"
+            />
           </div>
 
           {/* Description */}

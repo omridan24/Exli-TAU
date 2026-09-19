@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Share2, Copy, Mail, Check, Link2 } from 'lucide-react';
+import { X, Share2, Copy, Mail, Check, Link2, ExternalLink } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { CategoryIcon } from '../../../components/UI';
 import { DEFAULT_CATEGORIES } from '../../../config/constants';
@@ -154,6 +154,17 @@ export const WishlistShareModal = ({
               <span className="text-[11px] text-slate-500 block truncate">
                 {catDetails.name || item.category}
               </span>
+              {item.storeUrl && (
+                <a
+                  href={item.storeUrl.startsWith('http') ? item.storeUrl : `https://${item.storeUrl}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-pink-600 hover:text-pink-700 hover:underline mt-0.5"
+                >
+                  <ExternalLink className="w-3 h-3 shrink-0" />
+                  <span className="truncate">{t('wishlist.visitStore')}</span>
+                </a>
+              )}
             </div>
           </div>
 
