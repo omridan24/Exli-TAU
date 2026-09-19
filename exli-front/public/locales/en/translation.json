@@ -884,6 +884,7 @@
         "shareTitle": "Share Item",
         "shareSubtitle": "Share this item from your wishlist",
         "shareLink": "Item Link",
+        "noStoreUrlProvided": "No store link was provided",
         "copyLink": "Copy Link",
         "shareVia": "Share via",
         "whatsapp": "WhatsApp",

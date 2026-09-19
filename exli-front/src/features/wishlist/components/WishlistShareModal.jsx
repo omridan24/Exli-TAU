@@ -3,7 +3,7 @@ import { X, Share2, Copy, Mail, Check, Link2, ExternalLink } from 'lucide-react'
 import { useTranslation } from 'react-i18next';
 import { CategoryIcon } from '../../../components/UI';
 import { DEFAULT_CATEGORIES } from '../../../config/constants';
-import { getCurrencySymbol } from './WishlistCard';
+import { getCurrencySymbol, formatStoreUrl } from './WishlistCard';
 
 // WhatsApp brand SVG icon
 const WhatsAppIcon = ({ className = "w-4 h-4" }) => (
@@ -51,9 +51,10 @@ export const WishlistShareModal = ({
       icon: 'Gift'
     };
 
-  const shareUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/wishlist/item/${item.id}`
-    : `https://exli.app/wishlist/item/${item.id}`;
+  const hasStoreUrl = Boolean(item.storeUrl && item.storeUrl.trim());
+  const itemLink = hasStoreUrl
+    ? formatStoreUrl(item.storeUrl.trim())
+    : t('wishlist.noStoreUrlProvided', 'No store link was provided');
 
   const handleCopyLink = (e) => {
     e.preventDefault();
@@ -156,7 +157,7 @@ export const WishlistShareModal = ({
               </span>
               {item.storeUrl && (
                 <a
-                  href={item.storeUrl.startsWith('http') ? item.storeUrl : `https://${item.storeUrl}`}
+                  href={formatStoreUrl(item.storeUrl)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-[11px] font-semibold text-pink-600 hover:text-pink-700 hover:underline mt-0.5"
@@ -194,14 +195,24 @@ export const WishlistShareModal = ({
                 <input
                   type="text"
                   readOnly
-                  value={shareUrl}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 select-all outline-none font-mono truncate focus:border-pink-300"
+                  value={itemLink}
+                  className={`w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none truncate transition-colors ${
+                    hasStoreUrl
+                      ? 'text-slate-600 font-mono select-all focus:border-pink-300'
+                      : 'text-slate-400 italic cursor-default'
+                  }`}
                 />
               </div>
               <button
                 type="button"
                 onClick={handleShareClick}
-                className="px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 font-bold text-xs flex items-center gap-1.5 transition-colors shrink-0 shadow-xs"
+                disabled={!hasStoreUrl}
+                className={`px-3.5 py-2.5 rounded-xl border font-bold text-xs flex items-center gap-1.5 transition-colors shrink-0 shadow-xs ${
+                  hasStoreUrl
+                    ? 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 cursor-pointer'
+                    : 'border-slate-200/60 bg-slate-100 text-slate-400 cursor-not-allowed opacity-75'
+                }`}
+                title={hasStoreUrl ? t('wishlist.copyLink', 'Copy link') : t('wishlist.noStoreUrlProvided', 'No store link was provided')}
               >
                 <Copy className="w-3.5 h-3.5" />
                 <span>{t('wishlist.copyLink', 'Copy link')}</span>

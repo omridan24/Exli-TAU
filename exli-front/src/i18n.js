@@ -20,7 +20,7 @@ i18n
         },
         backend: {
             loadPath: '/locales/{{lng}}/translation.json',
-            queryStringParams: { v: '1.0.3' }
+            queryStringParams: { v: '1.0.4' }
         },
         react: {
             useSuspense: false
