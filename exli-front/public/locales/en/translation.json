@@ -856,7 +856,7 @@
         "imageUrlPlaceholder": "https://example.com/item-photo.jpg",
         "storeUrl": "Online Store Link (Optional)",
         "storeUrlPlaceholder": "https://store.example.com/item/...",
-        "visitStore": "Visit Store",
+        "visitStore": "Visit online store",
         "descriptionLabel": "Description & Notes (Optional)",
         "descriptionPlaceholder": "Product specs, preferred color or size, notes...",
         "saveItem": "Save Item",

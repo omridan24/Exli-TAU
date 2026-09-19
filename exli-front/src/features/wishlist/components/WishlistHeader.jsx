@@ -13,8 +13,8 @@ export const WishlistHeader = ({ onAddItem }) => {
           <Gift className="w-6 h-6" />
         </div>
         <div className="text-start">
-          <h1 className="text-2xl font-bold text-slate-800">{t('dashboard.wishlist.title')}</h1>
-          <p className="text-sm text-slate-500 mt-0.5">{t('dashboard.wishlist.subtitle')}</p>
+          <h1 className="text-2xl font-bold text-slate-800">{t('dashboard.wishlist.title', t('wishlist.title', 'Wish List'))}</h1>
+          <p className="text-sm text-slate-500 mt-0.5">{t('dashboard.wishlist.subtitle', t('wishlist.subtitle', 'Keep track of items you love and plan your future purchases with ease.'))}</p>
         </div>
       </div>
 
@@ -24,7 +24,7 @@ export const WishlistHeader = ({ onAddItem }) => {
           className="bg-pink-600 hover:bg-pink-700 text-white shadow-pink-200/80 shrink-0"
         >
           <Plus className="w-4 h-4 me-1" />
-          <span>{t('wishlist.addItem')}</span>
+          <span>{t('wishlist.addItem', 'Add Item')}</span>
         </Button>
       )}
     </div>

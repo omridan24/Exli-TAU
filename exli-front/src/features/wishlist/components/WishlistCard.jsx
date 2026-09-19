@@ -40,20 +40,20 @@ export const WishlistCard = ({ item, categories = DEFAULT_CATEGORIES, onEdit, on
     switch (importance) {
       case 'high':
         return {
-          label: t('wishlist.importanceLevels.high'),
+          label: t('wishlist.importanceLevels.high', 'High'),
           className: 'bg-rose-50 text-rose-700 border-rose-200/80',
           icon: Flame
         };
       case 'low':
         return {
-          label: t('wishlist.importanceLevels.low'),
+          label: t('wishlist.importanceLevels.low', 'Low'),
           className: 'bg-slate-100 text-slate-600 border-slate-200',
           icon: Droplet
         };
       case 'medium':
       default:
         return {
-          label: t('wishlist.importanceLevels.medium'),
+          label: t('wishlist.importanceLevels.medium', 'Medium'),
           className: 'bg-amber-50 text-amber-700 border-amber-200/80',
           icon: Zap
         };
@@ -99,7 +99,7 @@ export const WishlistCard = ({ item, categories = DEFAULT_CATEGORIES, onEdit, on
             {item.imageUrl && imgError && (
               <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-1">
                 <ImageOff className="w-3.5 h-3.5" />
-                <span>{t('wishlist.imageUnavailable')}</span>
+                <span>{t('wishlist.imageUnavailable', 'Image unavailable')}</span>
               </div>
             )}
           </div>
@@ -145,7 +145,7 @@ export const WishlistCard = ({ item, categories = DEFAULT_CATEGORIES, onEdit, on
           {item.dateAdded && (
             <div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium">
               <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-              <span>{t('wishlist.addedOn', { date: formatDate(item.dateAdded) })}</span>
+              <span>{t('wishlist.addedOn', { date: formatDate(item.dateAdded), defaultValue: `Added ${formatDate(item.dateAdded)}` })}</span>
             </div>
           )}
 
@@ -167,7 +167,7 @@ export const WishlistCard = ({ item, categories = DEFAULT_CATEGORIES, onEdit, on
                 onClick={(e) => e.stopPropagation()}
               >
                 <ExternalLink className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">{t('wishlist.visitStore')}</span>
+                <span className="truncate">{t('wishlist.visitStore', 'Visit online store')}</span>
               </a>
             </div>
           )}
@@ -184,21 +184,21 @@ export const WishlistCard = ({ item, categories = DEFAULT_CATEGORIES, onEdit, on
             <button
               onClick={() => onShare && onShare(item)}
               className="p-1.5 rounded-lg text-slate-500 hover:text-pink-600 hover:bg-pink-50 transition-colors"
-              title={t('wishlist.shareItem')}
+              title={t('wishlist.shareItem', 'Share item')}
             >
               <Share2 className="w-4 h-4" />
             </button>
             <button
               onClick={() => onEdit(item)}
               className="p-1.5 rounded-lg text-slate-500 hover:text-pink-600 hover:bg-pink-50 transition-colors"
-              title={t('wishlist.editItem')}
+              title={t('wishlist.editItem', 'Edit item')}
             >
               <Edit2 className="w-4 h-4" />
             </button>
             <button
               onClick={() => onDelete(item)}
               className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-              title={t('wishlist.deleteItem')}
+              title={t('wishlist.deleteItem', 'Delete item')}
             >
               <Trash2 className="w-4 h-4" />
             </button>

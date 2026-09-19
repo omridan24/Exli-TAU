@@ -121,8 +121,8 @@ export default function App() {
 
             <button onClick={() => setActiveNode('wishlist')} className="p-8 bg-white rounded-2xl shadow-sm hover:shadow-md border border-slate-100 text-start group transition-all relative overflow-hidden">
               <div className="w-12 h-12 bg-pink-100 rounded-xl flex items-center justify-center text-pink-600 mb-4 group-hover:scale-110 transition-transform"><Gift /></div>
-              <h3 className="font-bold text-lg text-slate-800">{t('dashboard.wishlist.title')}</h3>
-              <p className="text-slate-500 text-sm mt-1">{t('dashboard.wishlist.description')}</p>
+              <h3 className="font-bold text-lg text-slate-800">{t('dashboard.wishlist.title', 'Wish List')}</h3>
+              <p className="text-slate-500 text-sm mt-1">{t('dashboard.wishlist.description', 'Track, budget, and save for the items you want next')}</p>
             </button>
 
             {/* Coming Soon Modules */}

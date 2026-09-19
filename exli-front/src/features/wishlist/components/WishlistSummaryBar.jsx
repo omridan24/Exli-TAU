@@ -37,7 +37,7 @@ export const WishlistSummaryBar = ({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t('wishlist.searchPlaceholder')}
+            placeholder={t('wishlist.searchPlaceholder', 'Search items by name, store, or notes...')}
             className="w-full start-0 ps-10 pe-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-medium text-slate-800 outline-none focus:bg-white focus:border-pink-500 transition-all"
           />
           {searchQuery && (
@@ -59,7 +59,7 @@ export const WishlistSummaryBar = ({
               onChange={(e) => setSelectedCategory(e.target.value)}
               className="appearance-none ps-9 pe-8 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 text-xs font-semibold outline-none focus:border-pink-500 transition-all cursor-pointer"
             >
-              <option value="all">{t('wishlist.filterCategory')}</option>
+              <option value="all">{t('wishlist.filterCategory', 'All Categories')}</option>
               {categories.map((cat) => {
                 const translationKey = `categories.${cat.id}`;
                 const translatedName = t(translationKey);
@@ -81,10 +81,10 @@ export const WishlistSummaryBar = ({
               onChange={(e) => setSelectedImportance(e.target.value)}
               className="appearance-none ps-9 pe-8 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 text-xs font-semibold outline-none focus:border-pink-500 transition-all cursor-pointer"
             >
-              <option value="all">{t('wishlist.filterImportance')}</option>
-              <option value="high">🔥 {t('wishlist.importanceLevels.high')}</option>
-              <option value="medium">⚡ {t('wishlist.importanceLevels.medium')}</option>
-              <option value="low">💧 {t('wishlist.importanceLevels.low')}</option>
+              <option value="all">{t('wishlist.filterImportance', 'All Importance')}</option>
+              <option value="high">🔥 {t('wishlist.importanceLevels.high', 'High')}</option>
+              <option value="medium">⚡ {t('wishlist.importanceLevels.medium', 'Medium')}</option>
+              <option value="low">💧 {t('wishlist.importanceLevels.low', 'Low')}</option>
             </select>
             <Flame className="w-3.5 h-3.5 text-slate-400 absolute start-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
@@ -95,12 +95,12 @@ export const WishlistSummaryBar = ({
       <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-2 text-slate-500 font-medium">
           <Layers className="w-4 h-4 text-pink-500" />
-          <span>{t('wishlist.totalItems', { count: items.length })}</span>
+          <span>{t('wishlist.totalItems', { count: items.length, defaultValue: `${items.length} Items` })}</span>
         </div>
 
         {/* Total Value Summary per currency */}
         <div className="flex items-center gap-2">
-          <span className="text-slate-400 font-medium">{t('wishlist.totalValue')}:</span>
+          <span className="text-slate-400 font-medium">{t('wishlist.totalValue', 'Total Estimated Value')}:</span>
           {totalCurrenciesList.length > 0 ? (
             <div className="flex items-center gap-2 flex-wrap">
               {totalCurrenciesList.map(([curr, sum]) => (

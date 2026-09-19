@@ -24,11 +24,11 @@ export const WishlistDeleteModal = ({ isOpen, onClose, onConfirm, item }) => {
         </div>
 
         <h3 className="text-xl font-bold text-slate-800 mb-2">
-          {t('wishlist.confirmDeleteTitle')}
+          {t('wishlist.confirmDeleteTitle', 'Remove Wishlist Item')}
         </h3>
 
         <p className="text-slate-600 text-sm mb-6 leading-relaxed">
-          {t('wishlist.confirmDeleteMessage', { name: item.name })}
+          {t('wishlist.confirmDeleteMessage', { name: item.name, defaultValue: `Are you sure you want to remove "${item.name}" from your wishlist?` })}
         </p>
 
         <div className="flex gap-3">
@@ -36,7 +36,7 @@ export const WishlistDeleteModal = ({ isOpen, onClose, onConfirm, item }) => {
             onClick={onClose}
             className="flex-1 px-4 py-3 rounded-xl border border-slate-200 font-bold text-slate-600 hover:bg-slate-50 transition-colors"
           >
-            {t('common.cancel')}
+            {t('common.cancel', 'Cancel')}
           </button>
           <Button
             variant="danger"
@@ -47,7 +47,7 @@ export const WishlistDeleteModal = ({ isOpen, onClose, onConfirm, item }) => {
             className="flex-1 justify-center bg-rose-600 hover:bg-rose-700 text-white"
           >
             <Trash2 className="w-4 h-4 me-1.5" />
-            {t('common.delete')}
+            {t('common.delete', 'Delete')}
           </Button>
         </div>
       </div>

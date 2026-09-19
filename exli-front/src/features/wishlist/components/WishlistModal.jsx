@@ -57,9 +57,9 @@ export const WishlistModal = ({ isOpen, onClose, onSave, itemToEdit, categories 
 
   const validate = () => {
     const errs = {};
-    if (!formData.name.trim()) errs.name = t('wishlist.validation.nameRequired');
+    if (!formData.name.trim()) errs.name = t('wishlist.validation.nameRequired', 'Please enter an item name');
     if (!formData.price || isNaN(formData.price) || Number(formData.price) < 0) {
-      errs.price = t('wishlist.validation.validPrice');
+      errs.price = t('wishlist.validation.validPrice', 'Please enter a valid price amount');
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -84,9 +84,9 @@ export const WishlistModal = ({ isOpen, onClose, onSave, itemToEdit, categories 
   };
 
   const importanceOptions = [
-    { id: 'high', label: t('wishlist.importanceLevels.high'), color: 'bg-rose-50 border-rose-300 text-rose-700 active:bg-rose-100', activeBg: 'bg-rose-600 text-white border-rose-600', icon: Flame },
-    { id: 'medium', label: t('wishlist.importanceLevels.medium'), color: 'bg-amber-50 border-amber-300 text-amber-700 active:bg-amber-100', activeBg: 'bg-amber-500 text-white border-amber-500', icon: Zap },
-    { id: 'low', label: t('wishlist.importanceLevels.low'), color: 'bg-slate-100 border-slate-300 text-slate-700 active:bg-slate-200', activeBg: 'bg-slate-700 text-white border-slate-700', icon: Droplet },
+    { id: 'high', label: t('wishlist.importanceLevels.high', 'High'), color: 'bg-rose-50 border-rose-300 text-rose-700 active:bg-rose-100', activeBg: 'bg-rose-600 text-white border-rose-600', icon: Flame },
+    { id: 'medium', label: t('wishlist.importanceLevels.medium', 'Medium'), color: 'bg-amber-50 border-amber-300 text-amber-700 active:bg-amber-100', activeBg: 'bg-amber-500 text-white border-amber-500', icon: Zap },
+    { id: 'low', label: t('wishlist.importanceLevels.low', 'Low'), color: 'bg-slate-100 border-slate-300 text-slate-700 active:bg-slate-200', activeBg: 'bg-slate-700 text-white border-slate-700', icon: Droplet },
   ];
 
   return (
@@ -100,9 +100,9 @@ export const WishlistModal = ({ isOpen, onClose, onSave, itemToEdit, categories 
             </div>
             <div className="text-start">
               <h2 className="font-bold text-slate-800 text-lg">
-                {itemToEdit ? t('wishlist.editItem') : t('wishlist.addItem')}
+                {itemToEdit ? t('wishlist.editItem', 'Edit Item') : t('wishlist.addItem', 'Add Item')}
               </h2>
-              <p className="text-xs text-slate-500">{t('dashboard.wishlist.subtitle')}</p>
+              <p className="text-xs text-slate-500">{t('dashboard.wishlist.subtitle', t('wishlist.subtitle', 'Keep track of items you love and plan your future purchases with ease.'))}</p>
             </div>
           </div>
           <button
@@ -118,13 +118,13 @@ export const WishlistModal = ({ isOpen, onClose, onSave, itemToEdit, categories 
           {/* Item Name */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
-              {t('wishlist.name')} *
+              {t('wishlist.name', 'Item Name')} *
             </label>
             <input
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder={t('wishlist.namePlaceholder')}
+              placeholder={t('wishlist.namePlaceholder', 'e.g. Wireless noise-canceling headphones, sneakers, desk lamp...')}
               className={`w-full px-4 py-3 rounded-xl border bg-slate-50 text-slate-800 font-medium outline-none focus:bg-white focus:border-pink-500 transition-all ${
                 errors.name ? 'border-rose-400 bg-rose-50/30' : 'border-slate-200'
               }`}
@@ -137,7 +137,7 @@ export const WishlistModal = ({ isOpen, onClose, onSave, itemToEdit, categories 
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2">
               <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
-                {t('wishlist.price')} *
+                {t('wishlist.price', 'Price')} *
               </label>
               <input
                 type="number"
@@ -145,7 +145,7 @@ export const WishlistModal = ({ isOpen, onClose, onSave, itemToEdit, categories 
                 min="0"
                 value={formData.price}
                 onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                placeholder={t('wishlist.pricePlaceholder')}
+                placeholder={t('wishlist.pricePlaceholder', 'e.g. 299')}
                 className={`w-full px-4 py-3 rounded-xl border bg-slate-50 text-slate-800 font-bold outline-none focus:bg-white focus:border-pink-500 transition-all ${
                   errors.price ? 'border-rose-400 bg-rose-50/30' : 'border-slate-200'
                 }`}
@@ -155,7 +155,7 @@ export const WishlistModal = ({ isOpen, onClose, onSave, itemToEdit, categories 
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
-                {t('wishlist.currency')}
+                {t('wishlist.currency', 'Currency')}
               </label>
               <select
                 value={formData.currency}
@@ -174,7 +174,7 @@ export const WishlistModal = ({ isOpen, onClose, onSave, itemToEdit, categories 
           {/* Category */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
-              {t('wishlist.category')}
+              {t('wishlist.category', 'Category')}
             </label>
             <select
               value={formData.category}
@@ -197,7 +197,7 @@ export const WishlistModal = ({ isOpen, onClose, onSave, itemToEdit, categories 
           {/* Importance Scale */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
-              {t('wishlist.importance')}
+              {t('wishlist.importance', 'Importance')}
             </label>
             <div className="grid grid-cols-3 gap-2">
               {importanceOptions.map((opt) => {
@@ -223,7 +223,7 @@ export const WishlistModal = ({ isOpen, onClose, onSave, itemToEdit, categories 
           {/* Date Added */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
-              {t('wishlist.dateAdded')}
+              {t('wishlist.dateAdded', 'Date Added')}
             </label>
             <input
               type="date"
@@ -236,14 +236,14 @@ export const WishlistModal = ({ isOpen, onClose, onSave, itemToEdit, categories 
           {/* Image URL */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
-              {t('wishlist.imageUrl')}
+              {t('wishlist.imageUrl', 'Image URL (Optional)')}
             </label>
             <div className="flex gap-2">
               <input
                 type="url"
                 value={formData.imageUrl}
                 onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                placeholder={t('wishlist.imageUrlPlaceholder')}
+                placeholder={t('wishlist.imageUrlPlaceholder', 'Paste image link (e.g. https://...)')}
                 className="flex-1 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 font-medium outline-none focus:bg-white focus:border-pink-500 transition-all"
               />
             </div>
@@ -258,7 +258,7 @@ export const WishlistModal = ({ isOpen, onClose, onSave, itemToEdit, categories 
                   }}
                 />
                 <div className="text-xs text-slate-500 truncate flex-1">
-                  <span className="font-semibold text-slate-700 block">{t('wishlist.previewImage')}</span>
+                  <span className="font-semibold text-slate-700 block">{t('wishlist.previewImage', 'Image Preview')}</span>
                   <span className="truncate block text-[11px] text-slate-400">{formData.imageUrl}</span>
                 </div>
               </div>
@@ -268,13 +268,13 @@ export const WishlistModal = ({ isOpen, onClose, onSave, itemToEdit, categories 
           {/* Store URL */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
-              {t('wishlist.storeUrl')}
+              {t('wishlist.storeUrl', 'Online store link')}
             </label>
             <input
               type="url"
               value={formData.storeUrl}
               onChange={(e) => setFormData({ ...formData, storeUrl: e.target.value })}
-              placeholder={t('wishlist.storeUrlPlaceholder')}
+              placeholder={t('wishlist.storeUrlPlaceholder', 'Paste store or product link (e.g. Amazon, Zara, Apple...)')}
               className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 font-medium outline-none focus:bg-white focus:border-pink-500 transition-all"
             />
           </div>
@@ -282,13 +282,13 @@ export const WishlistModal = ({ isOpen, onClose, onSave, itemToEdit, categories 
           {/* Description */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
-              {t('wishlist.descriptionLabel')}
+              {t('wishlist.descriptionLabel', 'Description & Notes (Optional)')}
             </label>
             <textarea
               rows="3"
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder={t('wishlist.descriptionPlaceholder')}
+              placeholder={t('wishlist.descriptionPlaceholder', 'Color, size, model, store notes, or personal reminders...')}
               className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 font-medium outline-none focus:bg-white focus:border-pink-500 transition-all resize-none"
             />
           </div>
@@ -300,7 +300,7 @@ export const WishlistModal = ({ isOpen, onClose, onSave, itemToEdit, categories 
               onClick={onClose}
               className="px-5 py-3 rounded-xl font-bold text-slate-600 hover:bg-slate-100 transition-colors"
             >
-              {t('common.cancel')}
+              {t('common.cancel', 'Cancel')}
             </button>
             <Button
               type="submit"
@@ -308,8 +308,8 @@ export const WishlistModal = ({ isOpen, onClose, onSave, itemToEdit, categories 
               className="bg-pink-600 hover:bg-pink-700 text-white shadow-pink-200"
             >
               {isSubmitting
-                ? (itemToEdit ? t('wishlist.updating') : t('wishlist.saving'))
-                : (itemToEdit ? t('wishlist.updateItem') : t('wishlist.saveItem'))}
+                ? (itemToEdit ? t('wishlist.updating', 'Updating...') : t('wishlist.saving', 'Saving...'))
+                : (itemToEdit ? t('wishlist.updateItem', 'Update Item') : t('wishlist.saveItem', 'Save Item'))}
             </Button>
           </div>
         </form>

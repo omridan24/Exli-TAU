@@ -225,7 +225,7 @@ export const WishlistNode = ({ userId, categories = DEFAULT_CATEGORIES }) => {
                   }}
                   className="mt-3 text-xs font-bold text-pink-600 hover:text-pink-700 underline"
                 >
-                  {t('wishlist.clearFilters')}
+                  {t('wishlist.clearFilters', 'Clear Filters')}
                 </button>
               </div>
             )}
@@ -238,10 +238,10 @@ export const WishlistNode = ({ userId, categories = DEFAULT_CATEGORIES }) => {
                 <Gift className="w-8 h-8" />
               </div>
               <h2 className="text-2xl font-bold text-slate-800 mb-2">
-                {t('wishlist.emptyTitle')}
+                {t('wishlist.emptyTitle', 'Your Wishlist is Empty')}
               </h2>
               <p className="text-slate-500 text-sm max-w-md mx-auto mb-8 leading-relaxed">
-                {t('wishlist.emptySubtitle')}
+                {t('wishlist.emptySubtitle', "Add products, gadgets, or gifts you're planning or dreaming to buy!")}
               </p>
               <Button
                 onClick={() => {
@@ -251,7 +251,7 @@ export const WishlistNode = ({ userId, categories = DEFAULT_CATEGORIES }) => {
                 className="bg-pink-600 hover:bg-pink-700 text-white shadow-pink-200 mx-auto"
               >
                 <Plus className="w-4 h-4 me-1.5" />
-                <span>{t('wishlist.addItem')}</span>
+                <span>{t('wishlist.addItem', 'Add Item')}</span>
               </Button>
             </Card>
           </div>

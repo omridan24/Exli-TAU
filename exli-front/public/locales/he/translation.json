@@ -858,7 +858,7 @@
         "imageUrlPlaceholder": "https://example.com/item-photo.jpg",
         "storeUrl": "קישור לחנות מקוונת (רשות)",
         "storeUrlPlaceholder": "https://store.example.com/item/...",
-        "visitStore": "מעבר לחנות",
+        "visitStore": "מעבר לחנות מקוונת",
         "descriptionLabel": "תיאור והערות (רשות)",
         "descriptionPlaceholder": "מפרט המוצר, מידה או צבע מועדף, הערות...",
         "saveItem": "שמור פריט",
