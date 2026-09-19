@@ -88,7 +88,7 @@ export const WishlistShareModal = ({
     }
 
     // Exli wishlist personal disclosure
-    lines.push(t('wishlist.whatsappShareDisclosure', 'An item from my wishlist on Exli'));
+    lines.push(t('wishlist.whatsappShareDisclosure', 'An item from my wishlist on #Exli'));
 
     const message = lines.filter(Boolean).join('\n\n');
     const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
