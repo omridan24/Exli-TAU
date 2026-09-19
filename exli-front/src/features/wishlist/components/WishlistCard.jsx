@@ -181,18 +181,6 @@ export const WishlistCard = ({ item, categories = DEFAULT_CATEGORIES, onEdit, on
           </div>
 
           <div className="flex items-center gap-1">
-            {item.storeUrl && (
-              <a
-                href={formatStoreUrl(item.storeUrl)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-1.5 rounded-lg text-slate-500 hover:text-pink-600 hover:bg-pink-50 transition-colors"
-                title={t('wishlist.visitStore')}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <ExternalLink className="w-4 h-4" />
-              </a>
-            )}
             <button
               onClick={() => onShare && onShare(item)}
               className="p-1.5 rounded-lg text-slate-500 hover:text-pink-600 hover:bg-pink-50 transition-colors"
