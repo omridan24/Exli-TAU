@@ -878,6 +878,17 @@
         "validation": {
             "nameRequired": "אנא הזן שם פריט",
             "validPrice": "אנא הזן סכום מחיר תקין"
-        }
+        },
+        "shareItem": "שיתוף פריט",
+        "shareTitle": "שיתוף פריט מהמשאלות",
+        "shareSubtitle": "שתף פריט זה מרשימת המשאלות שלך",
+        "shareLink": "קישור לפריט",
+        "copyLink": "העתק קישור",
+        "shareVia": "שתף באמצעות",
+        "whatsapp": "WhatsApp",
+        "email": "אימייל",
+        "x": "X",
+        "shareMessage": "הוסף הודעה (רשות)",
+        "shareMessagePlaceholder": "תראו את הפריט הזה מרשימת המשאלות שלי!"
     }
 }

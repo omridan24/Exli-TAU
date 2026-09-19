@@ -876,6 +876,17 @@
         "validation": {
             "nameRequired": "Please enter an item name",
             "validPrice": "Please enter a valid price amount"
-        }
+        },
+        "shareItem": "Share Item",
+        "shareTitle": "Share Item",
+        "shareSubtitle": "Share this item from your wishlist",
+        "shareLink": "Item Link",
+        "copyLink": "Copy Link",
+        "shareVia": "Share via",
+        "whatsapp": "WhatsApp",
+        "email": "Email",
+        "x": "X",
+        "shareMessage": "Add a note (optional)",
+        "shareMessagePlaceholder": "Check out this item on my wishlist!"
     }
 }

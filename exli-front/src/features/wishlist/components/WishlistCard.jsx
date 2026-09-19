@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Edit2, Trash2, Calendar, Tag, ImageOff, Flame, Zap, Droplet } from 'lucide-react';
+import { Edit2, Trash2, Calendar, Tag, ImageOff, Flame, Zap, Droplet, Share2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Card, CategoryIcon } from '../../../components/UI';
 import { DEFAULT_CATEGORIES } from '../../../config/constants';
@@ -14,7 +14,7 @@ export const getCurrencySymbol = (currency) => {
   }
 };
 
-export const WishlistCard = ({ item, categories = DEFAULT_CATEGORIES, onEdit, onDelete }) => {
+export const WishlistCard = ({ item, categories = DEFAULT_CATEGORIES, onEdit, onDelete, onShare }) => {
   const { t } = useTranslation();
   const [imgError, setImgError] = useState(false);
 
@@ -160,6 +160,13 @@ export const WishlistCard = ({ item, categories = DEFAULT_CATEGORIES, onEdit, on
           </div>
 
           <div className="flex items-center gap-1">
+            <button
+              onClick={() => onShare && onShare(item)}
+              className="p-1.5 rounded-lg text-slate-500 hover:text-pink-600 hover:bg-pink-50 transition-colors"
+              title={t('wishlist.shareItem')}
+            >
+              <Share2 className="w-4 h-4" />
+            </button>
             <button
               onClick={() => onEdit(item)}
               className="p-1.5 rounded-lg text-slate-500 hover:text-pink-600 hover:bg-pink-50 transition-colors"

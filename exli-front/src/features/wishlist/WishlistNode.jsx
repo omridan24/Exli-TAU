@@ -8,6 +8,7 @@ import { WishlistHeader } from './components/WishlistHeader';
 import { WishlistCard } from './components/WishlistCard';
 import { WishlistModal } from './components/WishlistModal';
 import { WishlistDeleteModal } from './components/WishlistDeleteModal';
+import { WishlistShareModal } from './components/WishlistShareModal';
 import { WishlistSummaryBar } from './components/WishlistSummaryBar';
 import { Gift, Plus, Sparkles } from 'lucide-react';
 import { Button, Card } from '../../components/UI';
@@ -26,6 +27,7 @@ export const WishlistNode = ({ userId, categories = DEFAULT_CATEGORIES }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [deletingItem, setDeletingItem] = useState(null);
+  const [sharingItem, setSharingItem] = useState(null);
 
   // Local storage backup key
   const storageKey = `exli_wishlist_${userId || 'guest'}`;
@@ -206,6 +208,7 @@ export const WishlistNode = ({ userId, categories = DEFAULT_CATEGORIES }) => {
                       setIsModalOpen(true);
                     }}
                     onDelete={(it) => setDeletingItem(it)}
+                    onShare={(it) => setSharingItem(it)}
                   />
                 ))}
               </div>
@@ -273,6 +276,14 @@ export const WishlistNode = ({ userId, categories = DEFAULT_CATEGORIES }) => {
         onClose={() => setDeletingItem(null)}
         onConfirm={handleDeleteItem}
         item={deletingItem}
+      />
+
+      {/* Share Item Modal */}
+      <WishlistShareModal
+        isOpen={!!sharingItem}
+        onClose={() => setSharingItem(null)}
+        item={sharingItem}
+        categories={categories}
       />
     </div>
   );
