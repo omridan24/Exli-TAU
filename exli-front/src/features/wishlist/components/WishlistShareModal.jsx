@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Share2, Mail, Link2 } from 'lucide-react';
+import { X, Share2, Mail } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '../../../components/UI';
 import { DEFAULT_CATEGORIES } from '../../../config/constants';
@@ -95,8 +95,6 @@ export const WishlistShareModal = ({
   const handleChannelClick = (channelId) => {
     if (channelId === 'whatsapp') {
       handleWhatsAppShare();
-    } else if (channelId === 'copy') {
-      handleCopyLink();
     }
     // Other channels remain no-op per specification
   };
@@ -108,13 +106,6 @@ export const WishlistShareModal = ({
       icon: WhatsAppIcon,
       iconBg: 'bg-[#25D366] text-white',
       hoverBorder: 'hover:border-emerald-300 hover:bg-emerald-50/50 hover:text-emerald-800'
-    },
-    {
-      id: 'copy',
-      name: t('wishlist.copyLink', 'Copy link'),
-      icon: Link2,
-      iconBg: 'bg-pink-500 text-white',
-      hoverBorder: 'hover:border-pink-300 hover:bg-pink-50/50 hover:text-pink-800'
     },
     {
       id: 'email',
@@ -197,7 +188,7 @@ export const WishlistShareModal = ({
             <label className="block text-xs font-semibold text-slate-700 mb-2">
               {t('wishlist.shareVia', 'Share via')}
             </label>
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
               {shareChannels.map((channel) => (
                 <ShareChannelButton
                   key={channel.id}
@@ -205,8 +196,6 @@ export const WishlistShareModal = ({
                   icon={channel.icon}
                   iconBg={channel.iconBg}
                   hoverBorder={channel.hoverBorder}
-                  isCopied={channel.id === 'copy' && copied}
-                  copiedText={t('wishlist.copied', 'Copied!')}
                   onClick={() => handleChannelClick(channel.id)}
                 />
               ))}
