@@ -61,7 +61,7 @@ export const WishlistShareModal = ({
     }
   };
 
-  const handleWhatsAppShare = () => {
+  const buildShareMessage = (disclosureKey = 'wishlist.whatsappShareDisclosure') => {
     const lines = [];
 
     // Optional user note
@@ -88,16 +88,28 @@ export const WishlistShareModal = ({
     }
 
     // Exli wishlist personal disclosure
-    lines.push(t('wishlist.whatsappShareDisclosure', 'An item from my wishlist on #Exli'));
+    lines.push(t(disclosureKey, t('wishlist.whatsappShareDisclosure', 'An item from my wishlist on #Exli')));
 
-    const message = lines.filter(Boolean).join('\n\n');
+    return lines.filter(Boolean).join('\n\n');
+  };
+
+  const handleWhatsAppShare = () => {
+    const message = buildShareMessage('wishlist.whatsappShareDisclosure');
     const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleXShare = () => {
+    const message = buildShareMessage('wishlist.xShareDisclosure');
+    const xUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(message)}`;
+    window.open(xUrl, '_blank', 'noopener,noreferrer');
   };
 
   const handleChannelClick = (channelId) => {
     if (channelId === 'whatsapp') {
       handleWhatsAppShare();
+    } else if (channelId === 'x') {
+      handleXShare();
     }
     // Other channels remain no-op per specification
   };
