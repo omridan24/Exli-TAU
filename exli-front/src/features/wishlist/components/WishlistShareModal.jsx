@@ -105,11 +105,20 @@ export const WishlistShareModal = ({
     window.open(xUrl, '_blank', 'noopener,noreferrer');
   };
 
+  const handleEmailShare = () => {
+    const message = buildShareMessage('wishlist.emailShareDisclosure');
+    const subject = t('wishlist.emailShareSubject', '{{name}} - Wishlist item on Exli', { name: item.name });
+    const mailtoUrl = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
+    window.location.href = mailtoUrl;
+  };
+
   const handleChannelClick = (channelId) => {
     if (channelId === 'whatsapp') {
       handleWhatsAppShare();
     } else if (channelId === 'x') {
       handleXShare();
+    } else if (channelId === 'email') {
+      handleEmailShare();
     }
     // Other channels remain no-op per specification
   };

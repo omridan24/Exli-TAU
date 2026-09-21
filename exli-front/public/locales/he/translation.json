@@ -893,6 +893,8 @@
         "whatsapp": "WhatsApp",
         "whatsappShareDisclosure": "מרשימת המשאלות שלי ב-#Exli",
         "email": "אימייל",
+        "emailShareSubject": "{{name}} - פריט מרשימת המשאלות ב-Exli",
+        "emailShareDisclosure": "מרשימת המשאלות שלי ב-#Exli",
         "x": "X",
         "xShareDisclosure": "מרשימת המשאלות שלי ב-#Exli",
         "shareMessage": "הוסף הודעה (רשות)",

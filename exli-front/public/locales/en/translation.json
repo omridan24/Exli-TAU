@@ -891,6 +891,8 @@
         "whatsapp": "WhatsApp",
         "whatsappShareDisclosure": "An item from my wishlist on #Exli",
         "email": "Email",
+        "emailShareSubject": "{{name}} - Wishlist item on Exli",
+        "emailShareDisclosure": "An item from my wishlist on #Exli",
         "x": "X",
         "xShareDisclosure": "An item from my wishlist on #Exli",
         "shareMessage": "Add a note (optional)",
