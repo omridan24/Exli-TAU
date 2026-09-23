@@ -39,8 +39,32 @@ def get_model_by_tier(tier="flash"):
         return 'gemini-1.5-flash'
 
 # --- NEW HELPER: GEOMETRY SORTING ---
+# Row tolerance as a fraction of page height: OCR'd lines belonging to the same
+# visual table row rarely land on the exact same Y, so we cluster anything within
+# this band together rather than requiring an exact match.
+ROW_Y_TOLERANCE = 0.008
+
 @task(name="geometry_sort_text")
 def geometry_sort_text(document_object):
+    """
+    Reconstructs reading order from OCR line bounding boxes.
+
+    A pure Y-sort (used previously) is fine for single-column documents like a
+    payslip, where each field is already its own line. It falls apart on wide
+    multi-column tables (e.g. a brokerage holdings table): Document AI detects
+    each row as several separate line objects at nearly the same Y, and since
+    sorting is stable, cells sharing a Y-value keep whatever arbitrary order
+    Document AI emitted them in - not their true left-to-right position. That
+    silently swaps values between adjacent columns (e.g. "last price" ending up
+    where "cost basis" belongs).
+
+    This clusters lines into visual rows by Y-proximity, then sorts each row's
+    cells by X, joining them with " | " so column boundaries are explicit in the
+    text the model sees. Applied uniformly to header and data rows alike, so
+    column position stays aligned between them regardless of text direction
+    (RTL Hebrew included - we don't need to know the direction, only that it's
+    consistent).
+    """
     try:
         full_text = ""
         for page in document_object.pages:
@@ -51,12 +75,28 @@ def geometry_sort_text(document_object):
                     line_text = document_object.text[segment.start_index:segment.end_index]
                 except:
                     continue
-                y = line.layout.bounding_poly.normalized_vertices[0].y
-                page_lines.append({"y": y, "text": line_text.strip()})
-            
-            page_lines.sort(key=lambda x: x["y"])
-            for pl in page_lines:
-                full_text += pl["text"] + "\n"
+                vertices = line.layout.bounding_poly.normalized_vertices
+                y = vertices[0].y
+                x = min(v.x for v in vertices)
+                text = line_text.strip()
+                if text:
+                    page_lines.append({"y": y, "x": x, "text": text})
+
+            page_lines.sort(key=lambda ln: ln["y"])
+
+            # Cluster into rows by Y-proximity. Compare against the row's first
+            # (anchor) line rather than the most recently added one, so a chain
+            # of near-neighbors can't let the row's Y-span drift past tolerance.
+            rows = []
+            for ln in page_lines:
+                if rows and (ln["y"] - rows[-1][0]["y"]) <= ROW_Y_TOLERANCE:
+                    rows[-1].append(ln)
+                else:
+                    rows.append([ln])
+
+            for row in rows:
+                row.sort(key=lambda ln: ln["x"])
+                full_text += " | ".join(ln["text"] for ln in row) + "\n"
         return full_text
     except Exception as e:
         logger.error(f"Geometry Sort Failed: {e}", exc_info=True)
@@ -349,4 +389,163 @@ def extract_payslip_data(file_bytes, mime_type="application/pdf"):
         
     except Exception as e:
         logger.error(f"Payslip Extraction Failed: {e}", exc_info=True)
+        return None
+
+
+@workflow(name="extract_investment_statement_data")
+def extract_investment_statement_data(file_bytes, mime_type="application/pdf"):
+    """
+    Extracts holdings from brokerage statements (Interactive Brokers, Bank Leumi, etc.)
+    Uses existing Document AI + Gemini flow.
+    Returns {"asOfDate": "YYYY-MM-DD" | None, "holdings": [...]} with each holding's
+    symbol, quantity, cost basis, and market value - or None if extraction failed
+    outright (missing API key, DocAI failure, malformed model response).
+    """
+    if not Config.GEMINI_API_KEY: 
+        return None
+
+    # Step 1: Get Document Object using Document AI
+    doc_object = extract_text_with_google_docai(file_bytes, mime_type)
+    
+    if not doc_object:
+        logger.warning("DocAI failed for investment statement. Falling back.")
+        return None
+
+    # Step 2: Reconstruct Text using Geometry Sorting
+    sorted_text = geometry_sort_text(doc_object)
+    
+    if not sorted_text:
+        logger.warning("Geometry sort returned empty text for investment statement.")
+        return None
+
+    # Step 3: Send Sorted Text to Gemini for extraction
+    model_name = get_model_by_tier("flash") 
+    logger.info(f"AI Service: Extracting investment holdings with {model_name}")
+
+    prompt = f"""
+    You are a financial data extraction expert specializing in brokerage statements.
+    Extract all investment holdings from this statement.
+
+    ### RAW TEXT:
+    '''
+    {sorted_text[:50000]}
+    '''
+
+    ### IMPORTANT - READING THE TEXT:
+    Each line represents one visual row from the document, with cells separated by
+    " | " in their left-to-right (or right-to-left, for Hebrew/RTL tables) reading
+    order. A table's header row and its data rows use the same cell order, so match
+    each data row's Nth cell to the header row's Nth cell to know what it means -
+    don't assume a fixed left-to-right meaning across different tables on the page.
+
+    ### TASK:
+    Extract each holding into a JSON array.
+
+    ### FIELDS PER HOLDING:
+    - "symbol": Ticker symbol (e.g., "AAPL", "VOO", "MSFT"). ONLY set this if the
+      statement is showing that EXACT globally-tradable instrument. Leave null if
+      you're not certain - see the Israeli/TASE rule below for the most common way
+      this goes wrong.
+    - "name": Full name of the security if available (e.g., "Apple Inc.", "Vanguard S&P 500 ETF")
+    - "quantity": Number of shares/units owned (float). Must be a positive number.
+    - "costBasis": Total cost basis in original currency (float). Use null if not found.
+    - "marketValue": Current market value (float). Use null if not found.
+    - "currency": Currency code of the values (e.g., "USD", "ILS", "EUR"). Default to "USD" if unclear.
+    - "assetType": One of: "stock", "etf", "bond", "mutual_fund", "crypto", or "other"
+    - "pricePerUnit": Price per share/unit if available (float). Use null if not found.
+    - "localSecurityId": The local exchange's own security identifier if shown
+      (e.g. a TASE "\u05de\u05e1\u05e4\u05e8 \u05e0\u05d9"\u05e2" security number like "1159235"). Use null if none.
+
+    ### RULES:
+    1. If uncertain about a value, use null. **Do NOT guess or hallucinate values.**
+    2. Return ONLY a valid JSON array for "holdings".
+    3. Skip any line items that aren't actual holdings (fees, totals, cash balances, dividends, etc.)
+    4. For ETFs, common examples include: VOO, VTI, QQQ, SPY, AGG, BND, SCHD, VIG
+    5. If a symbol is in ISIN format (e.g., US0378331005), try to extract the ticker if visible nearby.
+    6. Quantity must be positive. If you see negative quantities, these might be short positions - include them with a note.
+    7. **Every numeric field belongs to the SAME row.** Before filling in costBasis,
+       marketValue, quantity, and pricePerUnit for a holding, re-check that all four
+       came from that holding's own row and not a neighboring column or row.
+
+    ### ISRAELI/TASE SECURITIES - DO NOT INVENT A TICKER:
+    Israeli brokerage statements often hold local TASE-listed mutual funds or index-
+    tracking certificates whose NAME resembles a well-known global index or ETF
+    (e.g. a fund named "MSCIACWn" that tracks the MSCI ACWI index, or "NSDQ100n"
+    tracking the Nasdaq 100) - these are DIFFERENT INSTRUMENTS from the actual global
+    ETF with a similar name (e.g. the real "ACWI" ticker is iShares MSCI ACWI ETF on
+    NYSE Arca; a TASE fund that merely tracks the same index is not that ETF and does
+    not trade under that ticker). If a security only has a TASE security number
+    ("\u05de\u05e1\u05e4\u05e8 \u05e0\u05d9"\u05e2") and no genuine global ticker printed on the statement, set "symbol"
+    to null and put the TASE number in "localSecurityId" instead of guessing the
+    closest-sounding US ticker - a wrong-but-real ticker is worse than no ticker,
+    since it silently attaches this holding's numbers to a completely different fund.
+
+    ### HEBREW/ISRAELI CONTEXT:
+    - Common Israeli terms: "\u05de\u05e0\u05d9\u05d5\u05ea" (stocks), "\u05e7\u05e8\u05df \u05e1\u05dc" (ETF), "\u05d0\u05d2"\u05d7" (bonds)
+    - "\u05db\u05de\u05d5\u05ea" or "\u05d9\u05d7\u05d9\u05d3\u05d5\u05ea" = quantity, "\u05e9\u05d5\u05d5\u05d9" = value, "\u05e2\u05dc\u05d5\u05ea" = cost
+
+    8. **PRESERVE NAMES**:
+       - Do NOT Rename the security. Keep the name exactly as found in the text.
+       - Do NOT Translate Hebrew names.
+       - Do NOT Simplify names (e.g. keep "Vanguard S&P 500 ETF IV" as is).
+
+    ### OUTPUT FORMAT:
+    {{
+      "asOfDate": "2026-07-31",
+      "holdings": [
+        {{
+          "symbol": "VOO",
+          "name": "Vanguard S&P 500 ETF",
+          "quantity": 10.0,
+          "costBasis": 4200.50,
+          "marketValue": 4850.00,
+          "currency": "USD",
+          "assetType": "etf",
+          "pricePerUnit": 485.00,
+          "localSecurityId": null
+        }},
+        ...
+      ]
+    }}
+
+    "asOfDate" is the date the statement says it reflects (format YYYY-MM-DD;
+    often phrased like "\u05e0\u05db\u05d5\u05df \u05dc\u05d9\u05d5\u05dd DD/MM/YYYY" / "as of" / a statement date near the
+    top). Use null if you can't find one. If no holdings are found, "holdings"
+    should be an empty array.
+    """
+
+    try:
+        if not client: 
+            return None
+
+        response = client.models.generate_content(
+            model=model_name,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                temperature=0.0
+            )
+        )
+       
+        parsed = json.loads(response.text)
+
+        # Be tolerant of the model dropping back to a bare array despite the prompt
+        if isinstance(parsed, list):
+            holdings, as_of_date = parsed, None
+        elif isinstance(parsed, dict):
+            holdings = parsed.get("holdings", [])
+            as_of_date = parsed.get("asOfDate")
+        else:
+            logger.warning(f"Investment extraction returned unexpected type: {type(parsed)}")
+            return {"asOfDate": None, "holdings": []}
+
+        if not isinstance(holdings, list):
+            logger.warning(f"Investment extraction 'holdings' was not a list: {type(holdings)}")
+            holdings = []
+
+        logger.info(f"Successfully extracted {len(holdings)} holdings from investment statement (asOfDate={as_of_date})")
+        return {"asOfDate": as_of_date, "holdings": holdings}
+
+    except Exception as e:
+        logger.error(f"Investment Statement Extraction Failed: {e}", exc_info=True)
         return None

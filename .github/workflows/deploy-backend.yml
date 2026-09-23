@@ -9,7 +9,7 @@ on:
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  REGION: europe-central2  # Change to your region (e.g., us-central1)
+  REGION: europe-central2
   SERVICE_NAME: exli-processor
 
 jobs:
@@ -28,7 +28,7 @@ jobs:
       - name: Setup Cloud SDK
         uses: google-github-actions/setup-gcloud@v1
 
-      - name: Build and Deploy to Cloud Run (DEV)
+      - name: Build and Deploy to Cloud Run (PROD)
         run: |
           cd exli-backend
           gcloud run deploy ${{ env.SERVICE_NAME }} \
@@ -36,6 +36,29 @@ jobs:
             --region ${{ env.REGION }} \
             --project ${{ env.PROJECT_ID }} \
             --allow-unauthenticated \
-            --set-env-vars "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }},DOCAI_PROCESSOR_ID=${{ secrets.DOCAI_PROCESSOR_ID }},GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }},GCP_LOCATION=eu,TRACELOOP_API_KEY=${{ secrets.TRACELOOP_API_KEY }}" \
+            --set-env-vars "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }},DOCAI_PROCESSOR_ID=${{ secrets.DOCAI_PROCESSOR_ID }},GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }},GCP_LOCATION=eu,TRACELOOP_API_KEY=${{ secrets.TRACELOOP_API_KEY }},TWELVEDATA_API_KEY=${{ secrets.TWELVEDATA_API_KEY }},SYSTEM_API_KEY=${{ secrets.SYSTEM_API_KEY }},SMTP_USER=${{ secrets.SMTP_USER }},SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }},NOTIFICATION_EMAIL=admin@example.com" \
             --cpu 1 \
-            --memory 512Mi
+            --memory 512Mi \
+            --timeout 3600
+
+      - name: Get Service URL
+        id: get_url
+        run: |
+          SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.REGION }} --project ${{ env.PROJECT_ID }} --format 'value(status.url)')
+          echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_OUTPUT
+
+      # Market data ingestion is triggered by a Cloud Scheduler job hitting
+      # /system/ingest-market-data once a day, not by deploys. See ops notes
+      # for the `gcloud scheduler jobs create` command that provisions it.
+
+      # Keeps that scheduler job's auth header in sync with the SYSTEM_API_KEY
+      # secret, so GitHub Actions secrets stay the only place this key is ever
+      # edited/rotated - this just re-pushes the current value on every deploy.
+      # Requires the deploy service account to have roles/cloudscheduler.admin.
+      - name: Sync ingestion scheduler auth header
+        continue-on-error: true
+        run: |
+          gcloud scheduler jobs update http exli-market-ingest-daily-prod \
+            --project ${{ env.PROJECT_ID }} \
+            --location ${{ env.REGION }} \
+            --update-headers "X-System-Key=${{ secrets.SYSTEM_API_KEY }},Content-Type=application/json"

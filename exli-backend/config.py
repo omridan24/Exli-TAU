@@ -25,6 +25,10 @@ class Config:
     
     SYSTEM_API_KEY = os.environ.get("SYSTEM_API_KEY")
     
+    # Market Data Configs
+    TWELVEDATA_API_KEY = os.environ.get("TWELVEDATA_API_KEY")
+    MARKET_DATA_PROVIDER = os.environ.get("MARKET_DATA_PROVIDER", "twelvedata")  # "twelvedata" or "yahoo"
+    
     QUOTA_EXCEEDED_MESSAGE = (
         "You've reached your free limit for this month! We love that you're using Exli. "
         "To continue analyzing more files and unlock premium features, please consider upgrading to Pro."

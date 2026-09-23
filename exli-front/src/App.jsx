@@ -15,6 +15,7 @@ import { AnalyticsNode } from './features/analytics/AnalyticsNode';
 import { SettingsNode } from './features/settings/SettingsNode';
 import { WishlistNode } from './features/wishlist/WishlistNode';
 import OnboardingScreen from './features/onboarding/OnboardingScreen';
+import { InvestmentNode } from './features/investments/InvestmentNode';
 import { ExliLogo } from './components/UI';
 
 export default function App() {
@@ -126,12 +127,11 @@ export default function App() {
             </button>
 
             {/* Coming Soon Modules */}
-            <div className="p-8 bg-slate-100/60 rounded-2xl border border-slate-200 text-start relative overflow-hidden grayscale-[0.3] hover:grayscale-0 transition-all duration-300 cursor-not-allowed group">
-              <div className="absolute top-3 right-3 bg-slate-200 text-slate-500 text-xs font-bold px-2 py-1 rounded-full">{t('dashboard.comingSoon')}</div>
-              <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600 mb-4 group-hover:scale-105 transition-transform"><TrendingUp /></div>
-              <h3 className="font-bold text-lg text-slate-700">{t('dashboard.investments.title')}</h3>
+            <button onClick={() => setActiveNode('investments')} className="p-8 bg-white rounded-2xl shadow-sm hover:shadow-md border border-slate-100 text-start group transition-all relative overflow-hidden">
+              <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600 mb-4 group-hover:scale-110 transition-transform"><TrendingUp /></div>
+              <h3 className="font-bold text-lg text-slate-800">{t('dashboard.investments.title')}</h3>
               <p className="text-slate-500 text-sm mt-1">{t('dashboard.investments.description')}</p>
-            </div>
+            </button>
 
             <div className="p-8 bg-slate-100/60 rounded-2xl border border-slate-200 text-start relative overflow-hidden grayscale-[0.3] hover:grayscale-0 transition-all duration-300 cursor-not-allowed group">
               <div className="absolute top-3 right-3 bg-slate-200 text-slate-500 text-xs font-bold px-2 py-1 rounded-full">{t('dashboard.comingSoon')}</div>
@@ -159,6 +159,7 @@ export default function App() {
               {activeNode === 'income' && <IncomeNode userId={user?.uid} onComplete={() => setActiveNode('dashboard')} />}
               {activeNode === 'analytics' && <AnalyticsNode data={expenses} income={income} categories={categories} userId={user?.uid} />}
               {activeNode === 'settings' && <SettingsNode userId={user?.uid} categories={categories} onUpdateCategories={setCategories} />}
+              {activeNode === 'investments' && <InvestmentNode userId={user?.uid} onComplete={() => setActiveNode('dashboard')} />}
               {activeNode === 'wishlist' && <WishlistNode userId={user?.uid} categories={categories} />}
             </div>
           </div>

@@ -832,6 +832,318 @@
         "allJobs": "All Jobs",
         "select": "Select"
     },
+    "investments": {
+        "title": "Investments",
+        "subtitle": "Track your favorite stocks and ETFs",
+        "searchPlaceholder": "Search stocks or ETFs...",
+        "stocks": "Stocks & ETFs",
+        "noStocks": "Search and add stocks or ETFs to track",
+        "onlyDbStocks": "Only stocks available in our database can be tracked",
+        "period30D": "30 Days",
+        "periodYTD": "YTD",
+        "period1Y": "1 Year",
+        "showingData": "Showing data for",
+        "pricesUpdated": "Prices updated daily",
+        "searching": "Searching...",
+        "noData": "No data",
+        "high": "High",
+        "low": "Low",
+        "tabs": {
+            "goals": "Goals",
+            "track": "Watch",
+            "strategy": "Strategy",
+            "portfolio": "Portfolio",
+            "mission": "Mission"
+        },
+        "strategy": {
+            "title": "Strategy Playground",
+            "subtitle": "Set your investment goals and see the magic of compound growth",
+            "sliderLabel": "I want to invest",
+            "sliderLabelEnd": "of my income",
+            "monthlyAmount": "Monthly investment",
+            "averageIncome": "Average Income",
+            "manualIncome": "Custom Income",
+            "enterIncome": "Enter income",
+            "yourAverage": "Your average income",
+            "noIncomeData": "No income data yet. Add income entries to calculate your average.",
+            "usingAverage": "Using your average monthly income from past records",
+            "customCalc": "custom calculation",
+            "annualReturn": "Return",
+            "returnLow": "Conservative",
+            "returnModerate": "Moderate",
+            "returnHigh": "Aggressive",
+            "returnVeryHigh": "Very High",
+            "returnNote": "Historical average is 7-10%. Higher returns = higher risk.",
+            "freedomScale": {
+                "title": "Freedom Scale",
+                "tortoise": "Tortoise Mode (Retire at 70+)",
+                "cruising": "Cruising (Retire at 60)",
+                "fire": "FIRE Mode (Retire Early!)"
+            },
+            "projection": {
+                "title": "Melting vs. Growing",
+                "cashLine": "Cash Only (Inflation)",
+                "rocketLine": "With Investments",
+                "gapLabel": "The Cost of Waiting",
+                "in30Years": "in 30 years",
+                "inYears": "In {{years}} years",
+                "today": "Today",
+                "years": "years",
+                "assumption": "~7% annual return",
+                "costOfWaiting": "The Cost of Waiting",
+                "costExplanation": "If you keep your money as cash instead of investing, inflation eats away its purchasing power. Here's what you'd miss out on:",
+                "calculationNote": "Calculations assume {{return}}% annual return and ~2.5% annual inflation. Actual results will vary.",
+                "investedLabel": "🚀 Invested",
+                "debtSpiral": "⚠️ Debt Spiral",
+                "cashOnly": "🧊 Cash Only",
+                "cashScenarioNote": "* Cash scenario assumes saving ALL surplus ({{amount}}/mo) in cash, adjusted for inflation.",
+                "moreMultiplier": "{{count}}x more"
+            },
+            "usedForCalc": "Used for projections",
+            "disclaimer": "This is an estimation for educational purposes only. Past performance does not guarantee future results. This is not investment advice. Please consult a licensed financial advisor before making investment decisions."
+        },
+        "buckets": {
+            "title": "Allocation Buckets",
+            "subtitle": "Your goals automatically fill these buckets by time horizon",
+            "long": {
+                "name": "Long Range",
+                "shortName": "Long",
+                "timeRange": "10+ years",
+                "description": "Maximum growth potential • High volatility, highest returns"
+            },
+            "mid": {
+                "name": "Mid Range",
+                "shortName": "Mid",
+                "timeRange": "3-10 years",
+                "description": "Balanced growth • Moderate risk for medium-term goals"
+            },
+            "short": {
+                "name": "Short Term",
+                "shortName": "Short",
+                "timeRange": "0-3 years",
+                "description": "Capital preservation • Low risk, always available"
+            },
+            "locked": "Locked",
+            "unlock": "Lock",
+            "total": "Total",
+            "dragHint": "Goals are automatically assigned based on deadline",
+            "presets": {
+                "aggressive": "The Rocket 🚀",
+                "aggressiveDesc": "Maximum growth potential, for long-term investors",
+                "balanced": "Smart Investor 🎯",
+                "balancedDesc": "Balanced approach with steady growth",
+                "moderate": "The Steady Ship ⚓",
+                "moderateDesc": "Lower risk with reliable returns",
+                "conservative": "Safety First 🛡️",
+                "conservativeDesc": "Capital preservation with some growth"
+            }
+        },
+        "goals": {
+            "title": "My Goals",
+            "subtitle": "What are you building towards?",
+            "addGoal": "Add New Goal",
+            "noGoals": "No goals yet. Let's plan your future!",
+            "totalMonthlyRequired": "Total monthly savings needed",
+            "goalAdded": "Goal added to {{bucket}} bucket!",
+            "goalDeleted": "Goal removed",
+            "presets": {
+                "wedding": "Wedding",
+                "house": "House Down Payment",
+                "baby": "Baby Fund",
+                "education": "Education",
+                "retirement": "Early Retirement",
+                "car": "New Car",
+                "travel": "Dream Vacation",
+                "emergency": "Emergency Fund",
+                "custom": "Custom Goal"
+            },
+            "estimator": {
+                "title": "Smart Estimator",
+                "whatsYourVibe": "What's your vibe?",
+                "budget": "Budget",
+                "standard": "Standard",
+                "luxe": "Luxe"
+            },
+            "form": {
+                "goalName": "Goal Name",
+                "targetAmount": "Target Amount",
+                "deadline": "Target Date",
+                "save": "Save Goal"
+            },
+            "card": {
+                "monthlyNeeded": "{{amount}}/mo needed",
+                "monthsLeft": "{{months}} months left",
+                "assignedTo": "Assigned to {{bucket}}"
+            }
+        },
+        "onboarding": {
+            "welcome": {
+                "title": "Welcome to Exli Investments",
+                "subtitle": "Great investing isn't about picking hot stocks. It's about building towards your dreams.",
+                "description": "We'll help you create a personalized plan in 3 simple steps:",
+                "step1": "Define your life goals",
+                "step2": "Test your risk comfort",
+                "step3": "Get your custom allocation",
+                "cta": "Let's Build My Strategy"
+            },
+            "stressTest": {
+                "title": "Risk Storm Simulator",
+                "subtitle": "Let's see how you handle market turbulence",
+                "hypothetical": "Imagine you have $100,000 invested...",
+                "dragSlider": "Drag the slider to simulate a market crash",
+                "sellButton": "😨 STOP! I Want to Sell!",
+                "events": {
+                    "inflation": "Inflation Scare",
+                    "covid": "COVID Crash",
+                    "crisis2008": "2008 Crisis"
+                },
+                "educationalOverlay": {
+                    "mild": "Normal market fluctuation",
+                    "diversification": "Your Short Term bucket stayed safe! This is diversification at work.",
+                    "recovery": "Markets recovered from 2008 in about 18 months. Patience pays.",
+                    "sellWarning": "In 2008, many sold here and locked in permanent losses. Those who waited recovered fully."
+                },
+                "sellModal": {
+                    "title": "Wait! Before You Sell...",
+                    "subtitle": "Selling now would lock in a {{loss}} loss. Let's look at what history tells us.",
+                    "showHistory": "Show Me The History",
+                    "historyTitle": "Market Recovery History",
+                    "sellAnyway": "Sell Anyway",
+                    "stayInvested": "Stay Invested"
+                },
+                "complete": "I'm Ready"
+            },
+            "step": "Step {{step}} of 3",
+            "complete": {
+                "title": "You're All Set!",
+                "subtitle": "Your personalized investment strategy is ready",
+                "viewPlan": "View My Plan"
+            }
+        },
+        "consequence": {
+            "title": "Heads Up: This Change Has Consequences",
+            "currentPlan": "Current Plan",
+            "newPlan": "New Plan",
+            "retireAge": "Retirement Age",
+            "riskLevel": "Risk Level",
+            "expectedGrowth": "Expected Growth",
+            "delayImpact": "+{{years}} years to your goals!",
+            "defaultMessage": "Lowering risk now could delay your Retirement goal. Markets will feel scary—that's normal.",
+            "note": "💡 Remember: Your Short Term bucket is already protecting money you'll need soon. The Long bucket is designed to ride out storms.",
+            "keepPlan": "Keep My Plan",
+            "changeAnyway": "I Understand, Change It"
+        },
+        "lessons": {
+            "label": "Lesson",
+            "hubTitle": "📚 Investment Academy",
+            "hubSubtitle": "Master the fundamentals of smart investing",
+            "goalBased": {
+                "title": "Why Goal-Based Investing?",
+                "point1": "Traditional investing asks: \"How much risk can you handle?\" We ask: \"What are you dreaming of?\"",
+                "point2": "Each goal gets its own timeline and strategy. Your wedding fund shouldn't ride the same rollercoaster as your retirement.",
+                "point3": "When markets crash, you'll know exactly which goals are safe and which have time to recover.",
+                "takeaway": "💡 Takeaway: Goals first, investments second. Your money serves your dreams—not the other way around."
+            },
+            "timeHorizon": {
+                "title": "The Magic of Time Horizon",
+                "point1": "Short-term money (0-3 years): Keep it safe. A 30% crash right before your wedding? No thanks.",
+                "point2": "Mid-term money (3-10 years): Some risk is OK. You have time to recover from dips.",
+                "point3": "Long-term money (10+ years): Go for growth! History shows markets always recover over decades.",
+                "takeaway": "💡 Takeaway: Time is your superpower. The longer you can wait, the more risk (and reward) you can handle."
+            },
+            "diversification": {
+                "title": "Diversification: Your Safety Net",
+                "point1": "Don't put all your eggs in one basket. When tech stocks crash, bonds might shine.",
+                "point2": "Our bucket system is diversification on steroids. Short-term = safe, Long-term = growth.",
+                "point3": "Even in 2008's worst crash, diversified portfolios recovered faster than all-stock portfolios.",
+                "takeaway": "💡 Takeaway: Diversification can't prevent losses, but it can prevent catastrophe."
+            },
+            "compoundGrowth": {
+                "title": "Compound Growth: The 8th Wonder",
+                "point1": "₪1,000/month at 8% for 30 years = ₪1.5 million. You only put in ₪360,000!",
+                "point2": "The secret: your money makes money, which makes MORE money. Snowball effect.",
+                "point3": "Starting 10 years earlier can mean DOUBLE the final amount. Time beats everything.",
+                "takeaway": "💡 Takeaway: Start today. The best time to invest was yesterday. The second best time is now."
+            },
+            "stayingCourse": {
+                "title": "The Hardest Part: Staying the Course",
+                "point1": "In 2008, those who sold at the bottom locked in 50% losses forever.",
+                "point2": "Those who held? Fully recovered in 18 months and went on to new highs.",
+                "point3": "Our bucket system helps: when markets crash, your Short-term bucket is safe. Sleep easy.",
+                "takeaway": "💡 Takeaway: The market will test you. Your plan is designed to handle it. Trust the process."
+            }
+        },
+        "tooltips": {
+            "volatility": "How much prices jump around. High volatility = bigger swings up AND down.",
+            "allocation": "How you split your money between safe and risky investments.",
+            "diversification": "Not putting all eggs in one basket. When stocks fall, bonds might not.",
+            "compoundGrowth": "Your money making money, which makes more money. Time is the magic ingredient.",
+            "shortBucket": "Money you'll need soon. We keep it safe so a market crash won't ruin your plans.",
+            "midBucket": "Goals 3-10 years away. There's time to recover from dips, but we still play it smart.",
+            "longBucket": "Your retirement fund, 10+ years away. We can ride out any storm for maximum growth."
+        },
+        "portfolio": {
+            "title": "My Portfolio",
+            "subtitle": "Add what you currently have in your portfolio",
+            "searchPlaceholder": "Search stocks or ETFs to add...",
+            "unassigned": "Unassigned Assets",
+            "uploadStatement": "Upload Statement",
+            "uploading": "Analyzing...",
+            "estimatedTime": "~1 minute",
+            "addManually": "Add Manually",
+            "cryptoNudge": "Crypto is usually classified as Long Range, but you're the boss!",
+            "reviewExtraction": "Review Extracted Holdings",
+            "reviewNote": "Please review and edit the extracted data before adding to your portfolio.",
+            "statementAsOf": "This statement reflects your portfolio as of {{date}} - prices and values may be out of date if that was a while ago.",
+            "localSecurityId": "Local security #{{id}} - no global ticker found",
+            "addSelected": "Add Selected",
+            "quantity": "Quantity",
+            "costBasis": "Cost Basis",
+            "marketValue": "Market Value",
+            "pricePerShare": "Price/Share",
+            "dropHere": "Drag assets here",
+            "dropNow": "Drop here!",
+            "dragHint": "Drag and drop cards into buckets below, or use the buttons",
+            "emptyTitle": "Start Your Investment Journey!",
+            "emptyMessage": "Every great portfolio starts with a single step. Add your first investment or upload a brokerage statement to get started. We're here to help you build your future!",
+            "totalPortfolio": "Total Portfolio",
+            "overweight": "↑ {{diff}}% above target - no worries, you're on your way!",
+            "underweight": "↓ {{diff}}% below target - great opportunity to grow!",
+            "newAsset": "New",
+            "unverified": "Unverified",
+            "unverifiedHint": "Couldn't independently confirm this ticker - double-check it's correct",
+            "notSureWhich": "We're not sure which security this is — did you mean:",
+            "noneOfThese": "None of these, keep as typed"
+        },
+        "mission": {
+            "title": "Mission",
+            "headline": "Let's put your {{amount}} to work!",
+            "checklist": "This Month's Tasks",
+            "allBalanced": "Your portfolio is perfectly balanced!",
+            "buyRecommendation": "Buy {{quantity}} unit(s) of {{symbol}} (~{{price}})",
+            "done": "Done",
+            "notEnoughCash": "Not Enough Cash",
+            "cashRollover": "No worries! We'll keep this in your Safety Net for next month.",
+            "rolledOver": "rolled over",
+            "portfolioHealth": "Portfolio Health",
+            "aligned": "Aligned",
+            "rolledOverCash": "Rolled Over Cash",
+            "remaining": "Remaining Budget",
+            "complete": "Mission Complete!",
+            "completeDesc": "Great job! Your portfolio is now better aligned with your strategy.",
+            "investable": "To Invest",
+            "income": "Income",
+            "expenses": "Expenses",
+            "rollover": "Rollover",
+            "rolloverShort": "Rollover",
+            "rolloverTitle": "Cash Rolled Over: {{amount}}",
+            "rolloverDesc": "Keep this cash in your brokerage account! It will be added to next month's budget automatically so you can reach your targets faster.",
+            "noBudget": "No budget calculated for this month yet.",
+            "addIncomeExpenses": "Add Income & Expenses",
+            "addIncomeDesc": "Add your income and expenses for this month to calculate your investable budget automatically.",
+            "buy": "Buy"
+        }
+    },
     "wishlist": {
         "title": "Wish List",
         "subtitle": "Track, organize, and plan your future purchases.",
