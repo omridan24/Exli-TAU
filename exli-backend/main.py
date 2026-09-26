@@ -1035,12 +1035,13 @@ def reset_quotas():
 @app.route('/system/ingest-market-data', methods=['POST'])
 def ingest_market_data():
     """
-    Trigger market data ingestion. Only runs once per day.
-    Protected by system API key.
-    
+    Trigger market data ingestion. Only runs once per day, and only against
+    production (a request whose Host contains "dev" is refused immediately,
+    before any Firestore or TwelveData call). Protected by system API key.
+
     Query params:
     - force: Skip the daily check and run anyway
-    - limit: Limit number of symbols (for testing)
+    - limit: Limit number of symbols (for testing, against production)
     """
     from datetime import datetime, date, timedelta
     from dataclasses import asdict
@@ -1058,10 +1059,22 @@ def ingest_market_data():
     
     force = request.args.get('force', 'false').lower() == 'true'
     limit = request.args.get('limit', type=int, default=0)
-    
+
+    # Ingestion is production-only. exli-processor-dev has its own Cloud
+    # Scheduler job that used to fire at the same time as prod against the
+    # same Firestore DB and TwelveData key, wasting credits and doubling
+    # every report email - refusing here means that job (or any manual call
+    # against the dev host) is a free, instant no-op regardless of whether
+    # it's still enabled on the GCP side.
+    if "dev" in request.host.lower():
+        return jsonify({
+            "status": "skipped",
+            "message": "Ingestion only runs against production. This is the dev environment."
+        })
+
     # Detect environment
-    environment = "development" if "dev" in request.host.lower() or limit > 0 else "production"
-    
+    environment = "development" if limit > 0 else "production"
+
     try:
         db = firestore.Client()
         today = date.today().isoformat()
@@ -1086,9 +1099,11 @@ def ingest_market_data():
         
         # Import and run ingestion
         from services.providers.twelvedata_provider import TwelveDataProvider
+        from services.providers.market_data_provider import ProviderNotFoundError, ProviderRateLimitError
         from services.symbol_lists import get_all_symbols, CURRENCY_PAIRS, SYMBOL_ALIASES, CURRENCY_ALIASES, ETFS
+        from services import ingest_helpers
         import pytz
-        
+
         provider = TwelveDataProvider(Config.TWELVEDATA_API_KEY)
         
         # Check if US market is currently open (Mon-Fri, 9:30 AM - 4:00 PM ET)
@@ -1119,11 +1134,31 @@ def ingest_market_data():
         else:
             logger.info(f"US Market is OPEN (now: {now_et.strftime('%A %H:%M ET')}). Full ingestion.")
         
+        # --- DEAD-SYMBOL TOMBSTONES ---
+        # Symbols that are permanently unavailable (delisted/invalid, or gated
+        # behind a higher TwelveData plan tier than this key has) are recorded
+        # here so they're skipped forever instead of being retried every night -
+        # see docs/fx/01-fx-plan.md §0.1. Without this, smart rotation below
+        # always puts a never-ingested (because permanently 404ing) symbol
+        # first, and enough of those in a row used to trip the breaker before
+        # any real symbol got a chance.
+        dead_symbols_ref = db.collection("_system").document("deadSymbols")
+        try:
+            dead_symbols_doc = dead_symbols_ref.get()
+            dead_symbols = set(dead_symbols_doc.to_dict().keys()) if dead_symbols_doc.exists else set()
+        except Exception as e:
+            logger.warning(f"Failed to load dead-symbol tombstones: {e}")
+            dead_symbols = set()
+
         # --- SMART ROTATION LOGIC ---
-        config_symbols = get_all_symbols()
+        all_config_symbols = get_all_symbols()
+        config_symbols = [s for s in all_config_symbols if s not in dead_symbols]
+        tombstoned_here = [s for s in all_config_symbols if s in dead_symbols]
+        if tombstoned_here:
+            logger.info(f"Skipping {len(tombstoned_here)} tombstoned symbol(s): {tombstoned_here}")
         if limit:
             config_symbols = config_symbols[:limit]
-            
+
         symbol_map = {s: {"lastUpdated": "1970-01-01T00:00:00", "exists": False} for s in config_symbols}
         
         try:
@@ -1144,7 +1179,11 @@ def ingest_market_data():
             
         all_symbols = sorted(config_symbols, key=sort_key)
         
-        currency_pairs = CURRENCY_PAIRS[:10] if limit else CURRENCY_PAIRS
+        currency_pairs = [
+            (b, q) for (b, q) in CURRENCY_PAIRS if f"{b}_{q}" not in dead_symbols
+        ]
+        tombstoned_pairs_here = [f"{b}_{q}" for (b, q) in CURRENCY_PAIRS if f"{b}_{q}" in dead_symbols]
+        currency_pairs = currency_pairs[:10] if limit else currency_pairs
         
         logger.info(f"Starting market data ingestion (Smart Rotation): {len(all_symbols)} symbols, {len(currency_pairs)} currencies")
         
@@ -1156,6 +1195,7 @@ def ingest_market_data():
         rate_limited = False
         consecutive_rate_limit_errors = 0
         time_budget_exceeded = False
+        newly_tombstoned = 0
 
         BATCH_SIZE = 4
         BATCH_DELAY_SECONDS = 65
@@ -1211,20 +1251,24 @@ def ingest_market_data():
                 
                 logger.info(f"Fetching {symbol} from {start_date} to {last_market_day}")
                 data = provider.get_time_series(symbol, start_date, last_market_day)
-                
+
                 if data:
-                    quote = provider.get_quote(symbol)
-                    
+                    # A quote costs a second credit, so it's only worth spending on a
+                    # symbol we've never seen before (to capture name/exchange/currency
+                    # metadata once) - a daily refresh of a known symbol reuses that
+                    # metadata and takes its current price from the history itself.
+                    quote = provider.get_quote(symbol) if existing_data is None else None
+
                     if existing_data and price_history:
                         new_history = price_history + [asdict(p) for p in data]
                     else:
                         new_history = [asdict(p) for p in data]
-                    
+
                     doc_data = {
                         "symbol": symbol,
                         "name": quote.name if quote else (existing_data.get("name") if existing_data else symbol),
                         "type": "etf" if symbol in ETFS else "stock",
-                        "currency": quote.currency if quote else "USD",
+                        "currency": quote.currency if quote else (existing_data.get("currency") if existing_data else "USD"),
                         "currentPrice": quote.price if quote else (data[-1].close if data else 0),
                         "change": quote.change if quote else 0,
                         "changePercent": quote.change_percent if quote else 0,
@@ -1237,27 +1281,35 @@ def ingest_market_data():
                     consecutive_rate_limit_errors = 0
                     logger.info(f"Ingested {symbol} ({i+1}/{len(all_symbols)}, +{len(data)} points)")
                 else:
-                    if is_recent:
+                    # The provider call succeeded but returned nothing - a benign gap
+                    # (e.g. a market holiday) if we already have recent data, otherwise
+                    # a soft miss that nudges the breaker (a real failure raises instead,
+                    # see the except clauses below).
+                    outcome = ingest_helpers.classify_empty_result(is_recent)
+                    if outcome.breaker_delta == 0:
                         skipped_stocks += 1
                         logger.info(f"Skip {symbol} no new data, but has recent data")
                     else:
-                        # TwelveData returns HTTP 200 with an error body on rate-limit/quota
-                        # exhaustion, which the provider swallows and reports as "no data" -
-                        # it never raises here. A run of consecutive misses is our proxy signal
-                        # that the provider is failing outright rather than lacking data for
-                        # this particular symbol.
                         failed_stocks += 1
-                        consecutive_rate_limit_errors += 1
+                        consecutive_rate_limit_errors += outcome.breaker_delta
                         logger.warning(f"No data for {symbol}")
+            except ProviderNotFoundError as e:
+                # Permanent for this symbol - tombstone it and move on. This must
+                # never count toward the rate-limit breaker (see comment above).
+                logger.warning(f"{symbol} is permanently unavailable ({e}), tombstoning")
+                dead_symbols_ref.set({symbol: {"reason": str(e), "date": today}}, merge=True)
+                skipped_stocks += 1
+                newly_tombstoned += 1
+            except ProviderRateLimitError as e:
+                logger.warning(f"TwelveData rate limit hit fetching {symbol}: {e}")
+                failed_stocks += 1
+                consecutive_rate_limit_errors += ingest_helpers.RATE_LIMIT_BREAKER_WEIGHT
             except Exception as e:
                 logger.warning(f"Failed to ingest {symbol}: {e}")
                 failed_stocks += 1
-                if "429" in str(e) or "rate" in str(e).lower() or "credits" in str(e).lower():
-                    consecutive_rate_limit_errors += 3  # trip the breaker faster on an explicit signal
-                else:
-                    consecutive_rate_limit_errors += 1
+                consecutive_rate_limit_errors += ingest_helpers.GENERIC_MISS_BREAKER_WEIGHT
 
-            if consecutive_rate_limit_errors >= 6:
+            if ingest_helpers.breaker_tripped(consecutive_rate_limit_errors):
                 logger.warning(f"{consecutive_rate_limit_errors} consecutive failures, assuming provider is rate-limited. Stopping for today.")
                 rate_limited = True
 
@@ -1267,6 +1319,7 @@ def ingest_market_data():
 
         # Process currencies with incremental updates
         skipped_currencies = 0
+        ingested_currencies = []  # for the report email - which rates actually moved today
         for i, (base, quote_curr) in enumerate(currency_pairs):
             if rate_limited:
                 break
@@ -1311,15 +1364,17 @@ def ingest_market_data():
                     is_recent = False
                 
                 data = provider.get_forex_rates(base, quote_curr, start_date, last_market_day)
-                
+
                 if data:
-                    current_rate = provider.get_forex_quote(base, quote_curr)
-                    
+                    # Same reasoning as the stocks loop above: only spend a second
+                    # credit on a fresh quote for a pair we've never ingested before.
+                    current_rate = provider.get_forex_quote(base, quote_curr) if existing_data is None else None
+
                     if existing_data and rate_history:
                         new_history = rate_history + [asdict(r) for r in data]
                     else:
                         new_history = [asdict(r) for r in data]
-                    
+
                     doc_data = {
                         "symbol": f"{base}/{quote_curr}",
                         "baseCurrency": base,
@@ -1331,26 +1386,38 @@ def ingest_market_data():
                         "lastUpdated": datetime.utcnow().isoformat()
                     }
                     db.collection("currencyRates").document(doc_id).set(doc_data)
+                    ingested_currencies.append({
+                        "pair": f"{base}/{quote_curr}",
+                        "rate": doc_data["currentRate"],
+                        "newPoints": len(data)
+                    })
                     success_currencies += 1
                     consecutive_rate_limit_errors = 0
                     logger.info(f"Ingested {base}/{quote_curr} ({success_currencies}/{len(currency_pairs)}, total: {len(new_history)})")
                 else:
-                    if is_recent:
+                    outcome = ingest_helpers.classify_empty_result(is_recent)
+                    if outcome.breaker_delta == 0:
                         skipped_currencies += 1
                         logger.info(f"Skip {base}/{quote_curr} no new data (market closed?), but has recent data")
                     else:
                         failed_currencies += 1
-                        consecutive_rate_limit_errors += 1
+                        consecutive_rate_limit_errors += outcome.breaker_delta
                         logger.warning(f"No data for {base}/{quote_curr}")
+            except ProviderNotFoundError as e:
+                logger.warning(f"{base}/{quote_curr} is permanently unavailable ({e}), tombstoning")
+                dead_symbols_ref.set({doc_id: {"reason": str(e), "date": today}}, merge=True)
+                skipped_currencies += 1
+                newly_tombstoned += 1
+            except ProviderRateLimitError as e:
+                logger.warning(f"TwelveData rate limit hit fetching {base}/{quote_curr}: {e}")
+                failed_currencies += 1
+                consecutive_rate_limit_errors += ingest_helpers.RATE_LIMIT_BREAKER_WEIGHT
             except Exception as e:
                 logger.warning(f"Failed to ingest {base}/{quote_curr}: {e}")
                 failed_currencies += 1
-                if "429" in str(e) or "rate" in str(e).lower() or "credits" in str(e).lower():
-                    consecutive_rate_limit_errors += 3
-                else:
-                    consecutive_rate_limit_errors += 1
+                consecutive_rate_limit_errors += ingest_helpers.GENERIC_MISS_BREAKER_WEIGHT
 
-            if consecutive_rate_limit_errors >= 6:
+            if ingest_helpers.breaker_tripped(consecutive_rate_limit_errors):
                 logger.warning(f"{consecutive_rate_limit_errors} consecutive failures, assuming provider is rate-limited. Stopping for today.")
                 rate_limited = True
 
@@ -1362,7 +1429,8 @@ def ingest_market_data():
         duration_seconds = time_module.time() - start_time
         
         market_status_str = f"{'OPEN' if market_is_open else 'CLOSED'} ({now_et.strftime('%A %H:%M ET')})"
-        
+        total_tombstoned = len(tombstoned_here) + len(tombstoned_pairs_here) + newly_tombstoned
+
         # Update metadata
         meta_ref.set({
             "lastIngestionDate": today,
@@ -1375,9 +1443,12 @@ def ingest_market_data():
             "currenciesSkipped": skipped_currencies,
             "rateLimited": rate_limited,
             "timeBudgetExceeded": time_budget_exceeded,
-            "durationSeconds": round(duration_seconds)
+            "durationSeconds": round(duration_seconds),
+            "tombstonedSymbols": total_tombstoned,
+            "newlyTombstonedSymbols": newly_tombstoned,
+            "currenciesIngested": ingested_currencies
         })
-        
+
         # Send email notification
         send_ingestion_report(
             date=today,
@@ -1391,9 +1462,11 @@ def ingest_market_data():
             market_status=market_status_str,
             duration_seconds=duration_seconds,
             time_budget_exceeded=time_budget_exceeded,
-            rate_limited=rate_limited
+            rate_limited=rate_limited,
+            tombstoned=newly_tombstoned,
+            currencies_ingested=ingested_currencies
         )
-        
+
         return jsonify({
             "status": "success",
             "date": today,
@@ -1401,7 +1474,10 @@ def ingest_market_data():
             "currencies": {"success": success_currencies, "failed": failed_currencies, "skipped": skipped_currencies},
             "rateLimited": rate_limited,
             "timeBudgetExceeded": time_budget_exceeded,
-            "durationSeconds": round(duration_seconds)
+            "durationSeconds": round(duration_seconds),
+            "tombstonedSymbols": total_tombstoned,
+            "newlyTombstonedSymbols": newly_tombstoned,
+            "currenciesIngested": ingested_currencies
         })
         
     except Exception as e:

@@ -30,7 +30,9 @@ def send_ingestion_report(
     duration_seconds: float = 0,
     symbols_processed: list = None,
     time_budget_exceeded: bool = False,
-    rate_limited: bool = False
+    rate_limited: bool = False,
+    tombstoned: int = 0,
+    currencies_ingested: list = None
 ):
     """
     Send an email summary of market data ingestion.
@@ -43,6 +45,10 @@ def send_ingestion_report(
         market_status: Whether market was open or closed
         duration_seconds: How long the ingestion took
         symbols_processed: List of symbols that were processed
+        tombstoned: Count of symbols/pairs newly marked permanently unavailable this run
+        currencies_ingested: List of {"pair", "rate", "newPoints"} dicts for each
+            currency pair that was actually fetched today, so the report shows
+            the real exchange rates pulled in, not just a count
     """
     if not SMTP_USER or not SMTP_PASSWORD:
         logger.warning("Email not configured (SMTP_USER/SMTP_PASSWORD missing). Skipping notification.")
@@ -78,7 +84,24 @@ def send_ingestion_report(
             stop_reason = "Stopped early: provider appeared to be rate-limited"
         elif time_budget_exceeded:
             stop_reason = "Stopped early: hit today's time budget (rotation continues tomorrow)"
-        
+
+        tombstone_note = (
+            f"{tombstoned} symbol(s)/pair(s) skipped as permanently unavailable (delisted, invalid, "
+            f"or needs a higher TwelveData plan) - see the _system/deadSymbols doc"
+        ) if tombstoned else None
+
+        currencies_ingested = currencies_ingested or []
+        currency_rows_html = "".join(
+            f"""<tr>
+                <td>{c['pair']}</td>
+                <td>{c['rate']:.4f}</td>
+                <td>{c.get('newPoints', '-')}</td>
+            </tr>""" for c in currencies_ingested
+        )
+        currency_rows_text = "\n".join(
+            f"  {c['pair']}: {c['rate']:.4f} (+{c.get('newPoints', '?')} new day(s))" for c in currencies_ingested
+        )
+
         # Build HTML body
         html_body = f"""
         <html>
@@ -135,13 +158,16 @@ def send_ingestion_report(
                         <td>{total_currencies}</td>
                     </tr>
                 </table>
-                
+
+                {"<h3>💱 Exchange Rates Fetched Today</h3><table><tr><th>Pair</th><th>Rate</th><th>New Days</th></tr>" + currency_rows_html + "</table>" if currencies_ingested else ""}
+
                 <div class="meta">
                     <p><strong>Environment:</strong> {environment}</p>
                     <p><strong>Date:</strong> {date}</p>
                     <p><strong>Market Status:</strong> {market_status}</p>
                     <p><strong>Duration:</strong> {duration_str}</p>
                     {"<p><strong>Note:</strong> " + stop_reason + "</p>" if stop_reason else ""}
+                    {"<p><strong>Note:</strong> " + tombstone_note + "</p>" if tombstone_note else ""}
                     <p><strong>Timestamp:</strong> {datetime.utcnow().isoformat()}Z</p>
                 </div>
             </div>
@@ -169,10 +195,12 @@ CURRENCIES:
   ✗ Failed: {currencies_failed}
   ⏭ Skipped: {currencies_skipped}
   Total: {total_currencies}
+{chr(10) + "EXCHANGE RATES FETCHED TODAY:" + chr(10) + currency_rows_text if currencies_ingested else ""}
 
 Market Status: {market_status}
 Duration: {duration_str}
 {stop_reason if stop_reason else ""}
+{tombstone_note if tombstone_note else ""}
 Timestamp: {datetime.utcnow().isoformat()}Z
         """
         

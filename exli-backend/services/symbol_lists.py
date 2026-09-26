@@ -1,6 +1,18 @@
 """
 Symbol lists for market data ingestion.
 Contains S&P 500 stocks, major ETFs, and currency pairs with aliases.
+
+Note: a few former S&P 500 tickers were removed below because TwelveData
+returns a permanent 404 for them under our current API plan - confirmed
+live on 2026-09-26 (see docs/fx/01-fx-plan.md §0.1):
+  - WBA, PXD, HES: invalid symbol (delisted/merged - WBA went private,
+    PXD merged into XOM, HES merged into CVX)
+  - K, CTRA, PEAK: valid symbols, but TwelveData gates them behind a
+    higher-tier plan ("available starting with the Grow/Pro/Venture plan")
+Any other symbol that 404s is now handled automatically at ingest time -
+it gets tombstoned in Firestore (_system/deadSymbols) and skipped on
+future runs instead of jamming the rate-limit breaker. These six are
+pruned here too so they don't even need that first failed attempt.
 """
 
 # S&P 500 Stocks (Core 500 - these will be updated with full list)
@@ -23,11 +35,11 @@ SP500_SYMBOLS = [
     "GM", "F", "DHI", "LEN", "PHM", "NVR", "GRMN", "POOL", "BBY", "ULTA",
     # Consumer Staples
     "PG", "KO", "PEP", "COST", "WMT", "PM", "MO", "MDLZ", "CL", "KMB",
-    "GIS", "K", "HSY", "SJM", "CAG", "CPB", "MKC", "HRL", "CHD", "CLX",
-    "EL", "KR", "SYY", "WBA", "TGT", "STZ", "TAP", "ADM", "BG", "TSN",
+    "GIS", "HSY", "SJM", "CAG", "CPB", "MKC", "HRL", "CHD", "CLX",
+    "EL", "KR", "SYY", "TGT", "STZ", "TAP", "ADM", "BG", "TSN",
     # Energy
-    "XOM", "CVX", "COP", "SLB", "EOG", "MPC", "PSX", "VLO", "PXD", "OXY",
-    "HES", "DVN", "KMI", "WMB", "OKE", "HAL", "BKR", "FANG", "CTRA", "APA",
+    "XOM", "CVX", "COP", "SLB", "EOG", "MPC", "PSX", "VLO", "OXY",
+    "DVN", "KMI", "WMB", "OKE", "HAL", "BKR", "FANG", "APA",
     # Industrials
     "CAT", "RTX", "HON", "UPS", "BA", "DE", "LMT", "GE", "UNP", "ADP",
     "MMM", "CSX", "NSC", "ITW", "EMR", "ETN", "PH", "ROK", "JCI", "GD",
@@ -37,7 +49,7 @@ SP500_SYMBOLS = [
     "MLM", "DOW", "CTVA", "ALB", "IFF", "FMC", "CE", "CF", "MOS", "LYB",
     # Real Estate
     "PLD", "AMT", "EQIX", "CCI", "SPG", "PSA", "O", "WELL", "DLR", "AVB",
-    "EQR", "VICI", "VTR", "SBAC", "ARE", "MAA", "UDR", "ESS", "PEAK", "KIM",
+    "EQR", "VICI", "VTR", "SBAC", "ARE", "MAA", "UDR", "ESS", "KIM",
     # Utilities
     "NEE", "SO", "DUK", "D", "SRE", "AEP", "EXC", "XEL", "ED", "WEC",
     "PCG", "AWK", "ES", "EIX", "DTE", "AEE", "FE", "PPL", "CMS", "CNP",

@@ -9,12 +9,22 @@ import requests
 from config import logger
 
 from .market_data_provider import (
-    MarketDataProvider, 
-    PriceData, 
-    QuoteData, 
-    SearchResult, 
-    ForexRate
+    MarketDataProvider,
+    PriceData,
+    QuoteData,
+    SearchResult,
+    ForexRate,
+    ProviderError,
+    ProviderNotFoundError,
+    ProviderRateLimitError,
 )
+
+# TwelveData error codes that mean "this symbol/pair will never work", as opposed
+# to a transient problem. Includes both genuinely invalid symbols and symbols
+# that exist but require a higher-tier plan than this API key has - both are
+# permanent for this key, so they're treated the same way (see ProviderNotFoundError).
+_NOT_FOUND_CODES = {404}
+_RATE_LIMIT_CODES = {429}
 
 
 class TwelveDataProvider(MarketDataProvider):
@@ -43,23 +53,53 @@ class TwelveDataProvider(MarketDataProvider):
     def is_available(self) -> bool:
         return bool(self._api_key)
     
-    def _make_request(self, endpoint: str, params: dict) -> Optional[dict]:
-        """Make authenticated request to TwelveData API"""
+    def _make_request(self, endpoint: str, params: dict) -> dict:
+        """Make authenticated request to TwelveData API.
+
+        Raises ProviderNotFoundError or ProviderRateLimitError for those specific,
+        classified failures (see market_data_provider.py), or ProviderError for
+        anything else, instead of swallowing failures to None - callers used to
+        have no way to tell "this symbol is dead" apart from "the provider is
+        rate-limited", which let a handful of permanently-404ing tickers trip
+        the ingestion breaker every night (see docs/fx/01-fx-plan.md §0.1).
+
+        IMPORTANT: never build a log message or exception from the raw
+        requests exception/URL here - it contains apikey= in the query string.
+        Only the parsed JSON error body (code/message) is ever surfaced.
+        """
         params["apikey"] = self._api_key
         try:
             response = requests.get(f"{self.BASE_URL}/{endpoint}", params=params, timeout=30)
-            response.raise_for_status()
-            data = response.json()
-            
-            # Check for API error
-            if "status" in data and data["status"] == "error":
-                logger.error(f"TwelveData API error: {data.get('message', 'Unknown error')}")
-                return None
-                
-            return data
         except requests.RequestException as e:
-            logger.error(f"TwelveData request failed: {e}")
-            return None
+            raise ProviderError(f"TwelveData request failed: {type(e).__name__}") from None
+
+        try:
+            data = response.json()
+        except ValueError:
+            data = None
+
+        error_code = None
+        error_message = None
+        if isinstance(data, dict) and data.get("status") == "error":
+            error_code = data.get("code")
+            error_message = data.get("message", "Unknown error")
+        elif not response.ok:
+            error_code = response.status_code
+            error_message = f"HTTP {response.status_code}"
+        elif not isinstance(data, dict):
+            # 2xx with a body that isn't a JSON object (or isn't JSON at all) -
+            # not classifiable as not-found/rate-limited, but still a failure.
+            error_code = "unparseable_response"
+            error_message = "Response was not a JSON object"
+
+        if error_code is not None:
+            if error_code in _RATE_LIMIT_CODES or "credit" in (error_message or "").lower():
+                raise ProviderRateLimitError(error_message)
+            if error_code in _NOT_FOUND_CODES:
+                raise ProviderNotFoundError(error_message)
+            raise ProviderError(f"TwelveData API error {error_code}: {error_message}")
+
+        return data
     
     def get_time_series(
         self, 
@@ -78,11 +118,13 @@ class TwelveDataProvider(MarketDataProvider):
             "format": "JSON"
         }
         
+        # Raises ProviderNotFoundError/ProviderRateLimitError/ProviderError on
+        # failure - callers decide how to react (see docs/fx/01-fx-plan.md §0.1).
         data = self._make_request("time_series", params)
-        if not data or "values" not in data:
-            logger.warning(f"No time series data for {symbol}")
+        if "values" not in data:
+            logger.warning(f"TwelveData returned no 'values' for {symbol}")
             return []
-        
+
         result = []
         for item in data["values"]:
             try:
@@ -120,8 +162,8 @@ class TwelveDataProvider(MarketDataProvider):
         }
         
         data = self._make_request("time_series", params)
-        if not data or "values" not in data:
-            logger.warning(f"No forex data for {symbol}")
+        if "values" not in data:
+            logger.warning(f"TwelveData returned no 'values' for {symbol}")
             return []
         
         result = []
@@ -148,7 +190,7 @@ class TwelveDataProvider(MarketDataProvider):
         }
         
         data = self._make_request("symbol_search", params)
-        if not data or "data" not in data:
+        if "data" not in data:
             return []
         
         results = []
@@ -167,13 +209,21 @@ class TwelveDataProvider(MarketDataProvider):
         return results
     
     def get_quote(self, symbol: str) -> Optional[QuoteData]:
-        """Get current quote for a symbol"""
+        """Get current quote for a symbol. This is supplementary metadata (name,
+        exchange, current price) on top of get_time_series()'s history, so unlike
+        that method it swallows provider errors to None rather than raising -
+        a quote failing shouldn't block ingesting the symbol's price history."""
         params = {"symbol": symbol}
-        
-        data = self._make_request("quote", params)
-        if not data or "symbol" not in data:
+
+        try:
+            data = self._make_request("quote", params)
+        except ProviderError as e:
+            logger.warning(f"Quote unavailable for {symbol}: {e}")
             return None
-        
+
+        if "symbol" not in data:
+            return None
+
         try:
             return QuoteData(
                 symbol=data["symbol"],
@@ -188,16 +238,21 @@ class TwelveDataProvider(MarketDataProvider):
         except (KeyError, ValueError) as e:
             logger.error(f"Failed to parse quote for {symbol}: {e}")
             return None
-    
+
     def get_forex_quote(self, base_currency: str, quote_currency: str) -> Optional[float]:
-        """Get current forex rate"""
+        """Get current forex rate. Supplementary, same reasoning as get_quote()."""
         symbol = f"{base_currency}/{quote_currency}"
         params = {"symbol": symbol}
-        
-        data = self._make_request("exchange_rate", params)
-        if not data or "rate" not in data:
+
+        try:
+            data = self._make_request("exchange_rate", params)
+        except ProviderError as e:
+            logger.warning(f"Exchange rate unavailable for {symbol}: {e}")
             return None
-        
+
+        if "rate" not in data:
+            return None
+
         try:
             return float(data["rate"])
         except ValueError:
@@ -218,7 +273,7 @@ class TwelveDataProvider(MarketDataProvider):
             params["type"] = type_filter
         
         data = self._make_request("stocks", params)
-        if not data or "data" not in data:
+        if "data" not in data:
             return []
         
         return data["data"]

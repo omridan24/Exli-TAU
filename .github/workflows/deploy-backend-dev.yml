@@ -3,21 +3,7 @@ name: Deploy Backend DEV to Cloud Run
 on:
   # Allows you to click "Run workflow" manually in GitHub Actions tab
   workflow_dispatch:
-    inputs:
-      force_ingestion:
-        description: 'Force market data ingestion even if already ran today'
-        required: false
-        default: 'false'
-        type: choice
-        options:
-          - 'false'
-          - 'true'
-      ingestion_limit:
-        description: 'Number of symbols to ingest (0 = all)'
-        required: false
-        default: '20'
-        type: string
-  
+
   # Trigger on push to any branch EXCEPT main
   push:
     branches-ignore:
@@ -59,43 +45,9 @@ jobs:
             --memory 512Mi \
             --timeout 3600
 
-      - name: Get Service URL
-        id: get_url
-        run: |
-          SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.REGION }} --project ${{ env.PROJECT_ID }} --format 'value(status.url)')
-          echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_OUTPUT
-
-      # Keeps the daily ingestion Cloud Scheduler job's auth header in sync with the
-      # SYSTEM_API_KEY secret, so GitHub Actions secrets stay the only place this key
-      # is ever edited/rotated - this just re-pushes the current value on every deploy.
-      # Requires the deploy service account to have roles/cloudscheduler.admin.
-      - name: Sync ingestion scheduler auth header
-        continue-on-error: true
-        run: |
-          gcloud scheduler jobs update http exli-market-ingest-daily \
-            --project ${{ env.PROJECT_ID }} \
-            --location ${{ env.REGION }} \
-            --update-headers "X-System-Key=${{ secrets.SYSTEM_API_KEY }},Content-Type=application/json"
-
-      # Ongoing daily ingestion is handled by a Cloud Scheduler job, not by deploys -
-      # this step only fires when YOU manually run this workflow (Actions tab > Run
-      # workflow), so pushing backend code never triggers an extra ingestion run
-      # (and never spends extra TwelveData/Cloud Run budget) on its own.
-      - name: Trigger Market Data Ingestion (manual test only)
-        if: github.event_name == 'workflow_dispatch'
-        run: |
-          FORCE="${{ github.event.inputs.force_ingestion || 'false' }}"
-          LIMIT="${{ github.event.inputs.ingestion_limit || '20' }}"
-
-          echo "Force: $FORCE, Limit: $LIMIT"
-
-          RESPONSE=$(curl -s -X POST "${{ steps.get_url.outputs.SERVICE_URL }}/system/ingest-market-data?force=$FORCE&limit=$LIMIT" \
-            -H "X-System-Key: ${{ secrets.SYSTEM_API_KEY }}" \
-            -H "Content-Type: application/json")
-          echo "Response: $RESPONSE"
-
-          if echo "$RESPONSE" | grep -q '"status"'; then
-            echo "✅ Ingestion response received"
-          else
-            echo "⚠️ Unexpected response: $RESPONSE"
-          fi
+      # Market data ingestion is production-only (2026-09-26): the dev Cloud Run
+      # service refuses /system/ingest-market-data outright (see main.py), so
+      # there's nothing to trigger or sync here for dev anymore - no scheduler
+      # job to keep a header current for, no manual-test step that would do
+      # anything but get "skipped" back. If dev-environment ingestion testing
+      # is ever needed again, use production with a small ?limit= instead.

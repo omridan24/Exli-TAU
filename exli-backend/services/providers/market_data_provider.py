@@ -8,6 +8,32 @@ from datetime import date
 from dataclasses import dataclass
 
 
+class ProviderError(Exception):
+    """A market-data provider request failed. Base class for the typed errors
+    below; catch this to handle "something went wrong" without caring which.
+
+    Messages on all of these are built from the provider's own error body,
+    never from the failed request itself, so they never contain the API key -
+    see the note on TwelveDataProvider._make_request().
+    """
+
+
+class ProviderNotFoundError(ProviderError):
+    """The symbol/pair does not exist, is invalid, or isn't available on the
+    account's current plan tier. This is a PERMANENT condition for that
+    symbol - it will never succeed on retry - so callers should treat it very
+    differently from a rate limit: don't count it as a sign the provider is
+    struggling, and don't keep retrying it every run.
+    """
+
+
+class ProviderRateLimitError(ProviderError):
+    """The provider is throttling or has run out of credits. This is a
+    TRANSIENT, account-wide condition - unlike ProviderNotFoundError, it says
+    nothing about the specific symbol, and the caller should back off.
+    """
+
+
 @dataclass
 class PriceData:
     """Standardized price data point"""
