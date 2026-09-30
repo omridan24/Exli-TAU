@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { LayoutGrid, Upload, PieChart as PieIcon, Settings, LogOut, Wallet, ArrowRight, TrendingUp, Users, Globe, Gift } from 'lucide-react';
+import { GroupsNode } from './features/groups/GroupsNode';
+import { JoinGroupPage } from './features/groups/components/JoinGroupPage';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { collection, query, orderBy, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { useTranslation } from 'react-i18next';
@@ -27,6 +29,18 @@ export default function App() {
   const [activeNode, setActiveNode] = useState('dashboard');
   const [isWhitelisted, setIsWhitelisted] = useState(null);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(null);
+  const [pendingInviteToken, setPendingInviteToken] = useState(() => sessionStorage.getItem('exli_join_token'));
+
+  // /join/:token deep link (no router yet — plan 02 Debate N). Stash the token in
+  // sessionStorage so it survives the login redirect, then clean the URL.
+  useEffect(() => {
+    const match = window.location.pathname.match(/^\/join\/(.+)$/);
+    if (match) {
+      sessionStorage.setItem('exli_join_token', match[1]);
+      setPendingInviteToken(match[1]);
+      window.history.replaceState({}, '', '/');
+    }
+  }, []);
 
   // Initialize language hook at app level for RTL/LTR switching
   const { isRTL } = useLanguage(user?.uid);
@@ -83,6 +97,19 @@ export default function App() {
   if (isWhitelisted === false) return <AccessDeniedScreen email={user.email} onLogout={() => signOut(auth)} onRetry={() => window.location.reload()} />;
   if (hasCompletedOnboarding === null) return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-400 animate-pulse">Loading...</div>;
 
+  if (pendingInviteToken) {
+    return (
+      <JoinGroupPage
+        token={pendingInviteToken}
+        onDone={() => {
+          sessionStorage.removeItem('exli_join_token');
+          setPendingInviteToken(null);
+          setActiveNode('groups');
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
       <header className="bg-white border-b border-slate-200 h-16 flex items-center px-6 justify-between sticky top-0 z-50">
@@ -133,12 +160,11 @@ export default function App() {
               <p className="text-slate-500 text-sm mt-1">{t('dashboard.investments.description')}</p>
             </button>
 
-            <div className="p-8 bg-slate-100/60 rounded-2xl border border-slate-200 text-start relative overflow-hidden grayscale-[0.3] hover:grayscale-0 transition-all duration-300 cursor-not-allowed group">
-              <div className="absolute top-3 right-3 bg-slate-200 text-slate-500 text-xs font-bold px-2 py-1 rounded-full">{t('dashboard.comingSoon')}</div>
-              <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 mb-4 group-hover:scale-105 transition-transform"><Users /></div>
-              <h3 className="font-bold text-lg text-slate-700">{t('dashboard.partnership.title')}</h3>
-              <p className="text-slate-500 text-sm mt-1">{t('dashboard.partnership.description')}</p>
-            </div>
+            <button onClick={() => setActiveNode('groups')} className="p-8 bg-white rounded-2xl shadow-sm hover:shadow-md border border-slate-100 text-start group transition-all relative overflow-hidden">
+              <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 mb-4 group-hover:scale-110 transition-transform"><Users /></div>
+              <h3 className="font-bold text-lg text-slate-800">{t('groups.dashboard.title')}</h3>
+              <p className="text-slate-500 text-sm mt-1">{t('groups.dashboard.description')}</p>
+            </button>
 
             <div className="p-8 bg-slate-100/60 rounded-2xl border border-slate-200 text-start relative overflow-hidden grayscale-[0.3] hover:grayscale-0 transition-all duration-300 cursor-not-allowed group">
               <div className="absolute top-3 right-3 bg-slate-200 text-slate-500 text-xs font-bold px-2 py-1 rounded-full">{t('dashboard.comingSoon')}</div>
@@ -161,6 +187,7 @@ export default function App() {
               {activeNode === 'settings' && <SettingsNode userId={user?.uid} categories={categories} onUpdateCategories={setCategories} />}
               {activeNode === 'investments' && <InvestmentNode userId={user?.uid} onComplete={() => setActiveNode('dashboard')} />}
               {activeNode === 'wishlist' && <WishlistNode userId={user?.uid} categories={categories} />}
+              {activeNode === 'groups' && <GroupsNode userId={user?.uid} />}
             </div>
           </div>
         )}

@@ -1,0 +1,3 @@
+# Local dev/test only — not deployed to Cloud Run (Cloud Run just installs requirements.txt).
+-r requirements.txt
+pytest>=8.0.0

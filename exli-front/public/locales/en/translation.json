@@ -728,7 +728,9 @@
             "message": "Are you sure you want to close? Your changes will be lost.",
             "continueEditing": "Continue Editing",
             "discard": "Discard"
-        }
+        },
+        "approve": "Approve",
+        "reject": "Reject"
     },
     "categoryEditor": {
         "newCategory": "New Category",
@@ -830,7 +832,17 @@
         "suspect": "Suspect",
         "recurringTag": "Recurring",
         "allJobs": "All Jobs",
-        "select": "Select"
+        "select": "Select",
+        "moveToGroup": "Move to group",
+        "sharedInGroup": "Shared in {{name}}",
+        "sharedInGroupTooltip": "This is your share after the group split",
+        "groupActions": {
+            "title": "Groups",
+            "moveToAnother": "Move to another group",
+            "removeFromGroup": "Remove from group",
+            "removeConfirm": "This restores the original amount and removes it from the group. Continue?",
+            "removed": "Removed from group"
+        }
     },
     "investments": {
         "title": "Investments",
@@ -1209,5 +1221,193 @@
         "xShareDisclosure": "An item from my wishlist on #Exli",
         "shareMessage": "Add a note (optional)",
         "shareMessagePlaceholder": "Check out this item on my wishlist!"
+    },
+    "groups": {
+        "types": {
+            "partner": {
+                "name": "Partner",
+                "description": "Just the two of you"
+            },
+            "household": {
+                "name": "Household",
+                "description": "Roommates, family, anyone you share a home with"
+            },
+            "trip": {
+                "name": "Trip",
+                "description": "A vacation or getaway, start to end"
+            },
+            "friends": {
+                "name": "Friends",
+                "description": "Nights out, gifts, anything with your crew"
+            },
+            "other": {
+                "name": "Other",
+                "description": "Anything else"
+            }
+        },
+        "splitRules": {
+            "builtIn": {
+                "equality_first": {
+                    "name": "Equality First",
+                    "description": "Split evenly among everyone"
+                },
+                "love_but_i_pay": {
+                    "name": "I Love You But I'm Paying This One",
+                    "description": "Whoever paid covers it all"
+                },
+                "your_treat": {
+                    "name": "Your Treat",
+                    "description": "The other person owes it all"
+                },
+                "this_rounds_on_me": {
+                    "name": "This Round's On Me",
+                    "description": "Whoever paid covers it all"
+                },
+                "family_pack": {
+                    "name": "Family Pack",
+                    "description": "Split using preset share weights"
+                },
+                "fair_share": {
+                    "name": "Fair Share",
+                    "description": "Split by set percentages"
+                },
+                "split_by_income": {
+                    "name": "Split by Income",
+                    "description": "Split proportional to each income"
+                },
+                "youre_paying": {
+                    "name": "This Time It's All Yours",
+                    "description": "Whoever paid covers it all"
+                }
+            },
+            "custom": {
+                "name": "Pour It Yourself",
+                "description": "Type the exact amount yourself"
+            }
+        },
+        "dashboard": {
+            "title": "Groups",
+            "description": "Split expenses with the people in your life"
+        },
+        "list": {
+            "title": "Groups",
+            "newGroup": "New Group",
+            "empty": "No groups yet. Create one to start splitting expenses together.",
+            "members_one": "{{count}} member",
+            "members_other": "{{count}} members",
+            "pendingRequests_one": "{{count}} request waiting",
+            "pendingRequests_other": "{{count}} requests waiting"
+        },
+        "create": {
+            "title": "Create a Group",
+            "typeStepTitle": "What kind of group is this?",
+            "detailsStepTitle": "Tell us about it",
+            "nameLabel": "Group name",
+            "namePlaceholder": "e.g. Our Apartment",
+            "descriptionLabel": "Description (optional)",
+            "descriptionPlaceholder": "What's this group for?",
+            "pictureLabel": "Picture (optional)",
+            "uploadPicture": "Add a picture",
+            "changePicture": "Change picture",
+            "back": "Back",
+            "next": "Next",
+            "create": "Create Group",
+            "creating": "Creating...",
+            "cancel": "Cancel",
+            "errors": {
+                "nameRequired": "Please enter a group name"
+            }
+        },
+        "page": {
+            "backToGroups": "Back to Groups",
+            "overviewTab": "Overview",
+            "bucketsTab": "Who Paid What",
+            "membersTab": "Members",
+            "expensesTab": "Expenses",
+            "balancesTab": "Balances",
+            "inviteLink": "Invite link",
+            "addPeople": "Add people",
+            "buckets": {
+                "paid": "Paid",
+                "shouldPay": "Should pay",
+                "ahead": "{{amount}} ahead",
+                "behind": "{{amount}} behind",
+                "settled": "Settled up"
+            },
+            "copyLink": "Copy link",
+            "copied": "Copied!",
+            "youAreOwed": "You're owed {{amount}}",
+            "youOwe": "You owe {{amount}}",
+            "allSettled": "You're all settled up",
+            "expensesComingSoon": "Adding expenses is coming very soon.",
+            "owner": "Owner",
+            "adminBadge": "Admin",
+            "memberBadge": "Member",
+            "notFound": "This group doesn't exist, or you're not a member of it.",
+            "getInviteLink": "Get invite link",
+            "noExpenses": "No expenses yet.",
+            "allSettledGroup": "Everyone's settled up"
+        },
+        "join": {
+            "askToJoin": "Ask to Join",
+            "goToApp": "Go to Exli",
+            "pendingBody": "Request sent! Waiting for an admin to approve you.",
+            "cancelRequest": "Cancel Request",
+            "alreadyMember": "You're already a member of this group.",
+            "notWhitelisted": "You need access to Exli before you can join a group.",
+            "invalidLink": "This invite link is invalid or has expired.",
+            "decline": "Decline",
+            "invitedBy": "Invited by {{name}}"
+        },
+        "expense": {
+            "add": "Add Expense",
+            "title": "Add Expense",
+            "descriptionPlaceholder": "What was it for?",
+            "paidBy": "Paid by",
+            "splitAmong": "Split among",
+            "errors": {
+                "required": "Please fill in a description, amount, and at least one participant."
+            },
+            "editTitle": "Edit Expense",
+            "deleteConfirm": "Delete this expense? This can't be undone.",
+            "delete": "Delete this expense",
+            "category": "Category"
+        },
+        "splitPicker": {
+            "confirm": "Split it",
+            "waitingOnIncome": "Waiting on {{names}}'s income for this month",
+            "needsTwoPeople": "Only works between exactly two people",
+            "orTypeAmounts": "Or type exact amounts"
+        },
+        "settings": {
+            "title": "Group Settings",
+            "toggleAdmin": "Toggle admin",
+            "removeMember": "Remove from group",
+            "deleteConfirm": "Delete this group forever? All expenses and history will be gone. This can't be undone.",
+            "deleteGroup": "Delete Group",
+            "deleting": "Deleting...",
+            "removeConfirm": "Remove {{name}} from this group?",
+            "invite": {
+                "expiresIn_one": "Expires in {{count}} day",
+                "expiresIn_other": "Expires in {{count}} days",
+                "days_one": "{{count}} day",
+                "days_other": "{{count}} days",
+                "update": "Update",
+                "shareMessage": "Join \"{{groupName}}\" on Exli: {{link}}"
+            }
+        },
+        "transfer": {
+            "selectTitle": "Move to a Group",
+            "splitTitle": "How do we split it?",
+            "noGroups": "You're not in any groups yet.",
+            "bulkTitle": "Move {{count}} expenses to a group",
+            "bulkSplitHint": "Choose one split to apply to all {{count}} expenses",
+            "customStep": "Expense {{current}} of {{total}}",
+            "splitIndividually": "Split each one separately",
+            "splitIndividuallyHint": "Choose a split for each expense, one at a time",
+            "bulkConfirm": "Move {{count}} expenses",
+            "bulkDone": "{{count}} expenses moved",
+            "bulkFailed": "{{count}} couldn't be moved (already shared, or something went wrong)"
+        }
     }
 }

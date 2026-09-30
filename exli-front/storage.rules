@@ -1,0 +1,20 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Group cover images (plan: docs/groups/02-phase2-ui-and-splits-plan.md §7).
+    // Publicly readable (served via the Firebase v0 download URL, no token
+    // needed since this rule allows it) so an <img> tag just works. Only the
+    // backend can write or delete them — it uses the Admin SDK, which bypasses
+    // these rules entirely, same pattern as Firestore's `allow write: if false`.
+    match /groupImages/{groupId}/{fileName} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Default lock — matches the project's existing default-deny posture.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -22,8 +22,15 @@ class Config:
     QUOTA_PRO_TIER_MONTHLY = 100
     RATE_LIMIT_GLOBAL = "1000 per day"
     RATE_LIMIT_AI = "20 per minute"
+    # Invite-token endpoints are unauthenticated-ish (token in the URL) and a natural
+    # brute-force target, even though 128-bit tokens make guessing infeasible.
+    RATE_LIMIT_GROUP_INVITES = "30 per minute"
     
     SYSTEM_API_KEY = os.environ.get("SYSTEM_API_KEY")
+
+    # Firebase Storage (group cover images — plan 02 §7). Defaults to the project's
+    # actual default bucket; override with an env var only if that ever changes.
+    FIREBASE_STORAGE_BUCKET = os.environ.get("FIREBASE_STORAGE_BUCKET", "exli-24.firebasestorage.app")
     
     # Market Data Configs
     TWELVEDATA_API_KEY = os.environ.get("TWELVEDATA_API_KEY")

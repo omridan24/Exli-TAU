@@ -488,6 +488,7 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
                     incomeStats={incomeStats}
                     displayIncome={displayIncome}
                     displayExpenses={displayExpenses}
+                    userId={userId}
                     selectedMonth={selectedMonth}
                     selectedIds={selectedIds}
                     isForecastMonth={forecastMonths.has(selectedMonth)}

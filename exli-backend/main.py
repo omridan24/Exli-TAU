@@ -9,8 +9,8 @@ from services.stock_service import search_symbol, get_stock_details
 from services.market_data_service import MarketDataService
 from services.quota_service import check_and_increment_quota
 from utils.security import validate_file_safety
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
+from extensions import limiter
+from routes.groups import groups_bp
 from traceloop.sdk import Traceloop
 
 # --- TRACELOOP INIT ---
@@ -32,12 +32,13 @@ app = Flask(__name__)
 CORS(app)
 
 # --- Rate Limit Init ---
-limiter = Limiter(
-    get_remote_address,
-    app=app,
-    default_limits=[Config.RATE_LIMIT_GLOBAL],
-    storage_uri="memory://",
-)
+# `limiter` is created in extensions.py (no app yet) so routes/groups.py can also
+# apply @limiter.limit(...) to its blueprint routes without a circular import.
+app.config["RATELIMIT_DEFAULT"] = Config.RATE_LIMIT_GLOBAL
+limiter.init_app(app)
+
+# --- Groups Blueprint ---
+app.register_blueprint(groups_bp)
 
 # Constants
 MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB (Document AI limit)

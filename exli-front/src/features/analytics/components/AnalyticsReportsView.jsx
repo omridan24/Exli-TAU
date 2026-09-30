@@ -6,18 +6,22 @@ import {
 import {
     Trash2, DollarSign, Wallet, CheckSquare, Square,
     Check, X, Briefcase,
-    Flag, Calendar, Type, Repeat, HelpCircle
+    Flag, Calendar, Type, Repeat, HelpCircle, Users
 } from 'lucide-react';
 import { Card } from '../../../components/UI';
 import { MonthYearPickerModal } from '../../../components/MonthYearPickerModal';
 import { NoteModal } from '../../../components/NoteModal';
 import { IncomeEditModal } from '../../../components/IncomeEditModal';
 import { DEFAULT_CATEGORIES } from '../../../config/constants';
+import { useMyGroups } from '../../groups/hooks/useMyGroups';
+import { MoveToGroupFlow } from '../../groups/components/MoveToGroupFlow';
+import { BulkMoveToGroupFlow } from '../../groups/components/BulkMoveToGroupFlow';
+import { GroupedExpenseActionsModal } from '../../groups/components/GroupedExpenseActionsModal';
 
 export const AnalyticsReportsView = ({
     totalIncome, totalExpenses, totalSavings, savingsRate, dominantCurrency,
     categoryStats, incomeStats, displayIncome, displayExpenses,
-    selectedMonth, selectedIds, isForecastMonth,
+    selectedMonth, selectedIds, isForecastMonth, userId,
     handleIncomeDelete, executeDeleteMonth, isDeleteModalOpen, setIsDeleteModalOpen,
     handleDelete, toggleSelect, toggleSelectAll,
     executeBulkCategory, bulkCategory, setBulkCategory, categories,
@@ -27,6 +31,10 @@ export const AnalyticsReportsView = ({
 }) => {
     const { t } = useTranslation();
     const [hoveredIncome, setHoveredIncome] = useState(null);
+    const [movingExpense, setMovingExpense] = useState(null);
+    const [bulkMoving, setBulkMoving] = useState(false);
+    const [groupActionsFor, setGroupActionsFor] = useState(null);
+    const { groups: myGroups } = useMyGroups(userId);
 
     const getCategoryName = (name) => {
         const defaultCat = DEFAULT_CATEGORIES.find(c => c.name === name);
@@ -67,6 +75,9 @@ export const AnalyticsReportsView = ({
         const item = sortedExpenses.find(exp => exp.id === id);
         return item && item.note;
     });
+    const unsharedSelectedExpenses = selectedIds
+        .map(id => sortedExpenses.find(exp => exp.id === id))
+        .filter(exp => exp && !exp.groupRef);
 
     const [isMoveMonthOpen, setIsMoveMonthOpen] = useState(false);
     const [selectedMoveMonth, setSelectedMoveMonth] = useState('');
@@ -295,12 +306,14 @@ export const AnalyticsReportsView = ({
                                         const isRefundItem = tx.isRefund || tx.amount < 0;
                                         const isSuspectItem = tx.isSuspect;
                                         const isRecurringItem = tx.isRecurring;
+                                        const isGroupSharedItem = !!tx.groupRef;
                                         const displayAmount = Math.abs(tx.amount); // Show positive magnitude
 
                                         return (
                                             <tr key={tx.id} className={`hover:bg-slate-50 group border-b border-slate-100 ${selectedIds.includes(tx.id) ? 'bg-blue-50/50' : ''
                                                 } ${isSuspectItem ? 'bg-red-50 border-red-100 hover:bg-red-100/50' :
-                                                    isRecurringItem ? 'bg-purple-50/30 border-l-4 border-l-purple-400' : ''
+                                                    isRecurringItem ? 'bg-purple-50/30 border-l-4 border-l-purple-400' :
+                                                        isGroupSharedItem ? 'bg-orange-50/40 border-l-4 border-l-orange-400' : ''
                                                 }`}>
                                                 <td className="p-4 text-center cursor-pointer" onClick={() => toggleSelect(tx.id)}>
                                                     {selectedIds.includes(tx.id) ? <CheckSquare className="w-5 h-5 text-blue-500" /> : <Square className="w-5 h-5 text-slate-200" />}
@@ -317,9 +330,19 @@ export const AnalyticsReportsView = ({
                                                             <button onClick={() => saveAmount(tx.id)} className="text-emerald-500"><Check className="w-4 h-4" /></button>
                                                         </div>
                                                     ) : (
-                                                        <div onClick={() => startEditAmount(tx)} className={`font-mono font-bold cursor-pointer hover:bg-slate-100 px-2 py-1 rounded inline-flex items-center gap-2 group-hover:text-blue-600 transition-colors ${isRefundItem ? 'text-emerald-500' : 'text-slate-700'}`}>
+                                                        <div onClick={() => startEditAmount(tx)} className={`font-mono font-bold cursor-pointer hover:bg-slate-100 px-2 py-1 rounded inline-flex items-center gap-2 group-hover:text-blue-600 transition-colors ${isRefundItem ? 'text-emerald-500' : isGroupSharedItem ? 'text-orange-600' : 'text-slate-700'}`}>
                                                             {isRefundItem ? '+' : ''}{dominantCurrency} {displayAmount}
                                                         </div>
+                                                    )}
+                                                    {isGroupSharedItem && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setGroupActionsFor(tx)}
+                                                            title={t('analytics.sharedInGroupTooltip')}
+                                                            className="mt-1 text-[10px] bg-orange-100 text-orange-700 hover:bg-orange-200 px-1.5 py-0.5 rounded font-bold uppercase inline-flex items-center gap-1 cursor-pointer transition-colors"
+                                                        >
+                                                            <Users className="w-3 h-3" /> {t('analytics.sharedInGroup', { name: tx.groupRef.groupName })}
+                                                        </button>
                                                     )}
                                                 </td>
                                                 <td className="p-4">
@@ -331,7 +354,20 @@ export const AnalyticsReportsView = ({
                                                     {isSuspectItem && <span className="ml-2 text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold uppercase flex inline-flex items-center gap-1"><Flag className="w-3 h-3" /> {t('analytics.suspect')}</span>}
                                                     {isRecurringItem && <span className="ml-2 text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-bold uppercase flex inline-flex items-center gap-1"><Repeat className="w-3 h-3" /> {t('analytics.recurringTag')}</span>}
                                                 </td>
-                                                <td className="p-4 text-right"><button onClick={() => handleDelete(tx.id)} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button></td>
+                                                <td className="p-4 text-right">
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        {myGroups.length > 0 && !isGroupSharedItem && (
+                                                            <button
+                                                                onClick={() => setMovingExpense(tx)}
+                                                                title={t('analytics.moveToGroup')}
+                                                                className="text-slate-300 hover:text-indigo-500 transition-colors"
+                                                            >
+                                                                <Users className="w-4 h-4" />
+                                                            </button>
+                                                        )}
+                                                        <button onClick={() => handleDelete(tx.id)} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                                    </div>
+                                                </td>
                                             </tr>
                                         );
                                     })}
@@ -392,6 +428,16 @@ export const AnalyticsReportsView = ({
                         </button>
                     )}
 
+                    {/* Bulk move to group */}
+                    {myGroups.length > 0 && unsharedSelectedExpenses.length > 0 && (
+                        <button
+                            onClick={() => setBulkMoving(true)}
+                            className="flex items-center gap-1.5 text-xs font-bold bg-slate-800 text-indigo-300 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors"
+                        >
+                            <Users className="w-3 h-3" /> {t('analytics.moveToGroup')}
+                        </button>
+                    )}
+
                     <div className="h-4 w-px bg-slate-700"></div>
 
                     {/* Category */}
@@ -436,6 +482,36 @@ export const AnalyticsReportsView = ({
                         onUpdateIncome(id, updates);
                         setIncomeEditModalOpen(false);
                         setSelectedIncome(null);
+                    }}
+                />
+            )}
+
+            {movingExpense && (
+                <MoveToGroupFlow
+                    expense={movingExpense}
+                    userId={userId}
+                    onClose={() => setMovingExpense(null)}
+                    onMoved={() => setMovingExpense(null)}
+                />
+            )}
+
+            {bulkMoving && (
+                <BulkMoveToGroupFlow
+                    expenses={unsharedSelectedExpenses}
+                    userId={userId}
+                    onClose={() => setBulkMoving(false)}
+                    onMoved={() => { setBulkMoving(false); setSelectedIds && setSelectedIds([]); }}
+                />
+            )}
+
+            {groupActionsFor && (
+                <GroupedExpenseActionsModal
+                    expense={groupActionsFor}
+                    onClose={() => setGroupActionsFor(null)}
+                    onRemoved={() => setGroupActionsFor(null)}
+                    onMoveToAnother={(restoredExpense) => {
+                        setGroupActionsFor(null);
+                        setMovingExpense(restoredExpense);
                     }}
                 />
             )}

@@ -12,6 +12,8 @@ pytz>=2024.1
 # Google Document AI
 google-cloud-documentai>=2.24.0
 google-cloud-firestore>=2.14.0
+firebase-admin>=6.5.0
+Pillow>=10.3.0
 # Observability
 traceloop-sdk
 flask-limiter>=3.5.0

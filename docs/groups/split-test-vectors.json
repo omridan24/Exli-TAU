@@ -1,0 +1,131 @@
+{
+  "_comment": "Shared fixtures for the split engine, checked by BOTH exli-backend/services/split_engine.py (exli-backend/tests/test_split_engine.py) and exli-front/src/features/groups/utils/splitEngine.js (exli-front/scripts/verify-split-vectors.mjs). See docs/groups/02-phase2-ui-and-splits-plan.md §3.4 / §3.7 / Debate K. Keep both implementations and this file in sync by hand.",
+  "vectors": [
+    {
+      "description": "Equal split, divides evenly",
+      "amountMinor": 10000,
+      "kind": "equal",
+      "participants": ["a", "b"],
+      "payerId": "a",
+      "params": {},
+      "expectedShares": { "a": 5000, "b": 5000 }
+    },
+    {
+      "description": "Equal split, payer absorbs the odd agora",
+      "amountMinor": 10001,
+      "kind": "equal",
+      "participants": ["a", "b"],
+      "payerId": "a",
+      "params": {},
+      "expectedShares": { "a": 5001, "b": 5000 }
+    },
+    {
+      "description": "Equal split among 3, payer is not first alphabetically",
+      "amountMinor": 10000,
+      "kind": "equal",
+      "participants": ["a", "b", "c"],
+      "payerId": "c",
+      "params": {},
+      "expectedShares": { "a": 3333, "b": 3333, "c": 3334 }
+    },
+    {
+      "description": "Equal split with payer excluded from participants (payer covered nothing of their own)",
+      "amountMinor": 9999,
+      "kind": "equal",
+      "participants": ["b", "c"],
+      "payerId": "a",
+      "params": {},
+      "expectedShares": { "b": 5000, "c": 4999 }
+    },
+    {
+      "description": "I Love You But I'm Paying This One — payer owes the full amount, net zero",
+      "amountMinor": 4800,
+      "kind": "payer_covers",
+      "participants": ["a", "b"],
+      "payerId": "a",
+      "params": {},
+      "expectedShares": { "a": 4800 }
+    },
+    {
+      "description": "Your Treat — payer owes nothing, the other participant owes it all",
+      "amountMinor": 4800,
+      "kind": "others_cover",
+      "participants": ["a", "b"],
+      "payerId": "a",
+      "params": {},
+      "expectedShares": { "a": 0, "b": 4800 }
+    },
+    {
+      "description": "Your Treat with 2 other participants splits between them, remainder to smallest uid",
+      "amountMinor": 10001,
+      "kind": "others_cover",
+      "participants": ["a", "b", "c"],
+      "payerId": "a",
+      "params": {},
+      "expectedShares": { "a": 0, "b": 5001, "c": 5000 }
+    },
+    {
+      "description": "Family Pack (shares) — couple counts double vs a single",
+      "amountMinor": 9000,
+      "kind": "shares",
+      "participants": ["a", "b", "c"],
+      "payerId": "a",
+      "params": { "weights": { "a": 2, "b": 2, "c": 1 } },
+      "expectedShares": { "a": 3600, "b": 3600, "c": 1800 }
+    },
+    {
+      "description": "Fair Share (percent) 60/40",
+      "amountMinor": 10000,
+      "kind": "percent",
+      "participants": ["a", "b"],
+      "payerId": "a",
+      "params": { "weights": { "a": 60, "b": 40 } },
+      "expectedShares": { "a": 6000, "b": 4000 }
+    },
+    {
+      "description": "Fair Share (percent) with a rounding remainder absorbed by the payer",
+      "amountMinor": 10,
+      "kind": "percent",
+      "participants": ["a", "b"],
+      "payerId": "a",
+      "params": { "weights": { "a": 33, "b": 67 } },
+      "expectedShares": { "a": 4, "b": 6 }
+    },
+    {
+      "description": "Split by Income (income_ratio) — resolved ratios come in as integer weights",
+      "amountMinor": 10000,
+      "kind": "income_ratio",
+      "participants": ["a", "b"],
+      "payerId": "b",
+      "params": { "weights": { "a": 68, "b": 32 } },
+      "expectedShares": { "a": 6800, "b": 3200 }
+    },
+    {
+      "description": "Pour It Yourself (custom) — exact amounts must sum to the total",
+      "amountMinor": 10000,
+      "kind": "custom",
+      "participants": ["a", "b", "c"],
+      "payerId": "a",
+      "params": { "amounts": { "a": 5000, "b": 3000, "c": 2000 } },
+      "expectedShares": { "a": 5000, "b": 3000, "c": 2000 }
+    },
+    {
+      "description": "Single participant equal split (edge case: a solo group expense)",
+      "amountMinor": 1234,
+      "kind": "equal",
+      "participants": ["a"],
+      "payerId": "a",
+      "params": {},
+      "expectedShares": { "a": 1234 }
+    }
+  ],
+  "errorVectors": [
+    { "description": "Zero amount is rejected", "amountMinor": 0, "kind": "equal", "participants": ["a"], "payerId": "a", "params": {} },
+    { "description": "No participants is rejected", "amountMinor": 100, "kind": "equal", "participants": [], "payerId": "a", "params": {} },
+    { "description": "Custom amounts that don't sum to the total are rejected", "amountMinor": 100, "kind": "custom", "participants": ["a", "b"], "payerId": "a", "params": { "amounts": { "a": 40, "b": 50 } } },
+    { "description": "Custom split missing a participant's amount is rejected", "amountMinor": 100, "kind": "custom", "participants": ["a", "b"], "payerId": "a", "params": { "amounts": { "a": 100 } } },
+    { "description": "Percent split with all-zero weights is rejected", "amountMinor": 100, "kind": "percent", "participants": ["a", "b"], "payerId": "a", "params": { "weights": { "a": 0, "b": 0 } } },
+    { "description": "Your Treat with the payer as the only participant is rejected", "amountMinor": 100, "kind": "others_cover", "participants": ["a"], "payerId": "a", "params": {} },
+    { "description": "Unknown kind is rejected", "amountMinor": 100, "kind": "not_a_real_kind", "participants": ["a"], "payerId": "a", "params": {} }
+  ]
+}

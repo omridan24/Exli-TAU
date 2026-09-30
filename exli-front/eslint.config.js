@@ -23,7 +23,13 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      // Capitalized names are exempted because there's no JSX-usage-aware plugin
+      // here (no eslint-plugin-react) - plain no-unused-vars doesn't see a JSX tag
+      // like <IconComponent /> as a use of `IconComponent`. argsIgnorePattern
+      // covers the same case for a capitalized component destructured straight out
+      // of a function's props (e.g. `{ icon: IconComponent }`), which varsIgnorePattern
+      // alone doesn't reach.
+      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]', argsIgnorePattern: '^[A-Z_]' }],
     },
   },
 ])

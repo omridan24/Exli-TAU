@@ -732,7 +732,9 @@
             "discard": "התעלם"
         },
         "more": "יותר",
-        "less": "פחות"
+        "less": "פחות",
+        "approve": "אישור",
+        "reject": "דחייה"
     },
     "categoryEditor": {
         "newCategory": "קטגוריה חדשה",
@@ -834,7 +836,17 @@
         "suspect": "חשוד",
         "recurringTag": "קבוע",
         "allJobs": "כל העבודות",
-        "select": "בחר"
+        "select": "בחר",
+        "moveToGroup": "העברה לקבוצה",
+        "sharedInGroup": "משותף ב{{name}}",
+        "sharedInGroupTooltip": "זה החלק שלך אחרי החלוקה בקבוצה",
+        "groupActions": {
+            "title": "קבוצות",
+            "moveToAnother": "העברה לקבוצה אחרת",
+            "removeFromGroup": "הסרה מהקבוצה",
+            "removeConfirm": "פעולה זו תחזיר את הסכום המקורי ותסיר את ההוצאה מהקבוצה. להמשיך?",
+            "removed": "הוסר מהקבוצה"
+        }
     },
     "investments": {
         "title": "השקעות",
@@ -1233,5 +1245,193 @@
         "xShareDisclosure": "מרשימת המשאלות שלי ב-#Exli",
         "shareMessage": "הוסף הודעה (רשות)",
         "shareMessagePlaceholder": "תראו את הפריט הזה מרשימת המשאלות שלי!"
+    },
+    "groups": {
+        "types": {
+            "partner": {
+                "name": "בני זוג",
+                "description": "רק שניכם"
+            },
+            "household": {
+                "name": "משק בית",
+                "description": "שותפים, משפחה, כל מי שאתם חולקים איתו בית"
+            },
+            "trip": {
+                "name": "טיול",
+                "description": "חופשה או נסיעה, מהתחלה עד הסוף"
+            },
+            "friends": {
+                "name": "חברים",
+                "description": "יציאות, מתנות, כל דבר עם החבר'ה"
+            },
+            "other": {
+                "name": "אחר",
+                "description": "כל דבר אחר"
+            }
+        },
+        "splitRules": {
+            "builtIn": {
+                "equality_first": {
+                    "name": "שוויון קודם כל",
+                    "description": "מתחלק שווה בשווה בין כולם"
+                },
+                "love_but_i_pay": {
+                    "name": "אהבה זה אהבה, אבל את זה עליי",
+                    "description": "מי ששילם מכסה את הכול"
+                },
+                "your_treat": {
+                    "name": "הפעם זה עליך",
+                    "description": "הצד השני חייב את כל הסכום"
+                },
+                "this_rounds_on_me": {
+                    "name": "הסיבוב הזה עליי",
+                    "description": "מי ששילם מכסה את הכול"
+                },
+                "family_pack": {
+                    "name": "חבילה משפחתית",
+                    "description": "מתחלק לפי משקלים קבועים"
+                },
+                "fair_share": {
+                    "name": "חלוקה הוגנת",
+                    "description": "מתחלק לפי אחוזים שנקבעו"
+                },
+                "split_by_income": {
+                    "name": "לפי הכנסה",
+                    "description": "מתחלק ביחס להכנסה של כל אחד"
+                },
+                "youre_paying": {
+                    "name": "הפעם הכל עליך",
+                    "description": "מי ששילם מכסה את הכול"
+                }
+            },
+            "custom": {
+                "name": "תמזגו בעצמכם",
+                "description": "הקלידו סכום מדויק בעצמכם"
+            }
+        },
+        "dashboard": {
+            "title": "קבוצות",
+            "description": "חלקו הוצאות עם האנשים בחיים שלכם"
+        },
+        "list": {
+            "title": "קבוצות",
+            "newGroup": "קבוצה חדשה",
+            "empty": "עדיין אין קבוצות. צרו אחת כדי להתחיל לחלק הוצאות ביחד.",
+            "members_one": "חבר אחד",
+            "members_other": "{{count}} חברים",
+            "pendingRequests_one": "בקשה אחת ממתינה",
+            "pendingRequests_other": "{{count}} בקשות ממתינות"
+        },
+        "create": {
+            "title": "יצירת קבוצה",
+            "typeStepTitle": "איזה סוג קבוצה זו?",
+            "detailsStepTitle": "ספרו לנו עליה",
+            "nameLabel": "שם הקבוצה",
+            "namePlaceholder": "לדוגמה: הדירה שלנו",
+            "descriptionLabel": "תיאור (לא חובה)",
+            "descriptionPlaceholder": "בשביל מה הקבוצה הזו?",
+            "pictureLabel": "תמונה (לא חובה)",
+            "uploadPicture": "הוספת תמונה",
+            "changePicture": "החלפת תמונה",
+            "back": "חזרה",
+            "next": "הבא",
+            "create": "יצירת קבוצה",
+            "creating": "יוצר...",
+            "cancel": "ביטול",
+            "errors": {
+                "nameRequired": "נא להזין שם לקבוצה"
+            }
+        },
+        "page": {
+            "backToGroups": "חזרה לקבוצות",
+            "membersTab": "חברים",
+            "expensesTab": "הוצאות",
+            "balancesTab": "יתרות",
+            "overviewTab": "סקירה כללית",
+            "bucketsTab": "מי שילם מה",
+            "inviteLink": "קישור הזמנה",
+            "addPeople": "הוספת אנשים",
+            "buckets": {
+                "paid": "שילם",
+                "shouldPay": "צריך לשלם",
+                "ahead": "{{amount}} קדימה",
+                "behind": "{{amount}} מאחור",
+                "settled": "מאוזן"
+            },
+            "copyLink": "העתקת קישור",
+            "copied": "הועתק!",
+            "youAreOwed": "חייבים לך {{amount}}",
+            "youOwe": "אתה חייב {{amount}}",
+            "allSettled": "הכל מסודר",
+            "expensesComingSoon": "הוספת הוצאות תגיע בקרוב מאוד.",
+            "owner": "יוצר הקבוצה",
+            "adminBadge": "מנהל",
+            "memberBadge": "חבר",
+            "notFound": "הקבוצה הזו לא קיימת, או שאינך חבר בה.",
+            "getInviteLink": "קבלת קישור הזמנה",
+            "noExpenses": "עדיין אין הוצאות.",
+            "allSettledGroup": "כולם מסודרים"
+        },
+        "join": {
+            "askToJoin": "בקשה להצטרף",
+            "goToApp": "מעבר ל-Exli",
+            "pendingBody": "הבקשה נשלחה! ממתינים לאישור מנהל הקבוצה.",
+            "cancelRequest": "ביטול הבקשה",
+            "alreadyMember": "אתה כבר חבר בקבוצה הזו.",
+            "notWhitelisted": "צריך גישה ל-Exli לפני שאפשר להצטרף לקבוצה.",
+            "invalidLink": "קישור ההזמנה לא תקין או שפג תוקפו.",
+            "decline": "דחייה",
+            "invitedBy": "הוזמנת על ידי {{name}}"
+        },
+        "expense": {
+            "add": "הוספת הוצאה",
+            "title": "הוספת הוצאה",
+            "descriptionPlaceholder": "על מה ההוצאה?",
+            "paidBy": "מי שילם",
+            "splitAmong": "מתחלקים בין",
+            "errors": {
+                "required": "נא למלא תיאור, סכום, ולפחות משתתף אחד."
+            },
+            "editTitle": "עריכת הוצאה",
+            "deleteConfirm": "למחוק את ההוצאה הזו? לא ניתן לבטל פעולה זו.",
+            "delete": "מחיקת הוצאה זו",
+            "category": "קטגוריה"
+        },
+        "splitPicker": {
+            "confirm": "לחלק",
+            "waitingOnIncome": "ממתינים להכנסה של {{names}} לחודש הזה",
+            "needsTwoPeople": "עובד רק בין שני אנשים בדיוק",
+            "orTypeAmounts": "או הקלידו סכומים מדויקים"
+        },
+        "settings": {
+            "title": "הגדרות קבוצה",
+            "toggleAdmin": "הפיכה למנהל/הסרת ניהול",
+            "removeMember": "הסרה מהקבוצה",
+            "deleteConfirm": "למחוק את הקבוצה לצמיתות? כל ההוצאות וההיסטוריה יימחקו. לא ניתן לבטל פעולה זו.",
+            "deleteGroup": "מחיקת קבוצה",
+            "deleting": "מוחק...",
+            "removeConfirm": "להסיר את {{name}} מהקבוצה?",
+            "invite": {
+                "expiresIn_one": "פג תוקף בעוד יום",
+                "expiresIn_other": "פג תוקף בעוד {{count}} ימים",
+                "days_one": "יום אחד",
+                "days_other": "{{count}} ימים",
+                "update": "עדכון",
+                "shareMessage": "הצטרפו לקבוצה \"{{groupName}}\" באקסלי: {{link}}"
+            }
+        },
+        "transfer": {
+            "selectTitle": "העברה לקבוצה",
+            "splitTitle": "איך מחלקים?",
+            "noGroups": "עדיין לא נמצא באף קבוצה.",
+            "bulkTitle": "העברת {{count}} הוצאות לקבוצה",
+            "bulkSplitHint": "בחרו חלוקה אחת שתחול על כל {{count}} ההוצאות",
+            "customStep": "הוצאה {{current}} מתוך {{total}}",
+            "splitIndividually": "לחלק כל הוצאה בנפרד",
+            "splitIndividuallyHint": "בחרו חלוקה לכל הוצאה, אחת בכל פעם",
+            "bulkConfirm": "העברת {{count}} הוצאות",
+            "bulkDone": "{{count}} הוצאות הועברו",
+            "bulkFailed": "{{count}} לא הועברו (כבר שותפו, או שקרתה תקלה)"
+        }
     }
 }
