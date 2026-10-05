@@ -1,6 +1,7 @@
 import io
 import pandas as pd
 import re
+import calendar
 import json
 from datetime import datetime
 from config import logger
@@ -148,6 +149,7 @@ def process_uploaded_files(files):
                 # Filter Columns
                 final_cols = {}
                 if mapping_indices and len(mapping_indices) >= 2:
+                    mapping_indices = prefer_transaction_date_column(df.columns, mapping_indices)
                     for field, col_idx in mapping_indices.items():
                         if isinstance(col_idx, int) and 0 <= col_idx < len(df.columns):
                             final_cols[field] = df.iloc[:, col_idx].values
@@ -187,6 +189,40 @@ def process_uploaded_files(files):
         return {"status": "error", "message": str(e)}
 
 
+def prefer_transaction_date_column(columns, mapping_indices):
+    """
+    The AI is told to prefer the transaction date, but it sometimes picks the
+    billing-date column ("תאריך חיוב"), which collapses every row of a monthly
+    statement onto the single charge day. If the mapped date column is a
+    billing date and the file also has a transaction/purchase date column,
+    point the mapping at the latter. Returns the (possibly updated) mapping.
+    """
+    date_idx = (mapping_indices or {}).get("date")
+    if not isinstance(date_idx, int) or not (0 <= date_idx < len(columns)):
+        return mapping_indices
+
+    def header(i):
+        return " ".join(str(columns[i]).split())
+
+    def is_date_header(i):
+        h = header(i)
+        return "תאריך" in h or "מועד" in h or "date" in h.lower()
+
+    billing_words = ("חיוב", "billing", "charge")
+    tx_words = ("עסקה", "רכישה", "קניה", "קנייה", "transaction", "purchase")
+
+    current = header(date_idx).lower()
+    if not any(w in current for w in billing_words):
+        return mapping_indices
+
+    for i in range(len(columns)):
+        h = header(i).lower()
+        if i != date_idx and is_date_header(i) and any(w in h for w in tx_words)                 and not any(w in h for w in billing_words):
+            logger.info(f"Date column switched from billing date '{header(date_idx)}' to transaction date '{header(i)}'")
+            return {**mapping_indices, "date": i}
+    return mapping_indices
+
+
 def parse_date_to_iso(date_str):
     """
     Parses a date string into ISO format (YYYY-MM-DDTHH:MM:SSZ).
@@ -213,6 +249,8 @@ def parse_date_to_iso(date_str):
         "%Y-%m-%d",           # 2026-05-14
         "%Y-%m-%dT%H:%M:%S", # 2026-05-14T00:00:00
         "%Y-%m-%dT%H:%M:%SZ",# 2026-05-14T00:00:00Z
+        "%Y-%m-%d %H:%M:%S", # 2026-05-14 00:00:00 (str() of an Excel datetime cell)
+        "%Y-%m-%d %H:%M",    # 2026-05-14 00:00
         "%d/%m/%Y",           # 14/05/2026
         "%d-%m-%Y",           # 14-05-2026
         "%d.%m.%Y",           # 14.05.2026
@@ -230,15 +268,93 @@ def parse_date_to_iso(date_str):
         except ValueError:
             continue
     
-    # Last resort: let pandas try
+    # Last resort: let pandas try. Year-first strings are ISO-like and must
+    # never be read day-first, or pandas swaps month/day when day <= 12
+    # (2026-09-01 -> 2026-01-09).
     try:
-        d = pd.to_datetime(date_str, dayfirst=True)
+        year_first = bool(re.match(r"^\d{4}[-/.]", date_str))
+        d = pd.to_datetime(date_str, dayfirst=not year_first)
         return d.isoformat() + "Z"
     except Exception:
         pass
     
     logger.warning(f"Could not parse date: '{date_str}'")
     return None
+
+
+INSTALLMENT_RE = re.compile(r"(?:תשלום\s*(\d+)\s*מתוך\s*(\d+))|(?:payment\s*(\d+)\s*of\s*(\d+))", re.IGNORECASE)
+NOTES_HEADERS = ("הערות", "הערה", "notes", "note", "remarks")
+INSTALLMENT_MIN_MONTH_SHARE = 0.6
+
+
+def find_notes_values(raw_df):
+    """Returns the values of the first column whose header looks like a notes column, else None."""
+    for i, col in enumerate(raw_df.columns):
+        h = " ".join(str(col).split()).lower()
+        if any(h == w or h.startswith(w) for w in NOTES_HEADERS):
+            return raw_df.iloc[:, i].values
+    return None
+
+
+def parse_installment(notes):
+    """'תשלום 2 מתוך 12' -> (2, 12); None if the text isn't an installment note."""
+    m = INSTALLMENT_RE.search(str(notes or ""))
+    if not m:
+        return None
+    cur, total = (m.group(1), m.group(2)) if m.group(1) else (m.group(3), m.group(4))
+    cur, total = int(cur), int(total)
+    if total < 2 or not (1 <= cur <= total):
+        return None
+    return cur, total
+
+
+def apply_installment_months(transactions):
+    """
+    A purchase split into N payments shows up on every statement with its
+    ORIGINAL purchase date (e.g. bought 18 Aug, payment 2 of 12 charged in the
+    September statement). The charged amount belongs to the month it is paid,
+    not to the purchase month, otherwise it is booked in a month it never
+    touched. Works on the transactions of ONE file/statement:
+
+      * the statement month is the dominant month of its regular (non-
+        installment, or first-payment) transactions;
+      * every later installment (payment k>1) whose purchase month is earlier
+        is moved into that month (same day-of-month, clamped), keeping
+        originalDate / installment info for traceability.
+
+    If the statement has no clear single month (regular rows spread across
+    months, below INSTALLMENT_MIN_MONTH_SHARE) nothing is moved.
+    """
+    for tx in transactions:
+        inst = parse_installment(tx.get("notes"))
+        if inst:
+            tx["installment"] = {"current": inst[0], "total": inst[1]}
+
+    regular_months = [
+        tx["reportMonth"] for tx in transactions
+        if tx.get("reportMonth") and (not tx.get("installment") or tx["installment"]["current"] == 1)
+    ]
+    if not regular_months:
+        return transactions
+
+    counts = {}
+    for m in regular_months:
+        counts[m] = counts.get(m, 0) + 1
+    statement_month, top = max(counts.items(), key=lambda kv: kv[1])
+    if top / len(regular_months) < INSTALLMENT_MIN_MONTH_SHARE:
+        return transactions
+
+    year, month = int(statement_month[:4]), int(statement_month[5:7])
+    for tx in transactions:
+        inst = tx.get("installment")
+        if not inst or inst["current"] <= 1 or tx.get("reportMonth", "") >= statement_month:
+            continue
+        old_iso = tx["date"]
+        day = min(int(old_iso[8:10]), calendar.monthrange(year, month)[1])
+        tx["originalDate"] = old_iso
+        tx["date"] = f"{statement_month}-{day:02d}T00:00:00Z"
+        tx["reportMonth"] = statement_month
+    return transactions
 
 
 def detect_report_months(transactions):
@@ -409,6 +525,7 @@ def process_uploaded_files_auto(files):
                 # Filter Columns using AI mapping
                 final_cols = {}
                 if mapping_indices and len(mapping_indices) >= 2:
+                    mapping_indices = prefer_transaction_date_column(df.columns, mapping_indices)
                     for field, col_idx in mapping_indices.items():
                         if isinstance(col_idx, int) and 0 <= col_idx < len(df.columns):
                             final_cols[field] = df.iloc[:, col_idx].values
@@ -418,11 +535,17 @@ def process_uploaded_files_auto(files):
                         if header_name in df.columns:
                             final_cols[field] = df[header_name].values
                 
+                if final_cols and "notes" not in final_cols:
+                    notes_values = find_notes_values(df)
+                    if notes_values is not None:
+                        final_cols["notes"] = notes_values
+
                 if final_cols:
                     df = pd.DataFrame(final_cols)
                 
                 df = sanitize_dataframe(df)
                 df_clean = df.astype(object).where(pd.notnull(df), None)
+                file_transactions = []
 
                 # Convert rows to transaction dicts
                 for row in df_clean.values.tolist():
@@ -442,6 +565,11 @@ def process_uploaded_files_auto(files):
                     except (ValueError, TypeError):
                         amount = 0
                     
+                    # Footer/summary lines ("סך הכל", "9071.55₪") have no real date
+                    # and no amount; they must not become transactions.
+                    if amount == 0 and parse_date_to_iso(tx.get("date")) is None:
+                        continue
+
                     transaction = {
                         "date": str(tx.get("date") or ""),
                         "description": str(tx.get("description") or "Unknown"),
@@ -449,8 +577,13 @@ def process_uploaded_files_auto(files):
                         "currency": tx.get("currency", "ILS"),
                         "originalCategory": str(tx.get("category", "") or ""),
                         "sourceCard": card_info,
+                        "notes": str(tx.get("notes") or ""),
                     }
-                    all_transactions.append(transaction)
+                    file_transactions.append(transaction)
+
+                # Installments are placed in the statement month they were paid in
+                file_transactions = detect_report_months(file_transactions)
+                all_transactions.extend(apply_installment_months(file_transactions))
                 
             except Exception as e:
                 logger.error(f"[AUTO] Parse Error for {file_data['filename']}: {e}", exc_info=True)

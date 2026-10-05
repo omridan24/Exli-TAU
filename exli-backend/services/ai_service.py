@@ -223,11 +223,12 @@ def analyze_multiple_files_structure(file_samples):
     ### RULES:
     1. **Header Row**: Which row index contains the headers? (0-based)
     2. **Mapping Indices**: 
-       - "date": Index of the Charge/Billing Date column (e.g. "תאריך חיוב", "מועד חיוב"). If not available, fallback to Purchase Date ("תאריך רכישה", "תאריך קניה").
+       - "date": Index of the Transaction/Purchase Date column (e.g. "תאריך עסקה", "תאריך רכישה", "תאריך קניה"). Do NOT use the Charge/Billing Date ("תאריך חיוב", "מועד חיוב") when a transaction date column exists, because every row of a monthly statement shares the same billing date. Only if there is no transaction date column, fall back to the Charge/Billing Date.
        - "amount": Index of Amount/Billing/Debit column (Use the local currency billing amount)
        - "description": Index of Payee/Business Name
        - "currency": Index of Currency symbol (optional, if exists)
        - "category": Index of Category (optional)
+       - "notes": Index of the Notes column ("הערות"), e.g. "תשלום 2 מתוך 12" (optional)
     
     ### OUTPUT FORMAT:
     Return JSON Object:
