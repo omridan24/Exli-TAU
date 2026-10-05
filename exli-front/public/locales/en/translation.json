@@ -787,7 +787,25 @@
         "incomeOnly": "Income Only",
         "everything": "Everything",
         "selected": "{{count}} Selected",
-        "moveMonth": "Move Month",
+        "changeDate": {
+            "action": "Change date",
+            "title": "Change date for {{count}} expense(s)",
+            "willMove": "{{count}} expense(s) will move to {{month}}",
+            "willStay": "{{count}} expense(s) stay in {{month}} (only the day changes)",
+            "sharedBlocked": "{{count}} expense(s) shared in a group can't change date. Use \"Remove from group\" first, change the date, then share again.",
+            "sharedBlockedShort": "Shared in a group - remove from group first to change the date",
+            "back": "Back",
+            "breadcrumb": "Date steps",
+            "close": "Close",
+            "keepDay": "Keep each expense's own day",
+            "failed": "Failed to change the date.",
+            "confirm": "Change date",
+            "success": "Date changed for {{count}} expense(s)"
+        },
+        "dateMismatch": {
+            "tooltip": "Date is in {{dateMonth}} but shown in {{shownMonth}}",
+            "fix": "Move to {{month}}"
+        },
         "markSuspect": "Mark Suspect",
         "clearSuspect": "Clear Suspect",
         "addNote": "Add Note",
@@ -822,8 +840,6 @@
         "markSuspectFailed": "Failed to mark as suspect.",
         "clearedSuspectSuccess": "✅ Cleared suspect flag from {{count}} expense(s)",
         "clearSuspectFailed": "Failed to clear suspect flag.",
-        "movedMonthSuccess": "✅ Moved {{count}} expense(s) to {{month}}",
-        "moveMonthFailed": "Failed to move expenses.",
         "removedNotesSuccess": "✅ Removed notes from {{count}} expense(s)",
         "removeNotesFailed": "Failed to remove notes.",
         "updatedIncomeSuccess": "✅ Updated income record",
@@ -1453,12 +1469,12 @@
         },
         "incomeSplit": {
             "title": "Income split by month",
-            "explainer": "Each expense is split by the income ratio of its own month, based on the income entered the month before.",
+            "explainer": "Each expense is split by the income ratio of its own month, using the income entered for that same month.",
             "basedOn": "based on {{month}} income",
-            "monthFallback": "no income data yet - split equally",
+            "monthFallback": "no income data for this month yet - split equally",
             "rowLabel": "Income split for {{month}}",
             "rowFallback": "No income data for {{month}} - split equally",
-            "pickerResolved": "Income split for {{month}} (based on {{incomeMonth}} income)",
+            "pickerResolved": "Income split for {{month}}",
             "perMonthHint": "Each expense will use the income split of its own month."
         }
     }

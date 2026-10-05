@@ -358,7 +358,7 @@ def get_income_ratio_months(db, uid, group_id, month_keys):
     """
     Per-month "Split by Income" breakdown for the UI: for each expense month 'YYYY-MM',
     what that month's expenses resolve to (same rule as get_income_ratios: the ratio from
-    the income month right before it; `month` in each result says which month that was).
+    that same month's income; `month` in each result says which month that was).
     """
     snap = get_group_or_404(db, group_id)
     group = snap.to_dict()

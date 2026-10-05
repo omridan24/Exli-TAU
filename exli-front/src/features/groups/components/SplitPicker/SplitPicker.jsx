@@ -83,7 +83,7 @@ export const SplitPicker = ({ group, amountMinor, payerId, participantUids, date
   const expenseMonth = formatMonth(dateStr, i18n.language);
   const defaultIncomeNote = !isIncomeDefault || !incomeRatio ? null
     : incomeRatio.ready
-      ? t('groups.incomeSplit.pickerResolved', { month: expenseMonth, incomeMonth: formatMonth(incomeRatio.month, i18n.language) })
+      ? t('groups.incomeSplit.pickerResolved', { month: expenseMonth })
       : t('groups.incomeSplit.rowFallback', { month: expenseMonth });
   const defaultShares = !defaultRule ? null
     : isIncomeDefault && incomeRatio && !incomeRatio.ready

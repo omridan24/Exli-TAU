@@ -11,6 +11,7 @@ from services.quota_service import check_and_increment_quota
 from utils.security import validate_file_safety
 from extensions import limiter
 from routes.groups import groups_bp
+from routes.expenses import expenses_bp
 from traceloop.sdk import Traceloop
 
 # --- TRACELOOP INIT ---
@@ -39,6 +40,7 @@ limiter.init_app(app)
 
 # --- Groups Blueprint ---
 app.register_blueprint(groups_bp)
+app.register_blueprint(expenses_bp)
 
 # Constants
 MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB (Document AI limit)

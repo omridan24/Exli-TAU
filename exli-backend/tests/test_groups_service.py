@@ -377,12 +377,12 @@ class TestDefaultFixedSplit:
 
 class TestIncomeRatioMonths:
     def test_returns_one_breakdown_per_expense_month(self, db):
-        db.collection("users").document(OWNER).collection("income").add({"month": "2026-08", "neto": 15000})
+        db.collection("users").document(OWNER).collection("income").add({"month": "2026-09", "neto": 15000})
         gid = seed_group(db)
         result = svc.get_income_ratio_months(db, OWNER, gid, ["2026-09", "2026-10", "2026-09"])
         assert [r["forMonth"] for r in result] == ["2026-09", "2026-10"]
-        assert result[0]["month"] == "2026-08" and result[0]["ready"] is True
-        assert result[1]["month"] == "2026-09" and result[1]["ready"] is False
+        assert result[0]["month"] == "2026-09" and result[0]["ready"] is True
+        assert result[1]["month"] == "2026-10" and result[1]["ready"] is False
 
     def test_non_member_forbidden_and_bad_month_rejected(self, db):
         gid = seed_group(db)
@@ -434,8 +434,8 @@ class TestIncomeRatioPreview:
             OWNER: make_member(role="admin"),
             MEMBER: make_member(role="member"),
         }, memberIds=[OWNER, MEMBER])
-        db.collection("users").document(OWNER).collection("income").add({"month": "2026-09", "neto": 10000})
-        db.collection("users").document(MEMBER).collection("income").add({"month": "2026-09", "neto": 10000})
+        db.collection("users").document(OWNER).collection("income").add({"month": "2026-10", "neto": 10000})
+        db.collection("users").document(MEMBER).collection("income").add({"month": "2026-10", "neto": 10000})
 
         result = svc.get_income_ratio_preview(db, MEMBER, gid, datetime(2026, 10, 5).date())
 

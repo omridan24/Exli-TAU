@@ -11,18 +11,15 @@ income figure — see Debate Q on why that boundary matters.
 """
 
 
-def previous_month_key(for_date):
-    """'YYYY-MM' for the calendar month right before `for_date`'s month.
+def income_month_key(for_date):
+    """'YYYY-MM' of the income month used for an expense dated `for_date`.
 
-    The plan's own wording: an expense uses "last month's" income, so a January
-    expense uses December's income, an expense dated 2026-10-05 uses 2026-09, etc.
-    This is also what makes the ratio "adapt per month" automatically — no stored
-    weights, no admin action, just whichever month is now complete.
+    Same-month rule: an expense dated 2026-10-05 uses each participant's 2026-10
+    income, and a January expense uses that same year's January income. This is
+    what makes the ratio "adapt per month" automatically - no stored weights, no
+    admin action. (If the month's income isn't entered yet, callers fall back.)
     """
-    year, month = for_date.year, for_date.month
-    if month == 1:
-        return f"{year - 1}-12"
-    return f"{year}-{month - 1:02d}"
+    return f"{for_date.year}-{for_date.month:02d}"
 
 
 def _net_income_for_month(db, uid, month_key):
@@ -69,13 +66,13 @@ def get_income_ratios(db, group, for_date):
 
     Returns:
       {
-        "month": "YYYY-MM",            # the month actually used (for_date's month, minus one)
+        "month": "YYYY-MM",            # the income month used (for_date's own month)
         "ready": bool,
         "missing": [uid, ...],         # active members with no usable income for that month
         "ratios": {uid: int} | None,   # integer percents summing to 100; None unless ready
       }
     """
-    month_key = previous_month_key(for_date)
+    month_key = income_month_key(for_date)
     active_uids = sorted(
         uid for uid, m in (group.get("members") or {}).items() if m.get("status") == "active"
     )

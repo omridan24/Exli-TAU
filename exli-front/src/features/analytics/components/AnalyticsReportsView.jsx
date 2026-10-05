@@ -6,10 +6,9 @@ import {
 import {
     Trash2, DollarSign, Wallet, CheckSquare, Square,
     Check, X, Briefcase,
-    Flag, Calendar, Type, Repeat, HelpCircle, Users
+    Flag, Calendar, Type, Repeat, HelpCircle, Users, AlertTriangle
 } from 'lucide-react';
 import { Card } from '../../../components/UI';
-import { MonthYearPickerModal } from '../../../components/MonthYearPickerModal';
 import { NoteModal } from '../../../components/NoteModal';
 import { IncomeEditModal } from '../../../components/IncomeEditModal';
 import { DEFAULT_CATEGORIES } from '../../../config/constants';
@@ -17,6 +16,8 @@ import { useMyGroups } from '../../groups/hooks/useMyGroups';
 import { MoveToGroupFlow } from '../../groups/components/MoveToGroupFlow';
 import { BulkMoveToGroupFlow } from '../../groups/components/BulkMoveToGroupFlow';
 import { GroupedExpenseActionsModal } from '../../groups/components/GroupedExpenseActionsModal';
+import { ChangeDateModal } from './ChangeDateModal';
+import { getMonthMismatch } from '../utils/expenseDates';
 
 export const AnalyticsReportsView = ({
     totalIncome, totalExpenses, totalSavings, savingsRate, dominantCurrency,
@@ -27,12 +28,14 @@ export const AnalyticsReportsView = ({
     executeBulkCategory, bulkCategory, setBulkCategory, categories,
     editingId, startEditAmount, saveAmount, editAmountVal, setEditAmountVal,
     handleCategoryChange, formatDate, onAddNote, onMarkSuspect, onClearSuspect,
-    onMoveMonth, onRemoveNote, onUpdateIncome, setSelectedIds
+    onMoveMonth, onRemoveNote, onUpdateIncome, setSelectedIds,
+    onChangeDate, onFixMismatch, formatMonth
 }) => {
     const { t } = useTranslation();
     const [hoveredIncome, setHoveredIncome] = useState(null);
     const [movingExpense, setMovingExpense] = useState(null);
     const [bulkMoving, setBulkMoving] = useState(false);
+    const [changeDateFor, setChangeDateFor] = useState(null); // array of expenses
     const [groupActionsFor, setGroupActionsFor] = useState(null);
     const { groups: myGroups } = useMyGroups(userId);
 
@@ -79,8 +82,6 @@ export const AnalyticsReportsView = ({
         .map(id => sortedExpenses.find(exp => exp.id === id))
         .filter(exp => exp && !exp.groupRef);
 
-    const [isMoveMonthOpen, setIsMoveMonthOpen] = useState(false);
-    const [selectedMoveMonth, setSelectedMoveMonth] = useState('');
     const [noteModalOpen, setNoteModalOpen] = useState(false);
     const [incomeEditModalOpen, setIncomeEditModalOpen] = useState(false);
     const [selectedIncome, setSelectedIncome] = useState(null);
@@ -91,13 +92,7 @@ export const AnalyticsReportsView = ({
             executeBulkCategory();
         }
 
-        // Apply move month if selected
-        if (selectedMoveMonth && selectedIds.length && onMoveMonth) {
-            onMoveMonth(selectedIds, selectedMoveMonth);
-        }
-
         // Clear selections
-        setSelectedMoveMonth('');
         setBulkCategory('');
     };
 
@@ -318,7 +313,25 @@ export const AnalyticsReportsView = ({
                                                 <td className="p-4 text-center cursor-pointer" onClick={() => toggleSelect(tx.id)}>
                                                     {selectedIds.includes(tx.id) ? <CheckSquare className="w-5 h-5 text-blue-500" /> : <Square className="w-5 h-5 text-slate-200" />}
                                                 </td>
-                                                <td className="p-4 text-slate-500 whitespace-nowrap">{formatDate(tx.date)}</td>
+                                                <td className="p-4 text-slate-500 whitespace-nowrap">
+                                                    {formatDate(tx.date)}
+                                                    {(() => {
+                                                        const mismatch = getMonthMismatch(tx);
+                                                        if (!mismatch || isGroupSharedItem) return null;
+                                                        return (
+                                                            <div>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => onFixMismatch && onFixMismatch([tx.id])}
+                                                                    title={t('analytics.dateMismatch.tooltip', { dateMonth: formatMonth(mismatch.dateMonth), shownMonth: formatMonth(mismatch.reportMonth) })}
+                                                                    className="mt-1 text-[10px] bg-amber-100 text-amber-800 hover:bg-amber-200 px-1.5 py-0.5 rounded font-bold inline-flex items-center gap-1 cursor-pointer"
+                                                                >
+                                                                    <AlertTriangle className="w-3 h-3" /> {t('analytics.dateMismatch.fix', { month: formatMonth(mismatch.dateMonth) })}
+                                                                </button>
+                                                            </div>
+                                                        );
+                                                    })()}
+                                                </td>
                                                 <td className="p-4 font-bold text-slate-800">
                                                     {tx.description}
                                                     {tx.note && <div className="text-[10px] text-purple-600 bg-purple-50 px-1 py-0.5 rounded inline-block ml-2 border border-purple-100"><Type className="w-2 h-2 inline mr-1" />{tx.note}</div>}
@@ -356,6 +369,13 @@ export const AnalyticsReportsView = ({
                                                 </td>
                                                 <td className="p-4 text-right">
                                                     <div className="flex items-center justify-end gap-2">
+                                                        <button
+                                                            onClick={() => setChangeDateFor([tx])}
+                                                            title={isGroupSharedItem ? t('analytics.changeDate.sharedBlockedShort') : t('analytics.changeDate.action')}
+                                                            className="text-slate-300 hover:text-blue-500 transition-colors"
+                                                        >
+                                                            <Calendar className="w-4 h-4" />
+                                                        </button>
                                                         {myGroups.length > 0 && !isGroupSharedItem && (
                                                             <button
                                                                 onClick={() => setMovingExpense(tx)}
@@ -383,13 +403,13 @@ export const AnalyticsReportsView = ({
                     <span className="font-bold text-sm">{t('analytics.selected', { count: selectedIds.length })}</span>
                     <div className="h-4 w-px bg-slate-700"></div>
 
-                    {/* Move Month */}
+                    {/* Change exact date */}
                     <button
-                        onClick={() => setIsMoveMonthOpen(true)}
-                        className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${selectedMoveMonth ? 'bg-blue-600 text-white' : 'bg-slate-800 text-blue-300 hover:bg-slate-700'}`}
+                        onClick={() => setChangeDateFor(displayExpenses.filter(e => selectedIds.includes(e.id)))}
+                        className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors bg-slate-800 text-blue-300 hover:bg-slate-700"
                     >
                         <Calendar className="w-3 h-3" />
-                        {selectedMoveMonth || t('analytics.moveMonth')}
+                        {t('analytics.changeDate.action')}
                     </button>
 
                     {/* Mark/Clear Suspect */}
@@ -445,21 +465,26 @@ export const AnalyticsReportsView = ({
                         <option value="">{t('analytics.category')}...</option>
                         {categories.map(c => <option key={c.id} value={c.name}>{getCategoryName(c.name)}</option>)}
                     </select>
-                    <button onClick={handleApplyBulkActions} disabled={!bulkCategory && !selectedMoveMonth} className="bg-emerald-500 hover:bg-emerald-400 text-white p-1.5 rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-all"><Check className="w-4 h-4" /></button>
+                    <button onClick={handleApplyBulkActions} disabled={!bulkCategory} className="bg-emerald-500 hover:bg-emerald-400 text-white p-1.5 rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-all"><Check className="w-4 h-4" /></button>
                     <button onClick={() => setSelectedIds && setSelectedIds([])} className="ml-2 text-slate-500 hover:text-white"><X className="w-4 h-4" /></button>
                 </div>
             )}
 
-            {/* MonthYearPickerModal */}
-            <MonthYearPickerModal
-                isOpen={isMoveMonthOpen}
-                onClose={() => setIsMoveMonthOpen(false)}
-                value={selectedMoveMonth}
-                onSave={(month) => {
-                    setSelectedMoveMonth(month);
-                    setIsMoveMonthOpen(false);
-                }}
-            />
+            {changeDateFor && (
+                <ChangeDateModal
+                    expenses={changeDateFor}
+                    formatMonth={formatMonth}
+                    onClose={() => setChangeDateFor(null)}
+                    onKeepDay={async (month) => {
+                        await onMoveMonth(changeDateFor.map(e => e.id), month);
+                        setChangeDateFor(null);
+                    }}
+                    onConfirm={async (date) => {
+                        await onChangeDate(changeDateFor.map(e => e.id), date);
+                        setChangeDateFor(null);
+                    }}
+                />
+            )}
 
             {/* NoteModal */}
             <NoteModal

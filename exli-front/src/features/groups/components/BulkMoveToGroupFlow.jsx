@@ -87,7 +87,7 @@ export const BulkMoveToGroupFlow = ({ expenses, userId, onClose, onMoved }) => {
   };
 
   // The selected expenses can span several calendar months, and each one uses
-  // its OWN "last month" for Split by Income (plan §3.7) — so this checks
+  // its OWN month's income for Split by Income (plan §3.7) — so this checks
   // readiness for every distinct month actually present in the batch, not just
   // today's. Only "ready" if every one of them is. The backend re-checks each
   // expense against its own date again at transfer time regardless.

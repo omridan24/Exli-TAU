@@ -8,7 +8,7 @@ const MAX_MONTHS = 6;
 /**
  * Plain-language per-month view of the income split, e.g.
  * "Sep 2026: Me 75% / Lina 25%". Each expense uses the ratio of ITS OWN month
- * (computed from the income month right before it - see income_ratio_service).
+ * (computed from that same month's income - see income_ratio_service).
  * A month without complete income data shows an equal-split fallback instead.
  */
 export const IncomeMonthlyBreakdown = ({ group, expenseMonths = [] }) => {
@@ -40,7 +40,6 @@ export const IncomeMonthlyBreakdown = ({ group, expenseMonths = [] }) => {
             <span className="text-slate-600">
               {Object.entries(r.ratios).sort((a, b) => b[1] - a[1])
                 .map(([uid, pct]) => `${nameOf(uid)} ${formatPercent(pct)}`).join(' / ')}
-              <span className="text-xs text-slate-400"> ({t('groups.incomeSplit.basedOn', { month: formatMonth(r.month, i18n.language) })})</span>
             </span>
           ) : (
             <span className="text-amber-600">{t('groups.incomeSplit.monthFallback')}</span>

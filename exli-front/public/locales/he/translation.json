@@ -791,7 +791,25 @@
         "incomeOnly": "הכנסות בלבד",
         "everything": "הכל",
         "selected": "{{count}} נבחרו",
-        "moveMonth": "העבר חודש",
+        "changeDate": {
+            "action": "שנה תאריך",
+            "title": "שינוי תאריך ל-{{count}} הוצאות",
+            "willMove": "{{count}} הוצאות יועברו ל-{{month}}",
+            "willStay": "{{count}} הוצאות יישארו ב-{{month}} (רק היום משתנה)",
+            "sharedBlocked": "{{count}} הוצאות משותפות בקבוצה לא ניתנות לשינוי תאריך. יש ללחוץ קודם על \"הסר מהקבוצה\", לשנות תאריך ולשתף שוב.",
+            "sharedBlockedShort": "משותפת בקבוצה - יש להסיר מהקבוצה לפני שינוי התאריך",
+            "back": "חזרה",
+            "breadcrumb": "שלבי בחירת תאריך",
+            "close": "סגור",
+            "keepDay": "השאר את היום של כל הוצאה",
+            "failed": "שינוי התאריך נכשל.",
+            "confirm": "שנה תאריך",
+            "success": "התאריך שונה ל-{{count}} הוצאות"
+        },
+        "dateMismatch": {
+            "tooltip": "התאריך הוא ב{{dateMonth}} אך ההוצאה מוצגת ב{{shownMonth}}",
+            "fix": "העבר ל{{month}}"
+        },
         "markSuspect": "סמן כחשוד",
         "clearSuspect": "נקה סימון חשוד",
         "addNote": "הוסף הערה",
@@ -826,8 +844,6 @@
         "markSuspectFailed": "נכשל בסימון כחשוד.",
         "clearedSuspectSuccess": "✅ סימון חשוד הוסר מ-{{count}} הוצאות",
         "clearSuspectFailed": "נכשל בהסרת סימון חשוד.",
-        "movedMonthSuccess": "✅ {{count}} הוצאות הועברו ל-{{month}}",
-        "moveMonthFailed": "נכשל בהעברת הוצאות.",
         "removedNotesSuccess": "✅ הערות הוסרו מ-{{count}} הוצאות",
         "removeNotesFailed": "נכשל בהסרת הערות.",
         "updatedIncomeSuccess": "✅ רשומת הכנסה עודכנה",
@@ -1477,12 +1493,12 @@
         },
         "incomeSplit": {
             "title": "חלוקה לפי הכנסה, לפי חודש",
-            "explainer": "כל הוצאה מחולקת לפי יחס ההכנסות של החודש שלה, על בסיס ההכנסות שהוזנו בחודש שלפניו.",
+            "explainer": "כל הוצאה מחולקת לפי יחס ההכנסות של החודש שלה, על בסיס ההכנסות שהוזנו לאותו חודש.",
             "basedOn": "לפי הכנסות {{month}}",
-            "monthFallback": "אין עדיין נתוני הכנסה - חלוקה שווה",
+            "monthFallback": "אין עדיין נתוני הכנסה לחודש הזה - חלוקה שווה",
             "rowLabel": "חלוקה לפי הכנסה ל{{month}}",
             "rowFallback": "אין נתוני הכנסה ל{{month}} - חלוקה שווה",
-            "pickerResolved": "חלוקה לפי הכנסה ל{{month}} (לפי הכנסות {{incomeMonth}})",
+            "pickerResolved": "חלוקה לפי הכנסה ל{{month}}",
             "perMonthHint": "כל הוצאה תשתמש בחלוקה לפי ההכנסה של החודש שלה."
         }
     }

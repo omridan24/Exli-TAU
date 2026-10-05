@@ -127,7 +127,7 @@ def _resolve_split(db, group, expense_date, split_input, participants):
             # Re-derived fresh every time (plan §3.7) — never trust a cached ratio.
             ratio_result = income_ratio_service.get_income_ratios(db, group, expense_date)
             if not ratio_result["ready"] and from_default:
-                # Graceful fallback for the group DEFAULT only: this month has no complete
+                # Graceful fallback for the group DEFAULT only: the expense's month has no complete
                 # income data, so split equally and say so (split.params.incomeFallback).
                 # Picking the income rule by hand still blocks with INCOME_NOT_READY, as before.
                 return split_rule_id, "equal", {"incomeFallback": True, "incomeMonth": ratio_result["month"]}, None
@@ -142,7 +142,7 @@ def _resolve_split(db, group, expense_date, split_input, participants):
                     code="INCOME_NOT_READY",
                 )
             # incomeMonth: the month whose income produced these ratios (per expense, see
-            # income_ratio_service.previous_month_key) so the UI can label it.
+            # income_ratio_service.income_month_key) so the UI can label it.
             params = {"weights": ratio_result["ratios"], "incomeMonth": ratio_result["month"]}
             resolved_ratios = ratio_result["ratios"]  # snapshot the RATIO only, never raw income (Debate Q)
 

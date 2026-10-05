@@ -6,6 +6,7 @@ import {
 import { doc, deleteDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import { db, logUserAction } from '../../../config/firebase';
 import { AnalyticsReportsView } from './AnalyticsReportsView';
+import { expensesApi } from '../../../config/expensesApi';
 import { AnalyticsTrendsView } from './AnalyticsTrendsView';
 
 export const YearDashboard = ({ year, data, income, categories, userId, onBack }) => {
@@ -305,22 +306,24 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
 
     const handleMoveMonth = async (ids, targetMonth) => {
         if (!ids.length || !targetMonth) return;
+        // Server-side: also sets a date inside the target month so date and month never disagree.
+        await runDateChange(() => expensesApi.moveMonth(ids, targetMonth), targetMonth);
+    };
+
+    const runDateChange = async (call, targetMonth) => {
         try {
-            await Promise.all(ids.map(id => {
-                const ref = doc(db, 'users', userId, 'expenses', id);
-                return updateDoc(ref, {
-                    reportMonth: targetMonth,
-                    movedAt: new Date(),
-                    movedFrom: selectedMonth
-                });
-            }));
-            setSuccessMessage(t('analytics.movedMonthSuccess', { count: ids.length, month: formatMonth(targetMonth) }));
+            const res = await call();
+            if (res.blockedShared?.length) setErrorMessage(t('analytics.changeDate.sharedBlocked', { count: res.blockedShared.length }));
+            else if (res.updated?.length) setSuccessMessage(t('analytics.changeDate.success', { count: res.updated.length }));
             setSelectedIds([]);
         } catch (e) {
-            console.error("Move month failed", e);
-            setErrorMessage(t('analytics.moveMonthFailed'));
+            console.error("Date change failed", e);
+            setErrorMessage(e?.message || t('analytics.changeDate.failed'));
         }
     };
+
+    const handleChangeDate = (ids, date) => runDateChange(() => expensesApi.changeDate(ids, date));
+    const handleFixMismatch = (ids) => runDateChange(() => expensesApi.fixMonthMismatch(ids));
 
     const handleRemoveNote = async (ids) => {
         if (!ids.length) return;
@@ -514,6 +517,9 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
                     onMarkSuspect={handleMarkSuspect}
                     onClearSuspect={handleClearSuspect}
                     onMoveMonth={handleMoveMonth}
+                    onChangeDate={handleChangeDate}
+                    onFixMismatch={handleFixMismatch}
+                    formatMonth={formatMonth}
                     onRemoveNote={handleRemoveNote}
                     onUpdateIncome={handleUpdateIncome}
                     setSelectedIds={setSelectedIds}

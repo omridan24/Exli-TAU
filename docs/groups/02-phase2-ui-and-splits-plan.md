@@ -182,7 +182,7 @@ Exli already knows each member's income (from the Income feature); no other spli
 
 **How the ratio is computed:**
 1. Every `users/{uid}/income` document has a `month` field (`"YYYY-MM"`) and a `neto` (net) amount (confirmed in `OneTimeIncomeForm.jsx` / `RecurringIncomeForm.jsx`). A member can have several income docs in one month (multiple jobs); their month's net income is the **sum of `neto`** across all of that month's docs.
-2. **Which month?** The calendar month **before** the expense's date (the user's own phrasing: "last month['s] income"). An expense dated 2026-10-05 uses each participant's **2026-09** net income. This is what makes it "adapt per month" automatically: as soon as a new calendar month starts, expenses added in it roll onto the now-completed prior month's figures, with zero admin action.
+2. **Which month?** The **same** calendar month as the expense's date (changed from the original "last month's income" rule). An expense dated 2026-10-05 uses each participant's **2026-10** net income; a January expense uses that year's January income. This is what makes it "adapt per month" automatically, with zero admin action. If the month's income isn't entered yet, the group default falls back to an equal split (flagged `incomeFallback`) until it is.
 3. **Shares** = `amount × netIncome[uid] / Σ netIncome` over the expense's participants, using the same largest-remainder rounding as every other kind (§3.4).
 4. **If anyone required is missing that month's income**, the rule can't be used for that expense yet. The picker shows it as *"💼 Split by Income — waiting on Dana's September income"* instead of letting it be picked, rather than silently guessing or falling back to equal.
 

@@ -174,8 +174,8 @@ class TestCreateExpense:
             svc.create_expense(db, OWNER, gid, **basic_kwargs(split_input=split_input))
 
     def test_income_ratio_split_ready(self, db):
-        db.collection("users").document(OWNER).collection("income").add({"month": "2026-09", "neto": 15000})
-        db.collection("users").document(MEMBER).collection("income").add({"month": "2026-09", "neto": 5000})
+        db.collection("users").document(OWNER).collection("income").add({"month": "2026-10", "neto": 15000})
+        db.collection("users").document(MEMBER).collection("income").add({"month": "2026-10", "neto": 5000})
         gid = seed_group(db, splitRules=[equal_rule(), income_rule()])
 
         expense_id = svc.create_expense(
@@ -186,8 +186,8 @@ class TestCreateExpense:
         assert expense["split"]["resolvedRatios"] == {OWNER: 75, MEMBER: 25}
 
     def test_income_ratio_not_ready_blocks_expense(self, db):
-        db.collection("users").document(OWNER).collection("income").add({"month": "2026-09", "neto": 15000})
-        # MEMBER never filled in September income
+        db.collection("users").document(OWNER).collection("income").add({"month": "2026-10", "neto": 15000})
+        # MEMBER never filled in October income
         gid = seed_group(db, splitRules=[equal_rule(), income_rule()])
 
         with pytest.raises(groups_svc.ConflictError) as exc_info:
@@ -485,17 +485,33 @@ class TestIncomeDefaultResolvesPerExpenseMonth:
                           defaultSplitConfigured=True, **extra)
 
     def test_each_expense_uses_its_own_month_ratio(self, db):
-        seed_income(db, OWNER, "2026-08", 15000); seed_income(db, MEMBER, "2026-08", 5000)   # 75/25 -> used by Sept
-        seed_income(db, OWNER, "2026-09", 16000); seed_income(db, MEMBER, "2026-09", 4000)   # 80/20 -> used by Oct
+        seed_income(db, OWNER, "2026-09", 15000); seed_income(db, MEMBER, "2026-09", 5000)   # 75/25 -> used by Sept
+        seed_income(db, OWNER, "2026-10", 16000); seed_income(db, MEMBER, "2026-10", 4000)   # 80/20 -> used by Oct
         gid = self._group(db)
 
         sept = svc.create_expense(db, OWNER, gid, **basic_kwargs(date_str="2026-09-10", split_input={"useDefault": True}))
         octo = svc.create_expense(db, OWNER, gid, **basic_kwargs(date_str="2026-10-10", split_input=None))
 
         assert expense_dict(db, gid, sept)["shares"] == {OWNER: 7500, MEMBER: 2500}
-        assert expense_dict(db, gid, sept)["split"]["params"]["incomeMonth"] == "2026-08"
+        assert expense_dict(db, gid, sept)["split"]["params"]["incomeMonth"] == "2026-09"
         assert expense_dict(db, gid, octo)["shares"] == {OWNER: 8000, MEMBER: 2000}
+        assert expense_dict(db, gid, octo)["split"]["params"]["incomeMonth"] == "2026-10"
         assert expense_dict(db, gid, octo)["split"]["resolvedRatios"] == {OWNER: 80, MEMBER: 20}
+
+    def test_january_expense_uses_same_year_january_income(self, db):
+        seed_income(db, OWNER, "2025-12", 15000); seed_income(db, MEMBER, "2025-12", 5000)   # would be 75/25
+        seed_income(db, OWNER, "2026-01", 16000); seed_income(db, MEMBER, "2026-01", 4000)   # 80/20
+        gid = self._group(db)
+        jan = svc.create_expense(db, OWNER, gid, **basic_kwargs(date_str="2026-01-10", split_input=None))
+        assert expense_dict(db, gid, jan)["shares"] == {OWNER: 8000, MEMBER: 2000}
+        assert expense_dict(db, gid, jan)["split"]["params"]["incomeMonth"] == "2026-01"
+
+    def test_previous_month_income_only_falls_back_for_the_default(self, db):
+        seed_income(db, OWNER, "2026-09", 15000); seed_income(db, MEMBER, "2026-09", 5000)
+        gid = self._group(db)  # no October income yet
+        octo = svc.create_expense(db, OWNER, gid, **basic_kwargs(date_str="2026-10-10", split_input=None))
+        assert expense_dict(db, gid, octo)["shares"] == {OWNER: 5000, MEMBER: 5000}
+        assert expense_dict(db, gid, octo)["split"]["params"]["incomeFallback"] is True
 
     def test_missing_income_falls_back_to_equal_for_the_default(self, db):
         gid = self._group(db)  # nobody has income data
@@ -503,7 +519,7 @@ class TestIncomeDefaultResolvesPerExpenseMonth:
         expense = expense_dict(db, gid, expense_id)
         assert expense["shares"] == {OWNER: 5000, MEMBER: 5000}
         assert expense["split"]["params"]["incomeFallback"] is True
-        assert expense["split"]["params"]["incomeMonth"] == "2026-09"
+        assert expense["split"]["params"]["incomeMonth"] == "2026-10"
 
     def test_picking_the_income_rule_by_hand_still_blocks_when_missing(self, db):
         gid = self._group(db)
@@ -511,8 +527,8 @@ class TestIncomeDefaultResolvesPerExpenseMonth:
             svc.create_expense(db, OWNER, gid, **basic_kwargs(date_str="2026-10-10", split_input={"splitRuleId": "income"}))
 
     def test_transfer_from_analytics_uses_the_expense_month(self, db):
-        seed_income(db, OWNER, "2026-08", 15000); seed_income(db, MEMBER, "2026-08", 5000)
-        seed_income(db, OWNER, "2026-09", 16000); seed_income(db, MEMBER, "2026-09", 4000)
+        seed_income(db, OWNER, "2026-09", 15000); seed_income(db, MEMBER, "2026-09", 5000)
+        seed_income(db, OWNER, "2026-10", 16000); seed_income(db, MEMBER, "2026-10", 4000)
         gid = self._group(db)
         p_sept = seed_personal_expense(db, OWNER, "p1", amount=100.0, date="2026-09-03")
         p_oct = seed_personal_expense(db, OWNER, "p2", amount=100.0, date="2026-10-03")
@@ -526,8 +542,8 @@ class TestApplyDefaultSplitToExisting:
         return svc.create_expense(db, OWNER, gid, **basic_kwargs(date_str=date, amount_minor=amount, split_input={"splitRuleId": "eq"}, **kw))
 
     def test_converts_all_with_per_month_income_and_fixes_balances(self, db):
-        seed_income(db, OWNER, "2026-08", 15000); seed_income(db, MEMBER, "2026-08", 5000)
-        seed_income(db, OWNER, "2026-09", 16000); seed_income(db, MEMBER, "2026-09", 4000)
+        seed_income(db, OWNER, "2026-09", 15000); seed_income(db, MEMBER, "2026-09", 5000)
+        seed_income(db, OWNER, "2026-10", 16000); seed_income(db, MEMBER, "2026-10", 4000)
         gid = seed_group(db, splitRules=[equal_rule(), income_rule()])
         sept = self._seed_expense(db, gid, "2026-09-10")
         octo = self._seed_expense(db, gid, "2026-10-10")
