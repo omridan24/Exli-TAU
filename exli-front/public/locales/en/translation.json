@@ -1346,7 +1346,11 @@
             "notFound": "This group doesn't exist, or you're not a member of it.",
             "getInviteLink": "Get invite link",
             "noExpenses": "No expenses yet.",
-            "allSettledGroup": "Everyone's settled up"
+            "allSettledGroup": "Everyone's settled up",
+            "statsTab": "Other stats",
+            "totalExpenses": "Total expenses in this group: {{amount}}",
+            "searchPlaceholder": "Search by name, date or month (e.g. March, 2026-03)",
+            "noSearchResults": "No expenses match your search."
         },
         "join": {
             "askToJoin": "Ask to Join",
@@ -1394,7 +1398,9 @@
                 "days_other": "{{count}} days",
                 "update": "Update",
                 "shareMessage": "Join \"{{groupName}}\" on Exli: {{link}}"
-            }
+            },
+            "currency": "Currency",
+            "currencyHint": "Used for every amount in this group. Changing it relabels existing amounts; it does not convert them."
         },
         "transfer": {
             "selectTitle": "Move to a Group",
@@ -1408,6 +1414,52 @@
             "bulkConfirm": "Move {{count}} expenses",
             "bulkDone": "{{count}} expenses moved",
             "bulkFailed": "{{count}} couldn't be moved (already shared, or something went wrong)"
+        },
+        "split": {
+            "total": "Total {{amount}}",
+            "byIncome": "Split by income",
+            "toggle": "Show how this was split",
+            "title": "How this was split"
+        },
+        "stats": {
+            "total": "Total spent",
+            "count": "Expenses",
+            "average": "Average expense",
+            "byMonth": "By month - who paid what",
+            "paidBy": "Paid by {{name}}",
+            "shareVsPaid": "Each member's share vs paid",
+            "paidShare": "Paid {{paid}} · Share {{share}} ({{pct}}%)",
+            "byCategory": "By category",
+            "uncategorized": "Uncategorized",
+            "biggest": "Biggest expenses"
+        },
+        "defaultSplit": {
+            "title": "Default split",
+            "hint": "Preselected when adding or moving an expense into this group.",
+            "none": "No default set",
+            "fixedName": "Fixed percentages",
+            "orTypePercents": "Or type exact percentages",
+            "badge": "Group default",
+            "chooseDifferent": "Choose a different split",
+            "useDefault": "Use the group default",
+            "applyQuestion": "Convert the {{count}} existing expenses to this default too?",
+            "applyWarning": "This re-splits them and updates everyone's balances. Income-based splits use each expense's own month.",
+            "applyAll": "Apply to all {{count}}",
+            "onlyNew": "Only new expenses",
+            "applyDone": "{{count}} expenses converted.",
+            "applySkipped": "{{count}} couldn't be converted and were left as they were.",
+            "mustTotal100": "Fixed percentages must add up to 100%.",
+            "applyUnavailable": "The server doesn't support this yet (405). The backend needs to be redeployed with the latest version."
+        },
+        "incomeSplit": {
+            "title": "Income split by month",
+            "explainer": "Each expense is split by the income ratio of its own month, based on the income entered the month before.",
+            "basedOn": "based on {{month}} income",
+            "monthFallback": "no income data yet - split equally",
+            "rowLabel": "Income split for {{month}}",
+            "rowFallback": "No income data for {{month}} - split equally",
+            "pickerResolved": "Income split for {{month}} (based on {{incomeMonth}} income)",
+            "perMonthHint": "Each expense will use the income split of its own month."
         }
     }
 }

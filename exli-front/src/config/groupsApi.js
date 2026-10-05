@@ -68,6 +68,10 @@ export const groupsApi = {
 
   setSplitRules: (groupId, rules, defaultSplitRuleId) =>
     authedFetch(`/groups/${groupId}/split-rules`, { method: 'PUT', body: json({ rules, defaultSplitRuleId }) }),
+  getIncomeRatioMonths: (groupId, months) =>
+    authedFetch(`/groups/${groupId}/income-ratios?months=${months.join(',')}`),
+  applyDefaultSplit: (groupId) =>
+    authedFetch(`/groups/${groupId}/expenses/apply-default-split`, { method: 'POST' }),
   getIncomeRatioPreview: (groupId, date) =>
     authedFetch(`/groups/${groupId}/income-ratio${date ? `?date=${date}` : ''}`),
 
@@ -76,9 +80,9 @@ export const groupsApi = {
     authedFetch(`/groups/${groupId}/expenses/from-personal`, {
       method: 'POST', body: json({ personalExpenseId, split: splitInput }),
     }),
-  transferPersonalExpensesBatch: (groupId, personalExpenseIds, splitRuleId) =>
+  transferPersonalExpensesBatch: (groupId, personalExpenseIds, splitRuleId, useDefault = false) =>
     authedFetch(`/groups/${groupId}/expenses/from-personal/batch`, {
-      method: 'POST', body: json({ personalExpenseIds, splitRuleId }),
+      method: 'POST', body: json({ personalExpenseIds, splitRuleId, useDefault }),
     }),
   removePersonalExpenseFromGroup: (groupId, personalExpenseId) =>
     authedFetch(`/groups/${groupId}/expenses/from-personal/${personalExpenseId}`, { method: 'DELETE' }),

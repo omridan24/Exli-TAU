@@ -293,6 +293,105 @@ class TestUpdateGroup:
         assert db.collection("groups").document(gid).get().to_dict()["defaultSplitRuleId"] == "love_but_i_pay"
 
 
+class TestGroupCurrency:
+    def test_currency_updates_and_is_normalized(self, db):
+        gid = seed_group(db)
+        svc.update_group(db, OWNER, gid, {"currency": "usd"})
+        assert db.collection("groups").document(gid).get().to_dict()["currency"] == "USD"
+
+    def test_empty_currency_defaults_to_ils(self, db):
+        gid = seed_group(db, currency="USD")
+        svc.update_group(db, OWNER, gid, {"currency": None})
+        assert db.collection("groups").document(gid).get().to_dict()["currency"] == "ILS"
+
+    def test_unknown_currency_rejected(self, db):
+        gid = seed_group(db)
+        with pytest.raises(svc.ValidationError):
+            svc.update_group(db, OWNER, gid, {"currency": "ZZZ"})
+
+    def test_only_admin_can_change_currency(self, db):
+        gid = seed_group(db, members={OWNER: make_member(role="admin"), MEMBER: make_member()}, memberIds=[OWNER, MEMBER])
+        with pytest.raises(svc.ForbiddenError):
+            svc.update_group(db, MEMBER, gid, {"currency": "EUR"})
+
+    def test_new_groups_default_to_ils(self, db):
+        gid = svc.create_group(db, OWNER, user_info(OWNER), name="Trip")
+        assert db.collection("groups").document(gid).get().to_dict()["currency"] == "ILS"
+
+
+class TestDefaultFixedSplit:
+    def _two_member_group(self, db, **extra):
+        return seed_group(db, members={
+            OWNER: make_member(role="admin"), MEMBER: make_member(role="member"),
+        }, memberIds=[OWNER, MEMBER], **extra)
+
+    def test_sets_fixed_split_and_marks_configured(self, db):
+        gid = self._two_member_group(db)
+        svc.update_group(db, OWNER, gid, {"defaultFixedSplit": {"weights": {OWNER: 7000, MEMBER: 3000}}})
+        group = db.collection("groups").document(gid).get().to_dict()
+        assert group["defaultFixedSplit"] == {"weights": {OWNER: 7000, MEMBER: 3000}}
+        assert group["defaultSplitConfigured"] is True
+
+    def test_must_sum_to_100_percent(self, db):
+        gid = self._two_member_group(db)
+        with pytest.raises(svc.ValidationError):
+            svc.update_group(db, OWNER, gid, {"defaultFixedSplit": {"weights": {OWNER: 5000, MEMBER: 4000}}})
+
+    def test_must_cover_exactly_the_active_members(self, db):
+        gid = self._two_member_group(db)
+        with pytest.raises(svc.ValidationError):
+            svc.update_group(db, OWNER, gid, {"defaultFixedSplit": {"weights": {OWNER: 10000}}})
+        with pytest.raises(svc.ValidationError):
+            svc.update_group(db, OWNER, gid, {"defaultFixedSplit": {"weights": {OWNER: 5000, MEMBER: 4000, STRANGER: 1000}}})
+
+    def test_rejects_negative_or_non_integer_weights(self, db):
+        gid = self._two_member_group(db)
+        with pytest.raises(svc.ValidationError):
+            svc.update_group(db, OWNER, gid, {"defaultFixedSplit": {"weights": {OWNER: 11000, MEMBER: -1000}}})
+        with pytest.raises(svc.ValidationError):
+            svc.update_group(db, OWNER, gid, {"defaultFixedSplit": {"weights": {OWNER: 50.5, MEMBER: 49.5}}})
+
+    def test_only_admin_can_set(self, db):
+        gid = self._two_member_group(db)
+        with pytest.raises(svc.ForbiddenError):
+            svc.update_group(db, MEMBER, gid, {"defaultFixedSplit": {"weights": {OWNER: 5000, MEMBER: 5000}}})
+
+    def test_choosing_a_rule_clears_the_fixed_split(self, db):
+        gid = self._two_member_group(db, defaultFixedSplit={"weights": {OWNER: 5000, MEMBER: 5000}})
+        svc.update_group(db, OWNER, gid, {"defaultSplitRuleId": "eq"})
+        group = db.collection("groups").document(gid).get().to_dict()
+        assert group["defaultFixedSplit"] is None
+        assert group["defaultSplitConfigured"] is True
+
+    def test_null_clears_the_fixed_split(self, db):
+        gid = self._two_member_group(db, defaultFixedSplit={"weights": {OWNER: 5000, MEMBER: 5000}})
+        svc.update_group(db, OWNER, gid, {"defaultFixedSplit": None})
+        assert db.collection("groups").document(gid).get().to_dict()["defaultFixedSplit"] is None
+
+    def test_removing_a_member_clears_the_stale_fixed_split(self, db):
+        gid = self._two_member_group(db, defaultFixedSplit={"weights": {OWNER: 5000, MEMBER: 5000}})
+        group_ref = db.collection("groups").document(gid)
+        svc._remove_member_txn.to_wrap(db.transaction(), group_ref, OWNER, MEMBER, False)
+        assert db.collection("groups").document(gid).get().to_dict()["defaultFixedSplit"] is None
+
+
+class TestIncomeRatioMonths:
+    def test_returns_one_breakdown_per_expense_month(self, db):
+        db.collection("users").document(OWNER).collection("income").add({"month": "2026-08", "neto": 15000})
+        gid = seed_group(db)
+        result = svc.get_income_ratio_months(db, OWNER, gid, ["2026-09", "2026-10", "2026-09"])
+        assert [r["forMonth"] for r in result] == ["2026-09", "2026-10"]
+        assert result[0]["month"] == "2026-08" and result[0]["ready"] is True
+        assert result[1]["month"] == "2026-09" and result[1]["ready"] is False
+
+    def test_non_member_forbidden_and_bad_month_rejected(self, db):
+        gid = seed_group(db)
+        with pytest.raises(svc.ForbiddenError):
+            svc.get_income_ratio_months(db, STRANGER, gid, ["2026-09"])
+        with pytest.raises(svc.ValidationError):
+            svc.get_income_ratio_months(db, OWNER, gid, ["nope"])
+
+
 class TestSetSplitRules:
     def test_admin_can_replace_rules(self, db):
         gid = seed_group(db)

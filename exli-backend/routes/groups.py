@@ -126,6 +126,18 @@ def set_split_rules(group_id):
     return _handled(run)
 
 
+@groups_bp.route("/groups/<group_id>/income-ratios", methods=["GET"])
+@require_auth
+@require_whitelisted
+def income_ratio_months(group_id):
+    months = [m for m in (request.args.get("months") or "").split(",") if m]
+
+    def run():
+        return jsonify({"months": svc.get_income_ratio_months(_db(), g.uid, group_id, months)})
+
+    return _handled(run)
+
+
 @groups_bp.route("/groups/<group_id>/income-ratio", methods=["GET"])
 @require_auth
 @require_whitelisted
@@ -291,6 +303,16 @@ def create_expense(group_id):
     return _handled(run)
 
 
+@groups_bp.route("/groups/<group_id>/expenses/apply-default-split", methods=["POST"])
+@require_auth
+@require_whitelisted
+def apply_default_split(group_id):
+    def run():
+        return jsonify(expenses_svc.apply_default_split_to_existing(_db(), g.uid, group_id))
+
+    return _handled(run)
+
+
 @groups_bp.route("/groups/<group_id>/expenses/from-personal", methods=["POST"])
 @require_auth
 @require_whitelisted
@@ -314,7 +336,8 @@ def transfer_personal_expenses_batch(group_id):
 
     def run():
         result = expenses_svc.transfer_personal_expenses_batch(
-            _db(), g.uid, group_id, data.get("personalExpenseIds") or [], data.get("splitRuleId")
+            _db(), g.uid, group_id, data.get("personalExpenseIds") or [], data.get("splitRuleId"),
+            use_default=bool(data.get("useDefault")),
         )
         return jsonify(result)
 

@@ -3,10 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { Bucket } from '../../../../components/buckets/Bucket';
 import { useBucketAllocation } from '../../../../hooks/useBucketAllocation';
 import { formatMinorAmount, toMinorUnits } from '../../utils/money';
+import { formatPercent } from '../../utils/expenseSplit';
 
 /** The always-available custom uneven split — never a stored rule (plan §3.1/§4.3). */
-export const PourItYourself = ({ participants, amountMinor, currency, onChange, initialAmounts }) => {
+/** `percentMode`: amountMinor is 10000 (= 100%), so each value is hundredths of a percent and shown as a percentage. */
+export const PourItYourself = ({ participants, amountMinor, currency, onChange, initialAmounts, percentMode = false }) => {
   const { t } = useTranslation();
+  const fmt = (v) => (percentMode ? formatPercent(v / 100) : formatMinorAmount(v, currency));
   const ids = useMemo(() => participants.map((p) => p.uid), [participants]);
   const idsKey = ids.join(',');
 
@@ -36,19 +39,22 @@ export const PourItYourself = ({ participants, amountMinor, currency, onChange, 
             isLocked={locks[p.uid]}
             onChange={(v) => setValue(p.uid, v)}
             onToggleLock={() => toggleLock(p.uid)}
-            formatValue={(v) => formatMinorAmount(v, currency)}
+            formatValue={fmt}
           />
         ))}
       </div>
       <p className={`text-center text-xs font-bold ${sum === amountMinor ? 'text-emerald-600' : 'text-rose-500'}`}>
-        {formatMinorAmount(sum, currency)} / {formatMinorAmount(amountMinor, currency)}
+        {fmt(sum)} / {fmt(amountMinor)}
       </p>
 
       <div className="space-y-1.5 pt-1">
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{t('groups.splitPicker.orTypeAmounts')}</p>
+        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{percentMode ? t('groups.defaultSplit.orTypePercents') : t('groups.splitPicker.orTypeAmounts')}</p>
         {participants.map((p) => (
           <div key={p.uid} className="flex items-center gap-2">
             <span className="flex-1 text-sm font-medium text-slate-600 truncate">{p.displayName}</span>
+            <span className="text-xs font-bold text-slate-400 w-12 text-end">
+              {formatPercent(amountMinor > 0 ? ((values[p.uid] || 0) / amountMinor) * 100 : 0)}
+            </span>
             <input
               type="number" min="0" step="0.01" inputMode="decimal"
               disabled={locks[p.uid]}

@@ -3,9 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { Check } from 'lucide-react';
 import { splitRuleName, splitRuleEmoji, splitRuleDescription } from '../../utils/splitCatalog';
 import { formatMinorAmount } from '../../utils/money';
+import { formatPercent } from '../../utils/expenseSplit';
 
 export const RuleRow = ({ rule, shares, members, currency, isSelected, isDisabled, disabledReason, onSelect }) => {
   const { t } = useTranslation();
+  const totalShares = shares ? Object.values(shares).reduce((a, b) => a + b, 0) : 0;
 
   return (
     <button
@@ -28,7 +30,7 @@ export const RuleRow = ({ rule, shares, members, currency, isSelected, isDisable
       ) : shares ? (
         <p className="text-xs text-slate-500 mt-1 truncate">
           {Object.entries(shares).map(([uid, amount], i) => (
-            <span key={uid}>{i > 0 && ' · '}{members?.[uid] || uid} {formatMinorAmount(amount, currency)}</span>
+            <span key={uid}>{i > 0 && ' · '}{members?.[uid] || uid} {formatMinorAmount(amount, currency)}{totalShares > 0 && ` (${formatPercent((amount / totalShares) * 100)})`}</span>
           ))}
         </p>
       ) : null}

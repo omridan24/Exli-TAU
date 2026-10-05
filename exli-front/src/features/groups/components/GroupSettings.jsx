@@ -1,19 +1,30 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { X, Camera, Loader2, Shield, UserMinus } from 'lucide-react';
 import { groupsApi } from '../../../config/groupsApi';
+import { DefaultSplitSettings } from './DefaultSplitSettings';
+import { initialDefaultChoice, FIXED, TOTAL_BP } from '../utils/defaultSplit';
+import { CURRENCIES } from '../../../config/constants';
 import { GROUP_TYPES, GROUP_TYPE_COLOR_CLASSES } from '../utils/groupTypes';
 
-/** Admin panel: edit details/picture/type, manage members, delete the group. Inviting
+/** Admin panel: edit details/picture/currency/type/default split, manage members, delete the group.
+ * ONE Save button (in the always-visible header) saves everything and closes. Inviting
  * new people lives on the main group page instead (see InviteModal) — this stays
  * for editing/removing people already in the group. */
-export const GroupSettings = ({ group, userId, onClose, onDeleted }) => {
+export const GroupSettings = ({ group, userId, expenseCount = 0, expenseMonths = [], onClose, onDeleted }) => {
   const { t } = useTranslation();
   const [name, setName] = useState(group.name || '');
   const [description, setDescription] = useState(group.description || '');
   const [type, setType] = useState(group.type || 'other');
   const [imagePreview, setImagePreview] = useState(group.imageUrl || null);
   const [imageFile, setImageFile] = useState(null);
+  const [currency, setCurrency] = useState(group.currency || 'ILS');
+  const [defaultChoice, setDefaultChoice] = useState(() => initialDefaultChoice(group));
+  const [fixedWeights, setFixedWeights] = useState(group.defaultFixedSplit?.weights || null);
+  const [confirmingApply, setConfirmingApply] = useState(false); // after saving a changed default: convert existing expenses?
+  const [applying, setApplying] = useState(false);
+  const [applyResult, setApplyResult] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -29,18 +40,53 @@ export const GroupSettings = ({ group, userId, onClose, onDeleted }) => {
     setImagePreview(URL.createObjectURL(file));
   };
 
-  const handleSaveDetails = async () => {
+  const initialChoice = initialDefaultChoice(group);
+  const fixedSum = fixedWeights ? Object.values(fixedWeights).reduce((x, y) => x + y, 0) : 0;
+  const defaultChanged = !!defaultChoice && (
+    defaultChoice !== initialChoice
+    || (defaultChoice === FIXED && JSON.stringify(fixedWeights) !== JSON.stringify(group.defaultFixedSplit?.weights))
+  );
+  const currencyOptions = CURRENCIES.includes(currency) ? CURRENCIES : [currency, ...CURRENCIES];
+
+  // The one Save: details + currency + type, then the default split (if changed), then the image.
+  const handleSave = async () => {
     if (!name.trim()) return;
+    if (defaultChoice === FIXED && fixedSum !== TOTAL_BP) {
+      setError(t('groups.defaultSplit.mustTotal100'));
+      return;
+    }
     setSaving(true);
     setError('');
     try {
-      await groupsApi.updateGroup(group.id, { name: name.trim(), description: description.trim() || null, type });
+      await groupsApi.updateGroup(group.id, { name: name.trim(), description: description.trim() || null, type, currency });
+      if (defaultChanged) {
+        await groupsApi.updateGroup(
+          group.id,
+          defaultChoice === FIXED ? { defaultFixedSplit: { weights: fixedWeights } } : { defaultSplitRuleId: defaultChoice }
+        );
+      }
       if (imageFile) await groupsApi.uploadImage(group.id, imageFile);
-      onClose();
+      if (defaultChanged && expenseCount > 0) {
+        setConfirmingApply(true); // close only after they choose "apply to all" or "only new"
+      } else {
+        onClose();
+      }
     } catch (err) {
       setError(err.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleApplyAll = async () => {
+    setApplying(true);
+    setError('');
+    try {
+      setApplyResult(await groupsApi.applyDefaultSplit(group.id));
+    } catch (err) {
+      setError(err.status === 405 ? t('groups.defaultSplit.applyUnavailable') : err.message);
+    } finally {
+      setApplying(false);
     }
   };
 
@@ -65,14 +111,58 @@ export const GroupSettings = ({ group, userId, onClose, onDeleted }) => {
 
   return (
     <>
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[120] flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 my-8">
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-          <h2 className="font-bold text-slate-800 text-lg">{t('groups.settings.title')}</h2>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 rounded-full"><X className="w-5 h-5" /></button>
+    {createPortal(
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[120] flex items-center justify-center p-4">
+      {/* The card is capped at the viewport height and only its body scrolls, so the header
+          (title, Save, X) can never be pushed off-screen. Before this, a tall card inside a
+          centered, scrollable overlay overflowed upward past the top edge, where it
+          can't be scrolled to - that is why the X wasn't visible. */}
+      <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+        <div className="p-4 border-b border-slate-100 flex items-center justify-between gap-3 shrink-0 bg-white">
+          <h2 className="font-bold text-slate-800 text-lg ps-2">{t('groups.settings.title')}</h2>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleSave} disabled={saving || confirmingApply || !name.trim()}
+              className="px-5 py-2 rounded-xl bg-slate-900 text-white font-bold text-sm flex items-center gap-2 disabled:opacity-40"
+            >
+              {saving && <Loader2 className="w-4 h-4 animate-spin" />} {t('common.save')}
+            </button>
+            <button onClick={onClose} aria-label={t('common.close')} className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-full"><X className="w-5 h-5" /></button>
+          </div>
         </div>
 
-        <div className="p-6 space-y-5">
+        <div className="p-6 space-y-5 overflow-y-auto">
+          {error && <p className="text-xs text-rose-500 font-medium">{error}</p>}
+
+          {confirmingApply && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-3">
+              {applyResult ? (
+                <>
+                  <p className="text-sm text-emerald-700 font-medium">
+                    {t('groups.defaultSplit.applyDone', { count: applyResult.converted })}
+                    {applyResult.skipped.length > 0 && ` ${t('groups.defaultSplit.applySkipped', { count: applyResult.skipped.length })}`}
+                  </p>
+                  <button type="button" onClick={onClose} className="w-full py-2.5 rounded-xl bg-slate-900 text-white font-bold text-sm">{t('common.close')}</button>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-slate-700 font-medium">{t('groups.defaultSplit.applyQuestion', { count: expenseCount })}</p>
+                  <p className="text-xs text-slate-500">{t('groups.defaultSplit.applyWarning')}</p>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={onClose} disabled={applying}
+                      className="flex-1 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-600 font-bold text-sm">
+                      {t('groups.defaultSplit.onlyNew')}
+                    </button>
+                    <button type="button" onClick={handleApplyAll} disabled={applying}
+                      className="flex-1 py-2.5 rounded-xl bg-slate-900 text-white font-bold text-sm flex items-center justify-center gap-2">
+                      {applying && <Loader2 className="w-4 h-4 animate-spin" />} {t('groups.defaultSplit.applyAll', { count: expenseCount })}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
           {/* Details */}
           <div className="flex items-center gap-4">
             <label className="w-16 h-16 rounded-2xl bg-slate-50 border-2 border-dashed border-slate-200 flex items-center justify-center cursor-pointer overflow-hidden shrink-0 hover:border-indigo-300">
@@ -91,6 +181,17 @@ export const GroupSettings = ({ group, userId, onClose, onDeleted }) => {
             placeholder={t('groups.create.descriptionPlaceholder')}
             className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none focus:border-indigo-500 resize-none"
           />
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">{t('groups.settings.currency')}</label>
+            <select
+              value={currency} onChange={(e) => setCurrency(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-medium"
+            >
+              {currencyOptions.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <p className="text-xs text-slate-400 mt-1">{t('groups.settings.currencyHint')}</p>
+          </div>
 
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">{t('groups.create.typeStepTitle')}</label>
@@ -116,10 +217,10 @@ export const GroupSettings = ({ group, userId, onClose, onDeleted }) => {
             </div>
           </div>
 
-          {error && <p className="text-xs text-rose-500 font-medium">{error}</p>}
-          <button onClick={handleSaveDetails} disabled={saving} className="w-full py-3 rounded-xl bg-slate-900 text-white font-bold flex items-center justify-center gap-2">
-            {saving && <Loader2 className="w-4 h-4 animate-spin" />} {t('common.save')}
-          </button>
+          <DefaultSplitSettings
+            group={{ ...group, currency }} choice={defaultChoice} weights={fixedWeights}
+            onChoice={setDefaultChoice} onWeights={setFixedWeights} expenseMonths={expenseMonths}
+          />
 
           {/* Members */}
           <div className="border-t border-slate-100 pt-4">
@@ -179,7 +280,9 @@ export const GroupSettings = ({ group, userId, onClose, onDeleted }) => {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
+    )}
 
     {removingMember && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[130] p-4">

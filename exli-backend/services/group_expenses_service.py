@@ -16,6 +16,7 @@ from config import logger
 from services.groups_service import (
     get_group_or_404,
     active_role,
+    ensure_permission,
     log_activity,
     GroupServiceError,
     ValidationError,
@@ -29,6 +30,7 @@ from services.split_engine import compute_shares, SplitError
 MAX_DESCRIPTION_LEN = 140
 MAX_NOTE_LEN = 500
 MAX_BATCH_TRANSFER = 100
+CONVERT_CHUNK_SIZE = 200  # expenses per Firestore batch: <= 2 writes each + 1 group update, well under the 500 cap
 
 
 # ---------------------------------------------------------------------------
@@ -90,6 +92,15 @@ def _resolve_split(db, group, expense_date, split_input, participants):
 
     Returns (split_rule_id_or_None, kind, params, resolved_ratios_or_None).
     """
+    from_default = bool(split_input.get("useDefault"))
+    if from_default:
+        fixed = group.get("defaultFixedSplit")
+        if fixed and fixed.get("weights"):
+            # Constant percentages. Persisted like any other split: the per-expense
+            # `shares` are the source of truth, `params.weights` the percentages applied.
+            return None, "percent", {"weights": dict(fixed["weights"]), "fromGroupDefault": True}, None
+        split_input = {"splitRuleId": group.get("defaultSplitRuleId")}
+
     split_rule_id = split_input.get("splitRuleId")
 
     if split_rule_id:
@@ -115,6 +126,11 @@ def _resolve_split(db, group, expense_date, split_input, participants):
         if kind == "income_ratio":
             # Re-derived fresh every time (plan §3.7) — never trust a cached ratio.
             ratio_result = income_ratio_service.get_income_ratios(db, group, expense_date)
+            if not ratio_result["ready"] and from_default:
+                # Graceful fallback for the group DEFAULT only: this month has no complete
+                # income data, so split equally and say so (split.params.incomeFallback).
+                # Picking the income rule by hand still blocks with INCOME_NOT_READY, as before.
+                return split_rule_id, "equal", {"incomeFallback": True, "incomeMonth": ratio_result["month"]}, None
             if not ratio_result["ready"]:
                 members = group.get("members") or {}
                 missing_names = ", ".join(
@@ -125,7 +141,9 @@ def _resolve_split(db, group, expense_date, split_input, participants):
                     f"{ratio_result['month']} income.",
                     code="INCOME_NOT_READY",
                 )
-            params = {"weights": ratio_result["ratios"]}
+            # incomeMonth: the month whose income produced these ratios (per expense, see
+            # income_ratio_service.previous_month_key) so the UI can label it.
+            params = {"weights": ratio_result["ratios"], "incomeMonth": ratio_result["month"]}
             resolved_ratios = ratio_result["ratios"]  # snapshot the RATIO only, never raw income (Debate Q)
 
         return split_rule_id, kind, params, resolved_ratios
@@ -162,7 +180,7 @@ def _validate_and_resolve(db, group, *, description, amount_minor, date_str, cat
         raise ValidationError("All participants must be active members of this group.")
 
     split_rule_id, kind, params, resolved_ratios = _resolve_split(
-        db, group, expense_date, split_input or {"splitRuleId": group.get("defaultSplitRuleId")}, participants
+        db, group, expense_date, split_input or {"useDefault": True}, participants
     )
 
     try:
@@ -179,7 +197,7 @@ def _validate_and_resolve(db, group, *, description, amount_minor, date_str, cat
         "category": category,
         "date": date_str,
         "amountMinor": amount_minor,
-        "currency": group.get("currency", "ILS"),
+        "currency": group.get("currency") or "ILS",
         "paidBy": payer_id,
         "participants": participants,
         "split": {
@@ -450,7 +468,7 @@ def transfer_personal_expense(db, uid, group_id, personal_expense_id, split_inpu
     return {"expenseId": expense_ref.id, "myShareMinor": my_share_minor}
 
 
-def transfer_personal_expenses_batch(db, uid, group_id, personal_expense_ids, split_rule_id):
+def transfer_personal_expenses_batch(db, uid, group_id, personal_expense_ids, split_rule_id, use_default=False):
     """
     Bulk 'move to group' from the Expenses report's multi-select bar: applies ONE
     chosen split rule across several personal expenses at once, so a
@@ -466,7 +484,7 @@ def transfer_personal_expenses_batch(db, uid, group_id, personal_expense_ids, sp
     """
     if not personal_expense_ids:
         raise ValidationError("personalExpenseIds is required.")
-    if not split_rule_id:
+    if not split_rule_id and not use_default:
         raise ValidationError("splitRuleId is required for a bulk move.")
     if len(personal_expense_ids) > MAX_BATCH_TRANSFER:
         raise ValidationError(f"You can move at most {MAX_BATCH_TRANSFER} expenses at once.")
@@ -474,12 +492,89 @@ def transfer_personal_expenses_batch(db, uid, group_id, personal_expense_ids, sp
     results = []
     for personal_expense_id in personal_expense_ids:
         try:
-            result = transfer_personal_expense(db, uid, group_id, personal_expense_id, {"splitRuleId": split_rule_id})
+            split_input = {"useDefault": True} if use_default else {"splitRuleId": split_rule_id}
+            result = transfer_personal_expense(db, uid, group_id, personal_expense_id, split_input)
             results.append({"personalExpenseId": personal_expense_id, "status": "ok", **result})
         except GroupServiceError as e:
             results.append({"personalExpenseId": personal_expense_id, "status": "error", "error": e.message, "code": e.code})
 
     return {"results": results}
+
+
+def apply_default_split_to_existing(db, uid, group_id):
+    """
+    Admin bulk operation: re-split EVERY existing (non-deleted) expense with the group's
+    current default split. Income-based defaults resolve per expense, from that expense's
+    own date, exactly like a newly added one. Balances are corrected by the per-member
+    delta (new shares - old shares), so the zero-sum invariant holds. Personal expenses
+    that were moved into the group get their reduced `amount` (the payer's share)
+    refreshed too.
+
+    Writes are chunked (CONVERT_CHUNK_SIZE expenses per Firestore batch); each chunk
+    adjusts balances with atomic Increments, so a chunk is all-or-nothing and a retry
+    only re-converts what's still different. Expenses that can't be re-split (e.g. Your
+    Treat with more than two people) are skipped and reported, not failed.
+    """
+    snap = get_group_or_404(db, group_id)
+    group = snap.to_dict()
+    ensure_permission(group, uid, "group.update")
+    if not group.get("defaultSplitConfigured"):
+        raise ValidationError("This group has no default split set.")
+
+    group_ref = snap.reference
+    expenses = [d for d in group_ref.collection("expenses").stream() if not (d.to_dict() or {}).get("deleted")]
+
+    planned = []
+    unchanged = 0
+    skipped = []
+    for doc in expenses:
+        e = doc.to_dict()
+        try:
+            participants = list(e.get("participants") or [])
+            split_rule_id, kind, params, resolved = _resolve_split(
+                db, group, _parse_date(e.get("date")), {"useDefault": True}, participants
+            )
+            new_shares = compute_shares(e["amountMinor"], kind, participants, e["paidBy"], params)
+        except (GroupServiceError, SplitError) as err:
+            skipped.append({"expenseId": doc.id, "error": getattr(err, "message", str(err))})
+            continue
+
+        new_split = {"splitRuleId": split_rule_id, "kind": kind, "params": params, "resolvedRatios": resolved}
+        if new_shares == e.get("shares") and new_split == e.get("split"):
+            unchanged += 1
+            continue
+        planned.append((doc, e, new_split, new_shares))
+
+    for start in range(0, len(planned), CONVERT_CHUNK_SIZE):
+        chunk = planned[start:start + CONVERT_CHUNK_SIZE]
+        batch = db.batch()
+        chunk_deltas = {}
+        for doc, e, new_split, new_shares in chunk:
+            delta = _combine_deltas(
+                _negate(_balance_deltas(e["paidBy"], e["amountMinor"], e.get("shares") or {})),
+                _balance_deltas(e["paidBy"], e["amountMinor"], new_shares),
+            )
+            chunk_deltas = _combine_deltas(chunk_deltas, delta)
+            batch.update(doc.reference, {
+                "split": new_split, "shares": new_shares,
+                "updatedAt": firestore.SERVER_TIMESTAMP, "updatedBy": uid,
+            })
+            if e.get("source") == "personal_transfer" and e.get("sourcePersonalExpenseId") and e.get("createdBy"):
+                personal_ref = db.collection("users").document(e["createdBy"]).collection("expenses").document(
+                    e["sourcePersonalExpenseId"])
+                personal_snap = personal_ref.get()
+                if personal_snap.exists and (personal_snap.to_dict() or {}).get("groupRef"):
+                    batch.update(personal_ref, {"amount": new_shares.get(e["paidBy"], 0) / 100})
+
+        group_update = {f"balances.{m_uid}": firestore.Increment(d) for m_uid, d in chunk_deltas.items() if d}
+        group_update["updatedAt"] = firestore.SERVER_TIMESTAMP
+        batch.update(group_ref, group_update)
+        batch.commit()
+
+    log_activity(db, group_id, "EXPENSES_RESPLIT", uid, metadata={
+        "converted": len(planned), "unchanged": unchanged, "skipped": len(skipped),
+    })
+    return {"total": len(expenses), "converted": len(planned), "unchanged": unchanged, "skipped": skipped}
 
 
 @firestore.transactional

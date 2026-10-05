@@ -163,8 +163,29 @@ class FakeTransaction:
         ref.update(data)
 
 
+class FakeBatch:
+    """Applies writes immediately; counts commits and ops so tests can check chunking."""
+
+    def __init__(self, client):
+        self._client = client
+        self._ops = 0
+
+    def set(self, ref, data):
+        ref.set(data)
+        self._ops += 1
+
+    def update(self, ref, data):
+        ref.update(data)
+        self._ops += 1
+
+    def commit(self):
+        assert self._ops <= 500, "Firestore batches are limited to 500 writes"
+        self._client.batch_commits.append(self._ops)
+
+
 class FakeClient:
     def __init__(self):
+        self.batch_commits = []
         self._store = {}  # (collection_path, doc_id) -> dict | None
 
     def collection(self, name):
@@ -172,6 +193,9 @@ class FakeClient:
 
     def transaction(self):
         return FakeTransaction()
+
+    def batch(self):
+        return FakeBatch(self)
 
     def recursive_delete(self, reference):
         prefix = f"{reference._path}/{reference.id}/"

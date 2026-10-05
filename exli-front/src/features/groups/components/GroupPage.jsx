@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowRight, Plus, Settings, UserPlus } from 'lucide-react';
+import { ArrowRight, Plus, Search, Settings, UserPlus } from 'lucide-react';
 import { GroupSettings } from './GroupSettings';
 import { InviteModal } from './InviteModal';
 import { useLanguage } from '../../../hooks/useLanguage';
@@ -12,6 +12,18 @@ import { ExpenseForm } from './ExpenseForm';
 import { ExpenseListItem } from './ExpenseListItem';
 import { BalancesList } from './BalancesList';
 import { MemberBucketsView } from './MemberBucketsView';
+import { GroupStatsView } from './GroupStatsView';
+import { IncomeMonthlyBreakdown } from './IncomeMonthlyBreakdown';
+import { expenseMatchesQuery, getIncomeSplitInfo } from '../utils/expenseSplit';
+
+const monthNamesFor = (locale) =>
+  Array.from({ length: 12 }, (_, i) => {
+    try {
+      return new Date(2000, i, 1).toLocaleDateString(locale, { month: 'long' });
+    } catch {
+      return '';
+    }
+  });
 
 /**
  * A group page: header, balance summary, members, and expenses (under the
@@ -21,14 +33,27 @@ import { MemberBucketsView } from './MemberBucketsView';
  * GroupSettings (gear icon, admin only).
  */
 export const GroupPage = ({ groupId, userId, onBack }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { isRTL } = useLanguage(userId);
   const { group, expenses, joinRequests, loading, notFound } = useGroup(groupId);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'buckets'
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'buckets' | 'stats'
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Search matches month names in both the UI language and English.
+  const monthNameSets = useMemo(() => [monthNamesFor(i18n.language), monthNamesFor('en')], [i18n.language]);
+  const filteredExpenses = useMemo(
+    () => expenses.filter((e) => monthNameSets.some((names) => expenseMatchesQuery(e, searchQuery, names))),
+    [expenses, searchQuery, monthNameSets]
+  );
+  const expenseMonths = useMemo(
+    () => [...new Set(expenses.map((e) => String(e.date || '').slice(0, 7)).filter(Boolean))],
+    [expenses]
+  );
+  const totalExpensesMinor = useMemo(() => expenses.reduce((sum, e) => sum + (e.amountMinor || 0), 0), [expenses]);
 
   const isAdmin = group?.members?.[userId]?.role === 'admin';
 
@@ -51,6 +76,9 @@ export const GroupPage = ({ groupId, userId, onBack }) => {
   const groupType = getGroupType(group.type);
   const colors = GROUP_TYPE_COLOR_CLASSES[groupType.color];
   const Icon = groupType.icon;
+  const defaultRule = (group.splitRules || []).find((r) => r.id === group.defaultSplitRuleId);
+  const showIncomeBreakdown = (!group.defaultFixedSplit && group.defaultSplitConfigured && defaultRule?.kind === 'income_ratio')
+    || expenses.some((e) => getIncomeSplitInfo(e).isIncome);
   const myBalance = (group.balances || {})[userId] || 0;
   const activeMembers = Object.entries(group.members || {}).filter(([, m]) => m.status === 'active');
 
@@ -108,7 +136,7 @@ export const GroupPage = ({ groupId, userId, onBack }) => {
 
       {/* Tabs */}
       <div className="inline-flex bg-slate-100 rounded-full p-1">
-        {['overview', 'buckets'].map((tabId) => (
+        {['overview', 'buckets', 'stats'].map((tabId) => (
           <button
             key={tabId}
             type="button"
@@ -124,10 +152,12 @@ export const GroupPage = ({ groupId, userId, onBack }) => {
 
       {activeTab === 'buckets' ? (
         <MemberBucketsView group={group} expenses={expenses} />
+      ) : activeTab === 'stats' ? (
+        <GroupStatsView group={group} expenses={expenses} />
       ) : (
         <>
           {/* Balance summary */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 text-center">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-center">
             {myBalance === 0 ? (
               <p className="text-lg font-bold text-slate-400">{t('groups.page.allSettled')}</p>
             ) : myBalance > 0 ? (
@@ -139,7 +169,18 @@ export const GroupPage = ({ groupId, userId, onBack }) => {
                 {t('groups.page.youOwe', { amount: formatMinorAmount(-myBalance, group.currency) })}
               </p>
             )}
+            <p className="text-lg font-bold text-slate-700">
+              {t('groups.page.totalExpenses', { amount: formatMinorAmount(totalExpensesMinor, group.currency) })}
+            </p>
           </div>
+
+          {showIncomeBreakdown && (
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+              <h2 className="font-bold text-slate-800 mb-1">{t('groups.incomeSplit.title')}</h2>
+              <p className="text-xs text-slate-400 mb-3">{t('groups.incomeSplit.explainer')}</p>
+              <IncomeMonthlyBreakdown group={group} expenseMonths={expenseMonths} />
+            </div>
+          )}
 
           {/* Balances (who owes whom, simplified) */}
           {activeMembers.length > 2 && (
@@ -194,11 +235,25 @@ export const GroupPage = ({ groupId, userId, onBack }) => {
                 <Plus className="w-4 h-4" /> {t('groups.expense.add')}
               </button>
             </div>
+            {expenses.length > 0 && (
+              <div className="relative mb-3">
+                <Search className="w-4 h-4 text-slate-400 absolute top-1/2 -translate-y-1/2 start-3 pointer-events-none" />
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={t('groups.page.searchPlaceholder')}
+                  className="w-full ps-9 pe-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-indigo-500"
+                />
+              </div>
+            )}
             {expenses.length === 0 ? (
               <p className="text-sm text-slate-400 text-center py-4">{t('groups.page.noExpenses')}</p>
+            ) : filteredExpenses.length === 0 ? (
+              <p className="text-sm text-slate-400 text-center py-4">{t('groups.page.noSearchResults')}</p>
             ) : (
-              expenses.map((expense) => (
-                <ExpenseListItem key={expense.id} expense={expense} group={group} onClick={() => setEditingExpense(expense)} />
+              filteredExpenses.map((expense) => (
+                <ExpenseListItem key={expense.id} expense={expense} group={group} onEdit={() => setEditingExpense(expense)} />
               ))
             )}
           </div>
@@ -214,7 +269,7 @@ export const GroupPage = ({ groupId, userId, onBack }) => {
       )}
 
       {showSettings && (
-        <GroupSettings group={group} userId={userId} onClose={() => setShowSettings(false)} onDeleted={onBack} />
+        <GroupSettings group={group} userId={userId} expenseCount={expenses.length} expenseMonths={expenseMonths} onClose={() => setShowSettings(false)} onDeleted={onBack} />
       )}
 
       {showInvite && (

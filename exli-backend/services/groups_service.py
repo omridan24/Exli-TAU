@@ -17,6 +17,9 @@ from config import logger
 import services.split_catalog as split_catalog
 import services.income_ratio_service as income_ratio_service
 from services.split_engine import MEMBER_SPECIFIC_KINDS
+from services.currency_codes import VALID_CURRENCY_CODES
+
+DEFAULT_CURRENCY = "ILS"
 
 MAX_NAME_LEN = 60
 MAX_DESCRIPTION_LEN = 280
@@ -228,6 +231,27 @@ def create_group(db, uid, user_info, *, name, description=None, currency="ILS", 
     return group_ref.id
 
 
+FIXED_SPLIT_TOTAL = 10000  # basis points: weights are hundredths of a percent, so 3333/3333/3334 stays exact
+
+
+def _validate_fixed_split(group, fixed):
+    """
+    A group's constant "buckets of percentages" default: {"weights": {uid: basis points}}
+    covering exactly the active members, each >= 0, summing to 10000 (= 100%).
+    """
+    weights = fixed.get("weights") if isinstance(fixed, dict) else None
+    if not isinstance(weights, dict) or not weights:
+        raise ValidationError("defaultFixedSplit must have a weights map.")
+    active = {uid for uid, m in (group.get("members") or {}).items() if m.get("status") == "active"}
+    if set(weights.keys()) != active:
+        raise ValidationError("defaultFixedSplit must include every active member, and only them.")
+    if any(isinstance(w, bool) or not isinstance(w, int) or w < 0 for w in weights.values()):
+        raise ValidationError("Fixed split weights must be whole numbers, 0 or more.")
+    if sum(weights.values()) != FIXED_SPLIT_TOTAL:
+        raise ValidationError("Fixed split percentages must add up to 100%.")
+    return {"weights": dict(weights)}
+
+
 def update_group(db, uid, group_id, patch):
     snap = get_group_or_404(db, group_id)
     group = snap.to_dict()
@@ -241,7 +265,10 @@ def update_group(db, uid, group_id, patch):
     if "emoji" in patch:
         updates["emoji"] = patch["emoji"]
     if "currency" in patch:
-        updates["currency"] = patch["currency"]
+        code = str(patch["currency"] or DEFAULT_CURRENCY).strip().upper()
+        if code not in VALID_CURRENCY_CODES:
+            raise ValidationError(f"Unknown currency: {patch['currency']}")
+        updates["currency"] = code  # a group's one currency; changing it relabels, it doesn't convert
     if "imageUrl" in patch:
         updates["imageUrl"] = patch["imageUrl"]
     if "type" in patch:
@@ -260,6 +287,14 @@ def update_group(db, uid, group_id, patch):
         if patch["defaultSplitRuleId"] not in valid_ids:
             raise ValidationError("defaultSplitRuleId must reference an existing split rule.")
         updates["defaultSplitRuleId"] = patch["defaultSplitRuleId"]
+        updates["defaultFixedSplit"] = None  # choosing a rule replaces any fixed-percentages default
+        updates["defaultSplitConfigured"] = True
+    if "defaultFixedSplit" in patch:
+        if patch["defaultFixedSplit"] is None:
+            updates["defaultFixedSplit"] = None
+        else:
+            updates["defaultFixedSplit"] = _validate_fixed_split(group, patch["defaultFixedSplit"])
+            updates["defaultSplitConfigured"] = True
     if "settings" in patch and isinstance(patch["settings"], dict):
         settings = dict(group.get("settings") or DEFAULT_SETTINGS)
         for key in ("membersCanInvite",):
@@ -314,6 +349,31 @@ def get_income_ratio_preview(db, uid, group_id, for_date):
         raise ForbiddenError("You are not a member of this group.")
 
     return income_ratio_service.get_income_ratios(db, group, for_date)
+
+
+MAX_INCOME_MONTHS = 24
+
+
+def get_income_ratio_months(db, uid, group_id, month_keys):
+    """
+    Per-month "Split by Income" breakdown for the UI: for each expense month 'YYYY-MM',
+    what that month's expenses resolve to (same rule as get_income_ratios: the ratio from
+    the income month right before it; `month` in each result says which month that was).
+    """
+    snap = get_group_or_404(db, group_id)
+    group = snap.to_dict()
+    if active_role(group, uid) is None:
+        raise ForbiddenError("You are not a member of this group.")
+
+    keys = list(dict.fromkeys(month_keys or []))[:MAX_INCOME_MONTHS]
+    results = []
+    for key in keys:
+        try:
+            for_date = datetime.strptime(key, "%Y-%m").date()
+        except (TypeError, ValueError):
+            raise ValidationError("months must be YYYY-MM values.")
+        results.append({"forMonth": key, **income_ratio_service.get_income_ratios(db, group, for_date)})
+    return results
 
 
 def _split_rules_after_membership_change(split_rules, uid, action):
@@ -657,6 +717,8 @@ def _approve_request_txn(transaction, group_ref, request_ref, admin_uid, target_
     updated_rules = _split_rules_after_membership_change(group.get("splitRules") or [], target_uid, "add")
     if updated_rules is not None:
         group_update["splitRules"] = updated_rules
+    if group.get("defaultFixedSplit"):
+        group_update["defaultFixedSplit"] = None  # the fixed percentages no longer cover everyone
 
     transaction.update(group_ref, group_update)
 
@@ -774,6 +836,8 @@ def _remove_member_txn(transaction, group_ref, actor_uid, target_uid, is_self):
     updated_rules = _split_rules_after_membership_change(group.get("splitRules") or [], target_uid, "remove")
     if updated_rules is not None:
         group_update["splitRules"] = updated_rules
+    if group.get("defaultFixedSplit"):
+        group_update["defaultFixedSplit"] = None  # the fixed percentages no longer cover everyone
 
     transaction.update(group_ref, group_update)
 

@@ -425,6 +425,191 @@ class TestTransferPersonalExpensesBatch:
             svc.transfer_personal_expenses_batch(db, OWNER, gid, ids, "eq")
 
 
+FIXED_DEFAULT = {"weights": {OWNER: 7000, MEMBER: 3000}}
+
+
+class TestFixedPercentageGroupDefault:
+    def test_new_expense_uses_fixed_default_and_persists_applied_split(self, db):
+        gid = seed_group(db, defaultFixedSplit=FIXED_DEFAULT, defaultSplitConfigured=True)
+        expense_id = svc.create_expense(db, OWNER, gid, **basic_kwargs(split_input=None))
+        expense = db.collection("groups").document(gid).collection("expenses").document(expense_id).get().to_dict()
+        assert expense["shares"] == {OWNER: 7000, MEMBER: 3000}
+        assert expense["split"]["kind"] == "percent"
+        assert expense["split"]["params"]["weights"] == FIXED_DEFAULT["weights"]
+        assert expense["split"]["params"]["fromGroupDefault"] is True
+        assert group_dict(db, gid)["balances"][MEMBER] == -3000
+
+    def test_use_default_flag_resolves_the_same_way(self, db):
+        gid = seed_group(db, defaultFixedSplit=FIXED_DEFAULT)
+        expense_id = svc.create_expense(db, OWNER, gid, **basic_kwargs(split_input={"useDefault": True}))
+        expense = db.collection("groups").document(gid).collection("expenses").document(expense_id).get().to_dict()
+        assert expense["shares"] == {OWNER: 7000, MEMBER: 3000}
+
+    def test_use_default_without_fixed_falls_back_to_default_rule(self, db):
+        gid = seed_group(db)
+        expense_id = svc.create_expense(db, OWNER, gid, **basic_kwargs(split_input={"useDefault": True}))
+        expense = db.collection("groups").document(gid).collection("expenses").document(expense_id).get().to_dict()
+        assert expense["split"]["splitRuleId"] == "eq"
+        assert expense["shares"] == {OWNER: 5000, MEMBER: 5000}
+
+    def test_explicit_rule_overrides_the_fixed_default(self, db):
+        gid = seed_group(db, defaultFixedSplit=FIXED_DEFAULT)
+        expense_id = svc.create_expense(db, OWNER, gid, **basic_kwargs(split_input={"splitRuleId": "eq"}))
+        expense = db.collection("groups").document(gid).collection("expenses").document(expense_id).get().to_dict()
+        assert expense["shares"] == {OWNER: 5000, MEMBER: 5000}
+
+    def test_transfer_with_default_and_batch_use_default(self, db):
+        gid = seed_group(db, defaultFixedSplit=FIXED_DEFAULT)
+        p1 = seed_personal_expense(db, OWNER, "p1", amount=100.0)
+        p2 = seed_personal_expense(db, OWNER, "p2", amount=100.0)
+
+        result = svc.transfer_personal_expense(db, OWNER, gid, p1, {"useDefault": True})
+        assert result["myShareMinor"] == 7000
+
+        batch = svc.transfer_personal_expenses_batch(db, OWNER, gid, [p2], None, use_default=True)
+        assert batch["results"][0]["status"] == "ok"
+        assert batch["results"][0]["myShareMinor"] == 7000
+
+
+def seed_income(db, uid, month, neto):
+    db.collection("users").document(uid).collection("income").add({"month": month, "neto": neto})
+
+
+def expense_dict(db, gid, expense_id):
+    return db.collection("groups").document(gid).collection("expenses").document(expense_id).get().to_dict()
+
+
+class TestIncomeDefaultResolvesPerExpenseMonth:
+    def _group(self, db, **extra):
+        return seed_group(db, splitRules=[equal_rule(), income_rule()], defaultSplitRuleId="income",
+                          defaultSplitConfigured=True, **extra)
+
+    def test_each_expense_uses_its_own_month_ratio(self, db):
+        seed_income(db, OWNER, "2026-08", 15000); seed_income(db, MEMBER, "2026-08", 5000)   # 75/25 -> used by Sept
+        seed_income(db, OWNER, "2026-09", 16000); seed_income(db, MEMBER, "2026-09", 4000)   # 80/20 -> used by Oct
+        gid = self._group(db)
+
+        sept = svc.create_expense(db, OWNER, gid, **basic_kwargs(date_str="2026-09-10", split_input={"useDefault": True}))
+        octo = svc.create_expense(db, OWNER, gid, **basic_kwargs(date_str="2026-10-10", split_input=None))
+
+        assert expense_dict(db, gid, sept)["shares"] == {OWNER: 7500, MEMBER: 2500}
+        assert expense_dict(db, gid, sept)["split"]["params"]["incomeMonth"] == "2026-08"
+        assert expense_dict(db, gid, octo)["shares"] == {OWNER: 8000, MEMBER: 2000}
+        assert expense_dict(db, gid, octo)["split"]["resolvedRatios"] == {OWNER: 80, MEMBER: 20}
+
+    def test_missing_income_falls_back_to_equal_for_the_default(self, db):
+        gid = self._group(db)  # nobody has income data
+        expense_id = svc.create_expense(db, OWNER, gid, **basic_kwargs(date_str="2026-10-10", split_input=None))
+        expense = expense_dict(db, gid, expense_id)
+        assert expense["shares"] == {OWNER: 5000, MEMBER: 5000}
+        assert expense["split"]["params"]["incomeFallback"] is True
+        assert expense["split"]["params"]["incomeMonth"] == "2026-09"
+
+    def test_picking_the_income_rule_by_hand_still_blocks_when_missing(self, db):
+        gid = self._group(db)
+        with pytest.raises(groups_svc.ConflictError):
+            svc.create_expense(db, OWNER, gid, **basic_kwargs(date_str="2026-10-10", split_input={"splitRuleId": "income"}))
+
+    def test_transfer_from_analytics_uses_the_expense_month(self, db):
+        seed_income(db, OWNER, "2026-08", 15000); seed_income(db, MEMBER, "2026-08", 5000)
+        seed_income(db, OWNER, "2026-09", 16000); seed_income(db, MEMBER, "2026-09", 4000)
+        gid = self._group(db)
+        p_sept = seed_personal_expense(db, OWNER, "p1", amount=100.0, date="2026-09-03")
+        p_oct = seed_personal_expense(db, OWNER, "p2", amount=100.0, date="2026-10-03")
+
+        assert svc.transfer_personal_expense(db, OWNER, gid, p_sept, {"useDefault": True})["myShareMinor"] == 7500
+        assert svc.transfer_personal_expense(db, OWNER, gid, p_oct, {"useDefault": True})["myShareMinor"] == 8000
+
+
+class TestApplyDefaultSplitToExisting:
+    def _seed_expense(self, db, gid, date, amount=10000, **kw):
+        return svc.create_expense(db, OWNER, gid, **basic_kwargs(date_str=date, amount_minor=amount, split_input={"splitRuleId": "eq"}, **kw))
+
+    def test_converts_all_with_per_month_income_and_fixes_balances(self, db):
+        seed_income(db, OWNER, "2026-08", 15000); seed_income(db, MEMBER, "2026-08", 5000)
+        seed_income(db, OWNER, "2026-09", 16000); seed_income(db, MEMBER, "2026-09", 4000)
+        gid = seed_group(db, splitRules=[equal_rule(), income_rule()])
+        sept = self._seed_expense(db, gid, "2026-09-10")
+        octo = self._seed_expense(db, gid, "2026-10-10")
+        groups_svc.update_group(db, OWNER, gid, {"defaultSplitRuleId": "income"})
+
+        result = svc.apply_default_split_to_existing(db, OWNER, gid)
+
+        assert result["converted"] == 2 and result["skipped"] == []
+        assert expense_dict(db, gid, sept)["shares"] == {OWNER: 7500, MEMBER: 2500}
+        assert expense_dict(db, gid, octo)["shares"] == {OWNER: 8000, MEMBER: 2000}
+        balances = group_dict(db, gid)["balances"]
+        assert balances == {OWNER: 2500 + 2000, MEMBER: -(2500 + 2000)}
+
+    def test_converts_to_fixed_percentages(self, db):
+        gid = seed_group(db)
+        e1 = self._seed_expense(db, gid, "2026-09-10")
+        groups_svc.update_group(db, OWNER, gid, {"defaultFixedSplit": {"weights": {OWNER: 7000, MEMBER: 3000}}})
+        result = svc.apply_default_split_to_existing(db, OWNER, gid)
+        assert result["converted"] == 1
+        assert expense_dict(db, gid, e1)["shares"] == {OWNER: 7000, MEMBER: 3000}
+        assert group_dict(db, gid)["balances"][MEMBER] == -3000
+
+    def test_second_run_is_a_noop(self, db):
+        gid = seed_group(db)
+        self._seed_expense(db, gid, "2026-09-10")
+        groups_svc.update_group(db, OWNER, gid, {"defaultFixedSplit": {"weights": {OWNER: 7000, MEMBER: 3000}}})
+        svc.apply_default_split_to_existing(db, OWNER, gid)
+        again = svc.apply_default_split_to_existing(db, OWNER, gid)
+        assert again["converted"] == 0 and again["unchanged"] == 1
+
+    def test_deleted_expenses_are_left_alone(self, db):
+        gid = seed_group(db)
+        e1 = self._seed_expense(db, gid, "2026-09-10")
+        svc.delete_expense(db, OWNER, gid, e1)
+        groups_svc.update_group(db, OWNER, gid, {"defaultFixedSplit": {"weights": {OWNER: 7000, MEMBER: 3000}}})
+        assert svc.apply_default_split_to_existing(db, OWNER, gid)["total"] == 0
+
+    def test_missing_income_month_falls_back_and_is_flagged(self, db):
+        gid = seed_group(db, splitRules=[equal_rule(), income_rule()])
+        e1 = self._seed_expense(db, gid, "2026-09-10")
+        groups_svc.update_group(db, OWNER, gid, {"defaultSplitRuleId": "income"})
+        svc.apply_default_split_to_existing(db, OWNER, gid)
+        assert expense_dict(db, gid, e1)["split"]["params"]["incomeFallback"] is True
+
+    def test_unconvertible_expense_is_skipped_not_fatal(self, db):
+        gid = seed_group(db, splitRules=[equal_rule(), your_treat_rule()])
+        e1 = self._seed_expense(db, gid, "2026-09-10")
+        groups_svc.update_group(db, OWNER, gid, {"defaultSplitRuleId": "treat"})
+        db.collection("groups").document(gid).update({"members.third": make_member(), "memberIds": [OWNER, MEMBER, "third"]})
+        e2 = svc.create_expense(db, OWNER, gid, **basic_kwargs(participants=[OWNER, MEMBER, "third"], split_input={"splitRuleId": "eq"}))
+        result = svc.apply_default_split_to_existing(db, OWNER, gid)
+        assert {s["expenseId"] for s in result["skipped"]} == {e2}
+        assert result["converted"] == 1
+        assert expense_dict(db, gid, e1)["shares"] == {OWNER: 0, MEMBER: 10000}
+
+    def test_requires_admin_and_a_configured_default(self, db):
+        gid = seed_group(db)
+        with pytest.raises(groups_svc.ValidationError):
+            svc.apply_default_split_to_existing(db, OWNER, gid)
+        groups_svc.update_group(db, OWNER, gid, {"defaultSplitRuleId": "eq"})
+        with pytest.raises(groups_svc.ForbiddenError):
+            svc.apply_default_split_to_existing(db, MEMBER, gid)
+
+    def test_large_group_is_written_in_chunks_under_the_batch_limit(self, db):
+        gid = seed_group(db)
+        for i in range(svc.CONVERT_CHUNK_SIZE + 5):
+            self._seed_expense(db, gid, "2026-09-10", amount=10000 + i)
+        groups_svc.update_group(db, OWNER, gid, {"defaultFixedSplit": {"weights": {OWNER: 7000, MEMBER: 3000}}})
+        result = svc.apply_default_split_to_existing(db, OWNER, gid)
+        assert result["converted"] == svc.CONVERT_CHUNK_SIZE + 5
+        assert len(db.batch_commits) == 2
+        assert sum(group_dict(db, gid)["balances"].values()) == 0
+
+    def test_personal_transfer_expense_amount_follows_the_new_share(self, db):
+        gid = seed_group(db)
+        pid = seed_personal_expense(db, OWNER, "p1", amount=100.0)
+        svc.transfer_personal_expense(db, OWNER, gid, pid, {"splitRuleId": "eq"})
+        groups_svc.update_group(db, OWNER, gid, {"defaultFixedSplit": {"weights": {OWNER: 7000, MEMBER: 3000}}})
+        svc.apply_default_split_to_existing(db, OWNER, gid)
+        assert db.collection("users").document(OWNER).collection("expenses").document(pid).get().to_dict()["amount"] == 70.0
+
+
 class TestRemovePersonalExpenseFromGroup:
     def test_restores_original_amount_and_clears_group_ref(self, db):
         gid = seed_group(db)

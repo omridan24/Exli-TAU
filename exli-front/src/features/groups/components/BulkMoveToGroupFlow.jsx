@@ -5,6 +5,7 @@ import { useMyGroups } from '../hooks/useMyGroups';
 import { groupsApi } from '../../../config/groupsApi';
 import { getGroupType, GROUP_TYPE_COLOR_CLASSES } from '../utils/groupTypes';
 import { RuleRow } from './SplitPicker/RuleRow';
+import { DefaultSplitCard } from './SplitPicker/DefaultSplitCard';
 import { SplitPicker } from './SplitPicker/SplitPicker';
 import { toMinorUnits, formatMinorAmount } from '../utils/money';
 
@@ -41,6 +42,8 @@ function datesByDistinctMonth(expenses) {
  * under it, and eventually read past the end (caught 2026-09-30: exactly this
  * crashed on the last expense with "Cannot read properties of undefined").
  */
+const USE_DEFAULT = '__default__';
+
 export const BulkMoveToGroupFlow = ({ expenses, userId, onClose, onMoved }) => {
   const { t } = useTranslation();
   const { groups, loading } = useMyGroups(userId);
@@ -104,7 +107,8 @@ export const BulkMoveToGroupFlow = ({ expenses, userId, onClose, onMoved }) => {
 
   const handleSelectGroup = (group) => {
     setSelectedGroup(group);
-    setSelectedRuleId(group.defaultSplitRuleId);
+    // A group with a constant-percentages default opens on it (sent as useDefault).
+    setSelectedRuleId(group.defaultFixedSplit ? USE_DEFAULT : group.defaultSplitRuleId);
     setIncomeRatio(null);
   };
 
@@ -112,7 +116,10 @@ export const BulkMoveToGroupFlow = ({ expenses, userId, onClose, onMoved }) => {
     setSubmitting(true);
     setError('');
     try {
-      const { results } = await groupsApi.transferPersonalExpensesBatch(selectedGroup.id, expenseIds, selectedRuleId);
+      const useDefault = selectedRuleId === USE_DEFAULT || isDefaultIncomeSelected;
+      const { results } = await groupsApi.transferPersonalExpensesBatch(
+        selectedGroup.id, expenseIds, useDefault ? null : selectedRuleId, useDefault
+      );
       const succeeded = results.filter((r) => r.status === 'ok').length;
       setSummary({ succeeded, failed: results.length - succeeded });
     } catch (err) {
@@ -121,6 +128,10 @@ export const BulkMoveToGroupFlow = ({ expenses, userId, onClose, onMoved }) => {
       setSubmitting(false);
     }
   };
+
+  const isDefaultIncomeSelected = !!selectedGroup && !!selectedGroup.defaultSplitConfigured
+    && selectedRuleId === selectedGroup.defaultSplitRuleId
+    && rules.find((r) => r.id === selectedRuleId)?.kind === 'income_ratio';
 
   const currentWalkExpense = walkIndex != null ? walkExpenses[walkIndex] : null;
   const currentWalkAmountMinor = currentWalkExpense ? toMinorUnits(Math.abs(currentWalkExpense.amount || 0)) : 0;
@@ -226,6 +237,11 @@ export const BulkMoveToGroupFlow = ({ expenses, userId, onClose, onMoved }) => {
             <>
               <p className="text-sm text-slate-500">{t('groups.transfer.bulkSplitHint', { count: expenseIds.length })}</p>
               <div className="space-y-2">
+                {selectedGroup.defaultFixedSplit && (
+                  <button type="button" onClick={() => setSelectedRuleId(USE_DEFAULT)} className={`w-full text-start rounded-xl ${selectedRuleId === USE_DEFAULT ? '' : 'opacity-60'}`}>
+                    <DefaultSplitCard group={selectedGroup} members={members} />
+                  </button>
+                )}
                 {rules.map((rule) => {
                   const disabledReason = disabledReasonFor(rule);
                   return (
@@ -251,10 +267,13 @@ export const BulkMoveToGroupFlow = ({ expenses, userId, onClose, onMoved }) => {
                   <p className="text-xs text-slate-400 mt-0.5">{t('groups.transfer.splitIndividuallyHint')}</p>
                 </button>
               </div>
+              {isDefaultIncomeSelected && (
+                <p className="text-xs text-indigo-600 font-medium">{t('groups.incomeSplit.perMonthHint')}</p>
+              )}
               {error && <p className="text-xs text-rose-500 font-medium">{error}</p>}
               <button
                 onClick={handleConfirm}
-                disabled={!selectedRuleId || submitting || !!disabledReasonFor(rules.find((r) => r.id === selectedRuleId) || {})}
+                disabled={!selectedRuleId || submitting || (selectedRuleId !== USE_DEFAULT && !isDefaultIncomeSelected && !!disabledReasonFor(rules.find((r) => r.id === selectedRuleId) || {}))}
                 className="w-full py-3 rounded-xl bg-slate-900 text-white font-bold flex items-center justify-center gap-2 disabled:opacity-40"
               >
                 {submitting && <Loader2 className="w-4 h-4 animate-spin" />} {t('groups.transfer.bulkConfirm', { count: expenseIds.length })}

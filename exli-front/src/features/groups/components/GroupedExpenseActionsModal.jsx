@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, ArrowRightLeft, Undo2, Loader2 } from 'lucide-react';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../../config/firebase';
 import { groupsApi } from '../../../config/groupsApi';
+import { ExpenseSplitBuckets } from './ExpenseSplitBuckets';
 
 /**
  * Opened from the "Shared in {{group}}" badge on an already-grouped personal
@@ -20,6 +23,20 @@ export const GroupedExpenseActionsModal = ({ expense, onClose, onRemoved, onMove
   const [confirmingRemove, setConfirmingRemove] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [splitView, setSplitView] = useState(null); // { group, groupExpense }; null while loading / unavailable
+
+  // Read-only look at how the group split this expense (members can read group docs).
+  useEffect(() => {
+    let cancelled = false;
+    const { groupId, groupExpenseId } = expense.groupRef;
+    Promise.all([getDoc(doc(db, 'groups', groupId)), getDoc(doc(db, 'groups', groupId, 'expenses', groupExpenseId))])
+      .then(([groupSnap, expenseSnap]) => {
+        if (cancelled || !groupSnap.exists() || !expenseSnap.exists()) return;
+        setSplitView({ group: { id: groupSnap.id, ...groupSnap.data() }, groupExpense: { id: expenseSnap.id, ...expenseSnap.data() } });
+      })
+      .catch((err) => console.error('Failed to load group split:', err));
+    return () => { cancelled = true; };
+  }, [expense.groupRef]);
 
   const restoredExpense = () => ({
     ...expense, amount: expense.originalAmount, groupRef: null, originalAmount: null,
@@ -62,6 +79,13 @@ export const GroupedExpenseActionsModal = ({ expense, onClose, onRemoved, onMove
           </div>
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 rounded-full"><X className="w-5 h-5" /></button>
         </div>
+
+        {splitView && (
+          <div className="bg-slate-50 rounded-2xl p-3 space-y-2">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider text-center">{t('groups.split.title')}</p>
+            <ExpenseSplitBuckets expense={splitView.groupExpense} group={splitView.group} />
+          </div>
+        )}
 
         {error && <p className="text-xs text-rose-500 font-medium">{error}</p>}
 
