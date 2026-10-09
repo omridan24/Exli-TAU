@@ -68,13 +68,30 @@ export const groupsApi = {
 
   setSplitRules: (groupId, rules, defaultSplitRuleId) =>
     authedFetch(`/groups/${groupId}/split-rules`, { method: 'PUT', body: json({ rules, defaultSplitRuleId }) }),
+  getIncomeRatioPreview: (groupId, date, currency) => {
+    const params = new URLSearchParams();
+    if (date) params.set('date', date);
+    if (currency) params.set('currency', currency);
+    const qs = params.toString();
+    return authedFetch(`/groups/${groupId}/income-ratio${qs ? `?${qs}` : ''}`);
+  },
   getIncomeRatioMonths: (groupId, months) =>
     authedFetch(`/groups/${groupId}/income-ratios?months=${months.join(',')}`),
   applyDefaultSplit: (groupId) =>
     authedFetch(`/groups/${groupId}/expenses/apply-default-split`, { method: 'POST' }),
-  getIncomeRatioPreview: (groupId, date) =>
-    authedFetch(`/groups/${groupId}/income-ratio${date ? `?date=${date}` : ''}`),
 
+  getMergePreview: (groupId, currency) =>
+    authedFetch(`/groups/${groupId}/merge-preview?currency=${encodeURIComponent(currency)}`),
+  consolidateCurrency: (groupId, currency) =>
+    authedFetch(`/groups/${groupId}/consolidate-currency`, { method: 'POST', body: json({ currency }) }),
+  recordSettlement: (groupId, payload) =>
+    authedFetch(`/groups/${groupId}/settlements`, { method: 'POST', body: json(payload) }),
+  deleteSettlement: (groupId, settlementId) =>
+    authedFetch(`/groups/${groupId}/settlements/${settlementId}`, { method: 'DELETE' }),
+  setPaymentHandles: (groupId, handles) =>
+    authedFetch(`/groups/${groupId}/me/payment-handles`, { method: 'PUT', body: json(handles) }),
+  convertExpense: (groupId, expenseId, toCurrency) =>
+    authedFetch(`/groups/${groupId}/expenses/${expenseId}/convert`, { method: 'POST', body: json({ toCurrency }) }),
   createExpense: (groupId, payload) => authedFetch(`/groups/${groupId}/expenses`, { method: 'POST', body: json(payload) }),
   transferPersonalExpense: (groupId, personalExpenseId, splitInput) =>
     authedFetch(`/groups/${groupId}/expenses/from-personal`, {

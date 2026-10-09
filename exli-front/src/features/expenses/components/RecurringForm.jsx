@@ -7,6 +7,7 @@ import { Button, CategoryIcon } from '../../../components/UI.jsx';
 import { CategoryEditorModal } from '../../settings/components/CategoryEditorModal.jsx';
 import { ExpensePresetSelector } from './ExpensePresetSelector.jsx';
 import { CloseConfirmationModal } from '../../../components/CloseConfirmationModal.jsx';
+import { CurrencyPicker } from '../../../components/CurrencyPicker.jsx';
 
 // Category translation mapping
 const categoryKeyMap = {
@@ -393,10 +394,12 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
                 customFrequencyUnit = formData.frequency.unit;
             }
 
+            // Stored in the currency entered; a ForeignCurrencyAlert offers the conversion later.
+            const resolved = { amount: parseFloat(formData.amount), currency: formData.currency };
             const recurringData = {
                 name: finalName,
-                amount: parseFloat(formData.amount),
-                currency: formData.currency,
+                amount: resolved.amount,
+                currency: resolved.currency,
                 category: formData.category,
                 direction: selectedDirection,
                 pastPeriodCount: formData.pastPeriodCount,
@@ -413,7 +416,6 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
                 lastProcessed: null,
                 createdAt: editData ? editData.createdAt : serverTimestamp()
             };
-
             let recurringId;
             if (editData) {
                 await updateDoc(doc(db, 'users', userId, 'recurring_expenses', editData.id), recurringData);
@@ -513,16 +515,11 @@ export const RecurringForm = ({ userId, categories, onSave, onCancel, editData =
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-2">{t('expenses.recurringForm.currency')}</label>
-                                <select
+                                <CurrencyPicker
                                     value={formData.currency}
-                                    onChange={e => setFormData({ ...formData, currency: e.target.value })}
-                                    className="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none"
-                                >
-                                    <option value="ILS">ILS (₪)</option>
-                                    <option value="USD">USD ($)</option>
-                                    <option value="EUR">EUR (€)</option>
-                                    <option value="GBP">GBP (£)</option>
-                                </select>
+                                    onChange={c => setFormData({ ...formData, currency: c })}
+                                    className="w-full"
+                                />
                             </div>
                         </div>
 

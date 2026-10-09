@@ -167,12 +167,25 @@ def convert_pdf_to_data(file_bytes):
     2. **Anchor**: Find the Date first. Prefer the Charge/Billing Date ("תאריך חיוב", "מועד חיוב") over the Purchase Date ("תאריך רכישה").
     3. **Positive Only**: Return absolute values.
     4. **Installments**: If "Payment X of Y", use the monthly charged amount.
-    5. **CURRENCY VALIDATION (CRITICAL)**: 
+    5. **CURRENCY VALIDATION (CRITICAL)**:
        - "Currency" MUST be a standard code (ILS, USD, EUR, GBP) or symbol (₪, $, €, £).
        - NEVER use Hebrew words (like "שונות", "רגילה", "חובה") as the currency. If unsure, default to "ILS".
-    
+    6. **FOREIGN CURRENCY CHARGES (charged_amount/charged_currency, OPTIONAL)**:
+       - Israeli credit card statements often show a foreign purchase with BOTH
+         the original amount (e.g. "45.00 USD") AND the actual amount billed to
+         the card in shekels (e.g. "₪153.20" - this already includes the bank's
+         own conversion fee, look for it near the transaction, sometimes under
+         a header like "חיוב בש\"ח" / "סכום חיוב" / "Amount Charged").
+       - When a row genuinely has BOTH figures, set "amount"/"currency" to the
+         ORIGINAL foreign figure, and ALSO set "charged_amount" (the shekel
+         figure) and "charged_currency" (normally "ILS").
+       - When a row has only ONE figure (the normal case), omit
+         charged_amount/charged_currency entirely - do not guess or duplicate
+         "amount" into them.
+
     ### OUTPUT:
-    JSON Array of {{ "date", "description", "amount", "currency", "category" }}
+    JSON Array of {{ "date", "description", "amount", "currency", "category", "charged_amount", "charged_currency" }}
+    (charged_amount/charged_currency are optional per item - omit the keys entirely when not applicable, don't set them to null)
     """
 
     try:
@@ -222,14 +235,23 @@ def analyze_multiple_files_structure(file_samples):
     
     ### RULES:
     1. **Header Row**: Which row index contains the headers? (0-based)
-    2. **Mapping Indices**: 
+    2. **Mapping Indices**:
        - "date": Index of the Transaction/Purchase Date column (e.g. "תאריך עסקה", "תאריך רכישה", "תאריך קניה"). Do NOT use the Charge/Billing Date ("תאריך חיוב", "מועד חיוב") when a transaction date column exists, because every row of a monthly statement shares the same billing date. Only if there is no transaction date column, fall back to the Charge/Billing Date.
        - "amount": Index of Amount/Billing/Debit column (Use the local currency billing amount)
        - "description": Index of Payee/Business Name
        - "currency": Index of Currency symbol (optional, if exists)
        - "category": Index of Category (optional)
+       - "chargedAmount"/"chargedCurrency" (OPTIONAL, only if a SEPARATE column
+         exists for it): some statement exports have a distinct "original
+         foreign amount" column AND a distinct "amount billed in ILS" column
+         (which already includes the bank's own conversion fee) - e.g. a
+         "Foreign Amount" + "Original Currency" pair alongside the main
+         "amount"/"currency". When that pairing genuinely exists as separate
+         columns, map "amount"/"currency" to the FOREIGN pair and
+         "chargedAmount"/"chargedCurrency" to the local-currency pair. Only
+         include these two keys when such a second pair of columns actually
+         exists - never invent them or duplicate the same column into both.
        - "notes": Index of the Notes column ("הערות"), e.g. "תשלום 2 מתוך 12" (optional)
-    
     ### OUTPUT FORMAT:
     Return JSON Object:
     {{

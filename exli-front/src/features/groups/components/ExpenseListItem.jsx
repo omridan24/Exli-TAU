@@ -2,17 +2,34 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, Pencil } from 'lucide-react';
 import { formatMinorAmount, groupCurrency } from '../utils/money';
+import { getCurrencySettings } from '../utils/currencySettings';
+import { getMinorUnits } from '../../../lib/fx/currencyMeta';
+import { useCurrencyContext } from '../../../lib/fx/useCurrencyContext';
+import { useFx } from '../../../lib/fx/useFx';
+import { ForeignCurrencyAlert } from '../../../components/ForeignCurrencyAlert';
+import { groupsApi } from '../../../config/groupsApi';
 import { getExpenseSplitRows, formatPercent, getIncomeSplitInfo, formatMonth } from '../utils/expenseSplit';
 import { ExpenseSplitBuckets } from './ExpenseSplitBuckets';
 
 /** One interaction per row: the chevron expands the read-only split; editing lives inside the expansion (pencil). */
-export const ExpenseListItem = ({ expense, group, onEdit }) => {
+/** `mainCurrency`/`canConvert` come from GroupPage: in a keep_original group an expense in a currency other than the
+ * group's main one gets the shared alert (convert to the group's main currency, creator/admin only). */
+export const ExpenseListItem = ({ expense, group, onEdit, mainCurrency, canConvert }) => {
   const { t, i18n } = useTranslation();
   const income = getIncomeSplitInfo(expense);
   const expenseMonth = formatMonth(expense.date, i18n.language);
   const [showSplit, setShowSplit] = useState(false);
   const payerName = group.members?.[expense.paidBy]?.displayName || expense.paidBy;
-  const currency = groupCurrency(group);
+  // keep_original groups hold each expense in the currency it was made in (a merge group
+  // already converted it on entry), so the row shows the expense's own currency.
+  const currency = expense.currency || groupCurrency(group);
+  const { defaultCurrency } = useCurrencyContext();
+  const { toDefault, format } = useFx();
+  const showForeignAlert = getCurrencySettings(group).mode === 'keep_original' && !!mainCurrency && currency !== mainCurrency;
+  // Personal convenience only: what this is roughly worth in MY default currency. Never stored.
+  const approx = currency !== defaultCurrency
+    ? toDefault({ amount: expense.amountMinor / 10 ** getMinorUnits(currency), currency, date: expense.date })
+    : null;
   const rows = getExpenseSplitRows(expense, group).filter((r) => r.amount > 0);
 
   return (
@@ -32,7 +49,23 @@ export const ExpenseListItem = ({ expense, group, onEdit }) => {
             </span>
           )}
         </div>
-        <span className="font-bold text-slate-700 text-sm">{formatMinorAmount(expense.amountMinor, currency)}</span>
+        <div className="text-end shrink-0">
+          <span className="font-bold text-slate-700 text-sm inline-flex items-center gap-1.5">
+            {formatMinorAmount(expense.amountMinor, currency)}
+            {showForeignAlert && (
+              <ForeignCurrencyAlert
+                amount={expense.amountMinor / 10 ** getMinorUnits(currency)}
+                currency={currency}
+                date={expense.date}
+                target={mainCurrency}
+                onConvert={canConvert ? () => groupsApi.convertExpense(group.id, expense.id, mainCurrency) : undefined}
+              />
+            )}
+          </span>
+          {approx?.value != null && (
+            <p className="text-[11px] text-slate-400 font-medium">{'≈'} {format(approx.value, defaultCurrency)}</p>
+          )}
+        </div>
         <button
           type="button"
           onClick={() => setShowSplit((s) => !s)}

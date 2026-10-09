@@ -10,7 +10,9 @@ import {
   Trash2
 } from "lucide-react";
 import { CategoryIcon } from "../../../../components/UI.jsx";
-import { DEFAULT_CATEGORIES, CURRENCIES } from "../../../../config/constants";
+import { DEFAULT_CATEGORIES } from "../../../../config/constants";
+import { supportedCurrencies } from "../../../../lib/fx/currencyMeta";
+import { Money } from "../../../../components/Money";
 
 const cleanDateDisplay = (isoString) => {
   if (!isoString) return "";
@@ -242,7 +244,7 @@ export const ExpenseAutoReviewRow = ({
                     <X className="w-3 h-3 text-slate-500" />
                   </button>
                 </div>
-                {CURRENCIES.map((currency) => (
+                {supportedCurrencies().map((currency) => (
                   <button
                     key={currency}
                     onClick={(e) => {
@@ -301,8 +303,7 @@ export const ExpenseAutoReviewRow = ({
         {/* Mobile Amount & Edit */}
         <div className="lg:hidden flex items-center gap-3">
           <div className="font-mono font-black text-slate-700">
-            {tx.amount}{" "}
-            <span className="text-xs text-slate-400">{tx.currency}</span>
+            <Money amount={tx.amount} currency={tx.currency} date={tx.date} original={tx.original} fx={tx.fx} />
           </div>
           <button
             onClick={(e) => {
@@ -424,8 +425,7 @@ export const ExpenseAutoReviewRow = ({
       {/* Desktop Amount & Actions */}
       <div className="hidden lg:flex items-center justify-end gap-3 relative">
         <div className="font-mono font-black text-slate-700 whitespace-nowrap transition-transform group-hover:-translate-x-8">
-          {tx.amount}{" "}
-          <span className="text-xs text-slate-400">{tx.currency}</span>
+          <Money amount={tx.amount} currency={tx.currency} date={tx.date} original={tx.original} fx={tx.fx} />
         </div>
         <button
           onClick={(e) => {

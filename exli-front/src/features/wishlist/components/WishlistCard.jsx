@@ -5,6 +5,7 @@ import { Card, CategoryIcon } from '../../../components/UI';
 import { DEFAULT_CATEGORIES } from '../../../config/constants';
 
 import { StoreLink, formatStoreUrl } from './StoreLink';
+import { Money } from '../../../components/Money';
 
 export const getCurrencySymbol = (currency) => {
   switch (currency) {
@@ -18,7 +19,7 @@ export const getCurrencySymbol = (currency) => {
 
 export { formatStoreUrl };
 
-export const WishlistCard = ({ item, categories = DEFAULT_CATEGORIES, onEdit, onDelete, onShare }) => {
+export const WishlistCard = ({ item, categories = DEFAULT_CATEGORIES, onEdit, onDelete, onShare, onConvert }) => {
   const { t } = useTranslation();
   const [imgError, setImgError] = useState(false);
 
@@ -133,10 +134,14 @@ export const WishlistCard = ({ item, categories = DEFAULT_CATEGORIES, onEdit, on
             </h3>
             <div className="text-end shrink-0">
               <div className="text-xl font-extrabold text-slate-900 font-mono">
-                <span className="text-pink-600 me-0.5">{getCurrencySymbol(item.currency)}</span>
-                {Number(item.price || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                <Money
+                  amount={Number(item.price || 0)}
+                  currency={item.currency || 'ILS'}
+                  original={item.original}
+                  fx={item.fx}
+                  onConvert={onConvert ? () => onConvert(item) : undefined}
+                />
               </div>
-              <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">{item.currency || 'ILS'}</span>
             </div>
           </div>
 

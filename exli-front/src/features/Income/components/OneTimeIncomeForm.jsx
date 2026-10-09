@@ -11,6 +11,8 @@ import { TaxBracketGraph } from './TaxBracketGraph.jsx';
 import { MismatchAlert } from './MismatchAlert.jsx';
 import { ExtractionSummary } from './ExtractionSummary.jsx';
 import { CloseConfirmationModal } from '../../../components/CloseConfirmationModal.jsx';
+import { useFx } from '../../../lib/fx/useFx.js';
+import { CurrencyPicker } from '../../../components/CurrencyPicker.jsx';
 
 const PENSION_PERCENTAGES = [6.0, 6.5, 7.0, 7.5, 8.0, 8.33, 8.5];
 
@@ -79,16 +81,38 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
         workplaceDomain: savedData?.workplaceDomain || ''
     });
 
+    // Israeli tax brackets are denominated in ILS (TAX_BRACKETS.Israel.currency)
+    // regardless of the user's own app-wide default currency - someone paid in
+    // USD but taxed in Israel needs their gross converted to ILS BEFORE the
+    // marginal-tax math runs, not after (docs/fx/01-fx-plan.md follow-up,
+    // 2026-09-26: the currency field here used to be purely decorative -
+    // entering "$10,000" ran Israeli brackets on the raw number 10000 as if
+    // it were ₪10,000). `userCountry` is fetched below; taxConfig may not be
+    // ready on the very first render, so this falls back to ILS.
+    const { convertTo, dataVersion } = useFx();
+    const [userCountry, setUserCountry] = useState('Israel');
+    const activeTaxConfig = getTaxConfig(userCountry);
+    const taxCurrency = activeTaxConfig?.currency || 'ILS';
+    const isForeignTaxCurrency = formData.currency !== taxCurrency;
+
+    const rawGrossAmount = parseFloat(formData.grossAmount) || 0;
+    const grossConversion = convertTo({ amount: rawGrossAmount, currency: formData.currency, month: reportMonth }, taxCurrency);
+    // Falls back to the raw entered number if the rate is genuinely
+    // unavailable, so the calculator never breaks - better an approximate
+    // number than none, and the saved record still keeps the true original.
+    const grossAmountForTax = grossConversion.value != null ? grossConversion.value : rawGrossAmount;
+
     // Pension/Other Deposits use pensionable gross (Israeli law: excludes food/travel bonuses)
     // Falls back to regular gross if bruto_pension was not found in the payslip
-    const pensionGross = parseFloat(formData.brutoPension || formData.grossAmount || 0);
+    const rawPensionBasis = parseFloat(formData.brutoPension || formData.grossAmount || 0);
+    const pensionConversion = convertTo({ amount: rawPensionBasis, currency: formData.currency, month: reportMonth }, taxCurrency);
+    const pensionGross = pensionConversion.value != null ? pensionConversion.value : rawPensionBasis;
 
     const [isSaving, setIsSaving] = useState(false);
     const [validationError, setValidationError] = useState('');
     const [employeeCustom, setEmployeeCustom] = useState(false);
     const [employerCustom, setEmployerCustom] = useState(false);
     const [severanceCustom, setSeveranceCustom] = useState(false);
-    const [userCountry, setUserCountry] = useState('Israel');
     const [taxCreditPoints, setTaxCreditPoints] = useState(2.25);
     const [defaultCreditPoints, setDefaultCreditPoints] = useState(2.25);
     const [calculatedTax, setCalculatedTax] = useState(0);
@@ -223,7 +247,9 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
         }
 
         if (formData.grossAmount && userCountry) {
-            const monthlyGross = parseFloat(formData.grossAmount);
+            // grossAmountForTax is grossAmount already converted to the tax
+            // bracket's own currency (see above) - never the raw entered figure.
+            const monthlyGross = grossAmountForTax;
             const annualGross = monthlyGross * 12;
 
             const taxConfig = getTaxConfig(userCountry);
@@ -239,12 +265,12 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                 setTaxBracketInfo(taxResult);
             }
         }
-    }, [formData.grossAmount, userCountry, taxCreditPoints, hasTax]);
+    }, [formData.grossAmount, grossAmountForTax, userCountry, taxCreditPoints, hasTax, dataVersion]);
 
-    // Auto-calculate additional taxes (MONTHLY INPUT - NO CONVERSION NEEDED)
+    // Auto-calculate additional taxes
     useEffect(() => {
         if (formData.grossAmount && userCountry) {
-            const monthlyGross = parseFloat(formData.grossAmount);
+            const monthlyGross = grossAmountForTax;
 
             const taxConfig = getTaxConfig(userCountry);
             if (taxConfig?.additionalTaxes) {
@@ -252,7 +278,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                 setAdditionalTaxes(result);
             }
         }
-    }, [formData.grossAmount, userCountry]);
+    }, [formData.grossAmount, grossAmountForTax, userCountry, dataVersion]);
 
     // Auto-calculate expected pension (employee + employer + severance)
     // Uses pensionGross (bruto for pension) instead of total gross
@@ -267,7 +293,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                 setFormData(prev => ({ ...prev, expectedPension: total }));
             }
         }
-    }, [formData.grossAmount, formData.brutoPension, formData.employeePct, formData.employerPct, formData.severancePct]);
+    }, [formData.grossAmount, formData.brutoPension, formData.employeePct, formData.employerPct, formData.severancePct, pensionGross, dataVersion]);
 
     // Auto-calculate Neto from Bruto - Tax - Employee Pension - Other Deposits
     useEffect(() => {
@@ -280,7 +306,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
         }
 
         if (formData.grossAmount) {
-            const gross = parseFloat(formData.grossAmount);
+            const gross = grossAmountForTax;
 
             // 1. Employee Pension (uses pensionGross - Israeli law)
             const pension = manualOverrides.pension_employee !== undefined
@@ -310,7 +336,7 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                 setFormData(prev => ({ ...prev, netAmount: autoNeto }));
             }
         }
-    }, [formData.grossAmount, formData.brutoPension, calculatedTax, additionalTaxes, formData.employeePct, manualOverrides, otherDepositEmployeePct]);
+    }, [formData.grossAmount, formData.brutoPension, calculatedTax, additionalTaxes, formData.employeePct, manualOverrides, otherDepositEmployeePct, grossAmountForTax, pensionGross, dataVersion]);
 
     const handleWorkplaceSelect = (workplace) => {
         setFormData({
@@ -334,19 +360,22 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
         setValidationError('');
 
         try {
-            // Save to income collection for the specific month only
+            // Save to income collection for the specific month only.
+            // bruto/neto/taxes/pension are all already in taxCurrency terms
+            // (grossAmountForTax/pensionGross above) - the record's currency
+            // must match, not the raw formData.currency the user typed in.
             const incomeData = {
                 userId,
                 month: reportMonth,
                 source_name: formData.workplaceName,
                 occupation: formData.occupation,
-                bruto: parseFloat(formData.grossAmount),
+                bruto: Math.round(grossAmountForTax),
                 neto: parseFloat(formData.netAmount),
                 taxes: (manualOverrides.tax_income ?? calculatedTax) +
                     (manualOverrides.tax_health ?? (additionalTaxes.breakdown.find(t => t.name.includes('Health'))?.amount || 0)) +
                     (manualOverrides.tax_national ?? (additionalTaxes.breakdown.find(t => t.name.includes('National'))?.amount || 0)),
                 pension: manualOverrides.pension_employee ?? Math.round(pensionGross * (formData.employeePct / 100)),
-                currency: formData.currency,
+                currency: taxCurrency,
                 type: 'one-time',
                 isRecurring: false,
                 workplaceLogo: formData.workplaceLogo,
@@ -360,6 +389,15 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                     totalMonthly: Math.round(pensionGross * ((otherDepositEmployeePct + otherDepositEmployerPct) / 100))
                 }
             };
+            if (isForeignTaxCurrency && grossConversion.value != null) {
+                incomeData.original = { amount: rawGrossAmount, currency: formData.currency };
+                incomeData.fx = {
+                    rate: grossConversion.rate,
+                    rateDate: grossConversion.rateDate,
+                    basis: grossConversion.basis,
+                    convertedAt: new Date().toISOString()
+                };
+            }
 
             if (existingId) {
                 await setDoc(doc(db, 'users', userId, 'income', existingId), incomeData, { merge: true });
@@ -611,12 +649,26 @@ export const OneTimeIncomeForm = ({ userId, workplaces, currency, reportMonth, o
                                                         <span className="text-blue-800 font-bold text-lg">{t('income.extraction.fields.grossSalary')}</span>
                                                         <div className="flex items-center gap-4">
                                                             <span className="font-black text-2xl text-blue-900">
-                                                                {parseFloat(formData.grossAmount || 0).toLocaleString()} <span className="text-lg text-blue-700">{formData.currency}</span>
+                                                                {parseFloat(formData.grossAmount || 0).toLocaleString()}
                                                             </span>
+                                                            <CurrencyPicker
+                                                                value={formData.currency}
+                                                                onChange={(c) => setFormData({ ...formData, currency: c })}
+                                                            />
                                                             <button type="button" onClick={() => setEditingField('grossAmount')} className="p-2 text-blue-500 hover:text-blue-700 hover:bg-blue-200/50 rounded-lg transition-colors cursor-pointer" title="Edit Gross Salary">
                                                                 ✏️
                                                             </button>
                                                         </div>
+                                                    </div>
+                                                )}
+
+                                                {isForeignTaxCurrency && grossConversion.value != null && (
+                                                    <div className="mb-4 -mt-2 px-4 text-xs text-blue-600">
+                                                        {t('income.oneTimeForm.taxConversionNote', {
+                                                            amount: Math.round(grossAmountForTax).toLocaleString(),
+                                                            currency: taxCurrency,
+                                                            defaultValue: 'Converted to {{amount}} {{currency}} for Israeli tax calculation'
+                                                        })}
                                                     </div>
                                                 )}
 

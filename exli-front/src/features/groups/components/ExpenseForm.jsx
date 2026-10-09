@@ -3,9 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { SplitPicker } from './SplitPicker/SplitPicker';
 import { toMinorUnits } from '../utils/money';
+import { getCurrencySettings } from '../utils/currencySettings';
 import { groupsApi } from '../../../config/groupsApi';
 import { DEFAULT_CATEGORIES } from '../../../config/constants';
 import { CategoryIcon } from '../../../components/UI';
+import { CurrencyPicker } from '../../../components/CurrencyPicker';
+import { useCurrencyPrefs } from '../../../lib/fx/useCurrencyPrefs';
+import { getMinorUnits } from '../../../lib/fx/currencyMeta';
 
 /** Add/edit an expense. `expense` (existing doc) switches this into edit mode —
  * same form and SplitPicker, prefilled, PATCH instead of POST on save. */
@@ -13,9 +17,21 @@ export const ExpenseForm = ({ group, userId, expense, onClose, onSaved }) => {
   const { t } = useTranslation();
   const isEditing = !!expense;
   const activeMembers = Object.entries(group.members || {}).filter(([, m]) => m.status === 'active');
+  const currencySettings = getCurrencySettings(group);
+  const { prefs: currencyPrefs } = useCurrencyPrefs(userId);
 
   const [description, setDescription] = useState(expense?.description || '');
-  const [amount, setAmount] = useState(expense ? String(expense.amountMinor / 100) : '');
+  // Editing a LOCKED (converted) expense reopens the form on its ORIGINAL
+  // amount/currency, not the already-converted mergeCurrency figure — the
+  // user should see/edit what they actually typed, and _resolve_currency
+  // (backend) decides whether the locked rate still applies (plan §3 Decision B).
+  const [currency, setCurrency] = useState(
+    expense?.original?.currency || expense?.currency
+      || (currencySettings.mode === 'merge' ? currencySettings.mergeCurrency : currencyPrefs.defaultCurrency)
+  );
+  const [amount, setAmount] = useState(
+    expense ? String((expense.original?.amountMinor ?? expense.amountMinor) / (10 ** getMinorUnits(currency))) : ''
+  );
   const [date, setDate] = useState(expense?.date || new Date().toISOString().slice(0, 10));
   const [category, setCategory] = useState(expense?.category || DEFAULT_CATEGORIES[0].id);
   const [payerId, setPayerId] = useState(expense?.paidBy || userId);
@@ -33,7 +49,7 @@ export const ExpenseForm = ({ group, userId, expense, onClose, onSaved }) => {
   // owe something, Pour It Yourself handles it — drag (or type) someone's bucket
   // to 0 to exclude them, rather than a separate "who's splitting" step.
   const participantUids = activeMembers.map(([uid]) => uid);
-  const amountMinor = toMinorUnits(amount || 0);
+  const amountMinor = toMinorUnits(amount || 0, currency);
 
   const handleNext = () => {
     if (!description.trim() || !amountMinor) {
@@ -50,7 +66,7 @@ export const ExpenseForm = ({ group, userId, expense, onClose, onSaved }) => {
     setIsSubmitting(true);
 
     const payload = {
-      description: description.trim(), amountMinor, date, category, payerId,
+      description: description.trim(), amountMinor, currency, date, category, payerId,
       participants: participantUids, split: splitInput,
     };
     try {
@@ -111,11 +127,17 @@ export const ExpenseForm = ({ group, userId, expense, onClose, onSaved }) => {
                   type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" min="0" step="0.01"
                   className="flex-1 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none focus:border-indigo-500"
                 />
-                <input
-                  type="date" value={date} onChange={(e) => setDate(e.target.value)}
-                  className="px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none focus:border-indigo-500"
-                />
+                <CurrencyPicker value={currency} onChange={setCurrency} />
               </div>
+              {currencySettings.mode === 'merge' && currency !== currencySettings.mergeCurrency && (
+                <p className="text-xs text-indigo-500 font-medium">
+                  {t('groups.expense.willConvertTo', { currency: currencySettings.mergeCurrency })}
+                </p>
+              )}
+              <input
+                type="date" value={date} onChange={(e) => setDate(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none focus:border-indigo-500"
+              />
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">{t('groups.expense.category')}</label>
                 <div className="grid grid-cols-4 gap-2">
@@ -152,9 +174,10 @@ export const ExpenseForm = ({ group, userId, expense, onClose, onSaved }) => {
             <>
               {error && <p className="text-xs text-rose-500 font-medium mb-2">{error}</p>}
               <SplitPicker
-                group={group} amountMinor={amountMinor} payerId={payerId}
+                group={group} amountMinor={amountMinor} currency={currency} payerId={payerId}
                 participantUids={participantUids} dateStr={date} onConfirm={handleConfirmSplit}
                 initialSplit={expense?.split} isSubmitting={isSubmitting}
+                incomeRatioCurrency={currencySettings.mode === 'merge' ? currencySettings.mergeCurrency : currency}
               />
             </>
           )}

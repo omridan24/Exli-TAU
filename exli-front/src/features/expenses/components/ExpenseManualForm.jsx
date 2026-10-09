@@ -2,8 +2,8 @@ import React, { useState, useRef } from 'react';
 import { X, PenTool, Plus, AlertCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button, CategoryIcon } from '../../../components/UI';
-import { CURRENCIES } from '../../../config/constants';
 import { CloseConfirmationModal } from '../../../components/CloseConfirmationModal.jsx';
+import { CurrencyPicker } from '../../../components/CurrencyPicker';
 
 // Category translation mapping (same as RecurringForm)
 const categoryKeyMap = {
@@ -121,13 +121,11 @@ export const ExpenseManualForm = ({
                                 <label className="block text-sm font-medium text-slate-700 mb-2">
                                     {t('expenses.recurringForm.currency')}
                                 </label>
-                                <select
-                                    className="w-full p-3 border border-slate-300 rounded-xl font-bold bg-white outline-none focus:ring-2 focus:ring-emerald-500"
+                                <CurrencyPicker
                                     value={manualData.currency}
-                                    onChange={e => setManualData({ ...manualData, currency: e.target.value })}
-                                >
-                                    {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
-                                </select>
+                                    onChange={c => setManualData({ ...manualData, currency: c })}
+                                    className="w-full"
+                                />
                             </div>
                         </div>
 

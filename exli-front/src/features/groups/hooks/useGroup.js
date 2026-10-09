@@ -3,7 +3,7 @@ import { collection, doc, onSnapshot, orderBy, query } from 'firebase/firestore'
 import { db } from '../../../config/firebase';
 
 /**
- * Live data for one group page: the group doc, its (non-deleted) expenses, and —
+ * Live data for one group page: the group doc, its (non-deleted) expenses and recorded payments (settlements), and —
  * for an admin only — pending join requests.
  *
  * Note on joinRequests: firestore.rules lets an admin read the WHOLE
@@ -17,6 +17,7 @@ import { db } from '../../../config/firebase';
 export function useGroup(groupId) {
   const [group, setGroup] = useState(null);
   const [expenses, setExpenses] = useState([]);
+  const [settlements, setSettlements] = useState([]);
   const [joinRequests, setJoinRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -60,6 +61,20 @@ export function useGroup(groupId) {
   useEffect(() => {
     if (!groupId) return undefined;
     return onSnapshot(
+      collection(db, 'groups', groupId, 'settlements'),
+      (snap) => {
+        const millis = (d) => d.createdAt?.toMillis?.() ?? Number.MAX_SAFE_INTEGER; // pending local write = newest
+        setSettlements(
+          snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((s) => !s.deleted).sort((a, b) => millis(b) - millis(a))
+        );
+      },
+      (err) => console.error('useGroup (settlements) failed:', err)
+    );
+  }, [groupId]);
+
+  useEffect(() => {
+    if (!groupId) return undefined;
+    return onSnapshot(
       collection(db, 'groups', groupId, 'joinRequests'),
       (snap) =>
         setJoinRequests(
@@ -69,5 +84,5 @@ export function useGroup(groupId) {
     );
   }, [groupId]);
 
-  return { group, expenses, joinRequests, loading, notFound };
+  return { group, expenses, settlements, joinRequests, loading, notFound };
 }

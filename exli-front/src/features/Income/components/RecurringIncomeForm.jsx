@@ -11,6 +11,8 @@ import { TaxBracketGraph } from './TaxBracketGraph.jsx';
 import { MismatchAlert } from './MismatchAlert.jsx';
 import { ExtractionSummary } from './ExtractionSummary.jsx';
 import { CloseConfirmationModal } from '../../../components/CloseConfirmationModal.jsx';
+import { useFx } from '../../../lib/fx/useFx.js';
+import { CurrencyPicker } from '../../../components/CurrencyPicker.jsx';
 
 
 const PENSION_PERCENTAGES = [6.0, 6.5, 7.0, 7.5, 8.0, 8.33, 8.5];
@@ -93,16 +95,33 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
         workplaceDomain: editData?.workplaceDomain || ''
     });
 
-    // Pension/Other Deposits use pensionable gross (Israeli law: excludes food/travel bonuses)
-    // Falls back to regular gross if bruto_pension was not found in the payslip
-    const pensionGross = parseFloat(formData.brutoPension || formData.grossAmount || 0);
-
     const [isSaving, setIsSaving] = useState(false);
     const [selectedDirection, setSelectedDirection] = useState(editData?.direction || '');
     const [validationError, setValidationError] = useState('');
     const [employeeCustom, setEmployeeCustom] = useState(false);
     const [employerCustom, setEmployerCustom] = useState(false);
     const [userCountry, setUserCountry] = useState('Israel');
+
+    // Israeli tax brackets are denominated in ILS (TAX_BRACKETS.Israel.currency)
+    // regardless of the user's own app-wide default currency - see the same
+    // fix in OneTimeIncomeForm.jsx for the full reasoning. A recurring
+    // template has no single date, so this uses today's rate, same as
+    // RecurringForm.jsx's expense-template offer.
+    const { convertTo, dataVersion } = useFx();
+    const activeTaxConfig = getTaxConfig(userCountry);
+    const taxCurrency = activeTaxConfig?.currency || 'ILS';
+    const isForeignTaxCurrency = formData.currency !== taxCurrency;
+    const todayIso = new Date().toISOString().slice(0, 10);
+
+    const rawGrossAmount = parseFloat(formData.grossAmount) || 0;
+    const grossConversion = convertTo({ amount: rawGrossAmount, currency: formData.currency, date: todayIso }, taxCurrency);
+    const grossAmountForTax = grossConversion.value != null ? grossConversion.value : rawGrossAmount;
+
+    // Pension/Other Deposits use pensionable gross (Israeli law: excludes food/travel bonuses)
+    // Falls back to regular gross if bruto_pension was not found in the payslip
+    const rawPensionBasis = parseFloat(formData.brutoPension || formData.grossAmount || 0);
+    const pensionConversion = convertTo({ amount: rawPensionBasis, currency: formData.currency, date: todayIso }, taxCurrency);
+    const pensionGross = pensionConversion.value != null ? pensionConversion.value : rawPensionBasis;
     const [taxCreditPoints, setTaxCreditPoints] = useState(2.25);
     const [calculatedTax, setCalculatedTax] = useState(0);
     const [taxBracketInfo, setTaxBracketInfo] = useState(null);
@@ -216,7 +235,9 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
         }
 
         if (formData.grossAmount && userCountry) {
-            const monthlyGross = parseFloat(formData.grossAmount);
+            // grossAmountForTax is grossAmount already converted to the tax
+            // bracket's own currency (see above) - never the raw entered figure.
+            const monthlyGross = grossAmountForTax;
             const annualGross = monthlyGross * 12; // Convert to annual
 
             const taxConfig = getTaxConfig(userCountry);
@@ -241,7 +262,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                 setAdditionalTaxes(additionalResult);
             }
         }
-    }, [formData.grossAmount, userCountry, taxCreditPoints, hasTax]);
+    }, [formData.grossAmount, grossAmountForTax, userCountry, taxCreditPoints, hasTax, dataVersion]);
 
     // Auto-calculate expected pension (employee + employer + severance)
     // Uses pensionGross (bruto for pension) instead of total gross
@@ -257,7 +278,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                 setFormData(prev => ({ ...prev, expectedPension: total }));
             }
         }
-    }, [formData.grossAmount, formData.brutoPension, formData.employeePct, formData.employerPct, formData.severancePct]);
+    }, [formData.grossAmount, formData.brutoPension, formData.employeePct, formData.employerPct, formData.severancePct, pensionGross, dataVersion]);
 
     // Auto-calculate Neto from Bruto - Tax - Employee Pension - Other Deposits
     useEffect(() => {
@@ -270,7 +291,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
         }
 
         if (formData.grossAmount) {
-            const gross = parseFloat(formData.grossAmount);
+            const gross = grossAmountForTax;
 
             // 1. Employee Pension (uses pensionGross - Israeli law)
             const pension = manualOverrides.pension_employee !== undefined
@@ -301,7 +322,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                 setFormData(prev => ({ ...prev, netAmount: autoNeto }));
             }
         }
-    }, [formData.grossAmount, formData.brutoPension, calculatedTax, additionalTaxes, formData.employeePct, manualOverrides, otherDepositEmployeePct]);
+    }, [formData.grossAmount, formData.brutoPension, calculatedTax, additionalTaxes, formData.employeePct, manualOverrides, otherDepositEmployeePct, grossAmountForTax, pensionGross, dataVersion]);
     // NOTE: NOT including employerPct - employer pension doesn't reduce take-home!
 
     const handleWorkplaceSelect = (workplace) => {
@@ -408,7 +429,7 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
         for (const { month, isForecast } of monthsToAdd.values()) {
             const incomeId = `recurring_${recurringId}_${month}`;
 
-            await setDoc(doc(incomeRef, incomeId), {
+            const monthlyIncomeDoc = {
                 source_name: `${recurringData.occupation} at ${recurringData.workplaceName}`,
                 bruto: recurringData.grossAmount,
                 neto: recurringData.netAmount,
@@ -422,7 +443,12 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                 recurringIncomeId: recurringId,
                 source: 'recurring_auto',
                 createdAt: serverTimestamp()
-            });
+            };
+            if (recurringData.original && recurringData.fx) {
+                monthlyIncomeDoc.original = recurringData.original;
+                monthlyIncomeDoc.fx = recurringData.fx;
+            }
+            await setDoc(doc(incomeRef, incomeId), monthlyIncomeDoc);
         }
     };
 
@@ -450,13 +476,18 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
         setValidationError('');
 
         try {
+            // grossAmount/brutoPension/currency are saved already converted to
+            // taxCurrency (same reasoning as OneTimeIncomeForm.jsx) - this
+            // template is what gets copied verbatim into every month's actual
+            // income doc below, so it must already be correct, not the raw
+            // entered figure in whatever currency was typed.
             const recurringData = {
                 workplaceName: formData.workplaceName,
                 occupation: formData.occupation,
-                grossAmount: parseFloat(formData.grossAmount),
-                brutoPension: formData.brutoPension ? parseFloat(formData.brutoPension) : null,
+                grossAmount: Math.round(grossAmountForTax),
+                brutoPension: formData.brutoPension ? Math.round(pensionGross) : null,
                 netAmount: parseFloat(formData.netAmount),
-                currency: formData.currency,
+                currency: taxCurrency,
                 employeePct: parseFloat(formData.employeePct),
                 employerPct: parseFloat(formData.employerPct),
                 expectedPension: formData.expectedPension,
@@ -478,6 +509,15 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                     totalMonthly: Math.round(pensionGross * ((otherDepositEmployeePct + otherDepositEmployerPct) / 100))
                 }
             };
+            if (isForeignTaxCurrency && grossConversion.value != null) {
+                recurringData.original = { amount: rawGrossAmount, currency: formData.currency };
+                recurringData.fx = {
+                    rate: grossConversion.rate,
+                    rateDate: grossConversion.rateDate,
+                    basis: grossConversion.basis,
+                    convertedAt: new Date().toISOString()
+                };
+            }
 
             let recurringId;
             if (editData) {
@@ -842,12 +882,26 @@ export const RecurringIncomeForm = ({ userId, workplaces, currency, onSave, onCa
                                                 <span className="text-orange-800 font-bold text-lg">{t('income.extraction.fields.grossSalary')}</span>
                                                 <div className="flex items-center gap-4">
                                                     <span className="font-black text-2xl text-orange-900">
-                                                        {parseFloat(formData.grossAmount || 0).toLocaleString()} <span className="text-lg text-orange-700">{formData.currency}</span>
+                                                        {parseFloat(formData.grossAmount || 0).toLocaleString()}
                                                     </span>
+                                                    <CurrencyPicker
+                                                        value={formData.currency}
+                                                        onChange={(c) => setFormData({ ...formData, currency: c })}
+                                                    />
                                                     <button type="button" onClick={() => setEditingField('grossAmount')} className="p-2 text-orange-500 hover:text-orange-700 hover:bg-orange-200/50 rounded-lg transition-colors cursor-pointer" title="Edit Gross Salary">
                                                         ✏️
                                                     </button>
                                                 </div>
+                                            </div>
+                                        )}
+
+                                        {isForeignTaxCurrency && grossConversion.value != null && (
+                                            <div className="mb-4 -mt-2 px-4 text-xs text-orange-600">
+                                                {t('income.recurringForm.taxConversionNote', {
+                                                    amount: Math.round(grossAmountForTax).toLocaleString(),
+                                                    currency: taxCurrency,
+                                                    defaultValue: 'Converted to {{amount}} {{currency}} for tax calculation'
+                                                })}
                                             </div>
                                         )}
 

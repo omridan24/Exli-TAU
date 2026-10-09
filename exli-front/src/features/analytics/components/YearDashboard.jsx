@@ -8,9 +8,15 @@ import { db, logUserAction } from '../../../config/firebase';
 import { AnalyticsReportsView } from './AnalyticsReportsView';
 import { expensesApi } from '../../../config/expensesApi';
 import { AnalyticsTrendsView } from './AnalyticsTrendsView';
+import { useFx } from '../../../lib/fx/useFx';
 
 export const YearDashboard = ({ year, data, income, categories, userId, onBack }) => {
     const { t } = useTranslation();
+    // Called early, before any useMemo below that depends on it - see the
+    // FX plan §1's flagged bug (mixed-currency amounts summed as if they
+    // were one) and the InvestmentNode.jsx TDZ mistake this project already
+    // hit once from getting this ordering wrong.
+    const { toDefault, defaultCurrency, dataVersion } = useFx();
     const [viewMode, setViewMode] = useState('month');
     const [trendType, setTrendType] = useState('expense');
     const [selectedMonth, setSelectedMonth] = useState('average');
@@ -75,18 +81,6 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
         };
     }, [data, income, year]);
 
-    const dominantCurrency = useMemo(() => {
-        if (!data.length) return 'ILS';
-        const counts = {};
-        const validCurrencies = ['ILS', 'USD', 'EUR', 'GBP', '₪', '$', '€', '£'];
-        data.forEach(d => {
-            let c = d.currency || 'ILS';
-            if (!validCurrencies.includes(c) && c.length > 3) c = 'ILS';
-            counts[c] = (counts[c] || 0) + 1;
-        });
-        return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b, 'ILS');
-    }, [data]);
-
     const availableMonths = useMemo(() => {
         const months = new Set([
             ...filteredData.expenses.map(d => d.reportMonth),
@@ -117,14 +111,22 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
     const displayExpenses = useMemo(() => selectedMonth === 'average' ? filteredData.expenses : filteredData.expenses.filter(d => d.reportMonth === selectedMonth), [filteredData.expenses, selectedMonth]);
     const displayIncome = useMemo(() => selectedMonth === 'average' ? filteredData.income : filteredData.income.filter(d => d.month === selectedMonth), [filteredData.income, selectedMonth]);
 
+    // Converts each item to the default currency at ITS OWN date/month before
+    // aggregating - a naive Number(item.amount) here was the exact bug
+    // flagged in docs/fx/01-fx-plan.md §1 (mixed currencies summed as if
+    // they were one). Items that can't be converted are skipped from the
+    // stats (never silently summed) and counted in excludedCount below.
     const categoryStats = useMemo(() => {
         const agg = {};
         displayExpenses.forEach(item => {
-            // Subtract if refund, add otherwise. 
+            const converted = toDefault({ amount: Number(item.amount) || 0, currency: item.currency || 'ILS', date: item.date, month: item.reportMonth });
+            if (converted.value == null) return; // unsupported currency - excluded, not summed as 0 either
+
+            // Subtract if refund, add otherwise.
             // Note: We use Math.abs just in case, though amount should be positive + isRefund=true.
             // If we allow negative inputs as per recent change, we should handle that too.
             // Logic: if isRefund OR amount < 0, it reduces expense.
-            const rawAmt = Number(item.amount);
+            const rawAmt = converted.value;
             const isReduction = item.isRefund || rawAmt < 0;
             const absAmt = Math.abs(rawAmt);
 
@@ -141,18 +143,25 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
             value: Math.max(0, agg[key] / divider), // Clamp to 0 to prevent breaking Pie Chart
             color: categories.find(c => c.name === key)?.color || '#64748b'
         })).sort((a, b) => b.value - a.value).filter(i => i.value > 0); // Filter out zero/negative slices
-    }, [displayExpenses, selectedMonth, availableMonths, categories]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [displayExpenses, selectedMonth, availableMonths, categories, toDefault, dataVersion]);
 
     const incomeStats = useMemo(() => {
         const agg = {};
         const colors = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444'];
         displayIncome.forEach(item => {
             const source = item.source_name || 'Other Income';
+            // All four fields share one currency/month, so one rate lookup
+            // (via a trivial "convert 1 unit" call) applies to every field,
+            // instead of four separate lookups per item.
+            const rateResult = toDefault({ amount: 1, currency: item.currency || 'ILS', month: item.month });
+            if (rateResult.value == null) return; // unsupported currency - excluded
+            const rate = rateResult.value;
             if (!agg[source]) agg[source] = { neto: 0, bruto: 0, taxes: 0, pension: 0, count: 0 };
-            agg[source].neto += Number(item.neto) || 0;
-            agg[source].bruto += Number(item.bruto) || 0;
-            agg[source].taxes += Number(item.taxes) || 0;
-            agg[source].pension += Number(item.pension) || 0;
+            agg[source].neto += (Number(item.neto) || 0) * rate;
+            agg[source].bruto += (Number(item.bruto) || 0) * rate;
+            agg[source].taxes += (Number(item.taxes) || 0) * rate;
+            agg[source].pension += (Number(item.pension) || 0) * rate;
             agg[source].count++;
         });
         const divider = (selectedMonth === 'average' && availableMonths.length > 0) ? availableMonths.length : 1;
@@ -164,7 +173,25 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
             pension: agg[key].pension / divider,
             color: colors[idx % colors.length]
         })).sort((a, b) => b.value - a.value);
-    }, [displayIncome, selectedMonth, availableMonths]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [displayIncome, selectedMonth, availableMonths, toDefault, dataVersion]);
+
+    // A count-only pass (mirrors the skip conditions above) so the UI can
+    // show "N items not included" without changing categoryStats/incomeStats'
+    // shape - both are consumed as plain arrays by child components below.
+    const excludedCount = useMemo(() => {
+        let count = 0;
+        displayExpenses.forEach(item => {
+            const r = toDefault({ amount: Number(item.amount) || 0, currency: item.currency || 'ILS', date: item.date, month: item.reportMonth });
+            if (r.value == null) count++;
+        });
+        displayIncome.forEach(item => {
+            const r = toDefault({ amount: 1, currency: item.currency || 'ILS', month: item.month });
+            if (r.value == null) count++;
+        });
+        return count;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [displayExpenses, displayIncome, toDefault, dataVersion]);
 
     const totalExpenses = categoryStats.reduce((acc, curr) => acc + curr.value, 0);
     const totalIncome = incomeStats.reduce((acc, curr) => acc + curr.value, 0);
@@ -192,12 +219,14 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
             const relevantTx = filteredData.expenses.filter(d => (d.assignedCategory || 'Uncategorized') === selectedCategory && !d.isRefund);
             const monthlyAgg = {};
             relevantTx.forEach(tx => {
+                const converted = toDefault({ amount: Number(tx.amount) || 0, currency: tx.currency || 'ILS', date: tx.date, month: tx.reportMonth });
+                if (converted.value == null) return; // unsupported currency - excluded, not summed as 0
                 const m = tx.reportMonth || 'Unknown';
                 if (!monthlyAgg[m]) monthlyAgg[m] = { amount: 0, recurringAmount: 0 };
                 if (tx.isRecurring) {
-                    monthlyAgg[m].recurringAmount += Number(tx.amount);
+                    monthlyAgg[m].recurringAmount += converted.value;
                 } else {
-                    monthlyAgg[m].amount += Number(tx.amount);
+                    monthlyAgg[m].amount += converted.value;
                 }
             });
             return Object.entries(monthlyAgg).map(([month, data]) => ({ month, amount: data.amount, recurringAmount: data.recurringAmount, totalAmount: data.amount + data.recurringAmount })).sort((a, b) => a.month.localeCompare(b.month));
@@ -205,12 +234,15 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
             const monthlyAgg = {};
             filteredData.income.forEach(inc => {
                 if (selectedJobFilter !== 'ALL_JOBS' && inc.source_name !== selectedJobFilter) return;
+                const converted = toDefault({ amount: Number(inc[selectedIncomeType]) || 0, currency: inc.currency || 'ILS', month: inc.month });
+                if (converted.value == null) return; // unsupported currency - excluded
                 const m = inc.month || 'Unknown';
-                monthlyAgg[m] = (monthlyAgg[m] || 0) + (Number(inc[selectedIncomeType]) || 0);
+                monthlyAgg[m] = (monthlyAgg[m] || 0) + converted.value;
             });
             return Object.entries(monthlyAgg).map(([month, amount]) => ({ month, amount, totalAmount: amount })).sort((a, b) => a.month.localeCompare(b.month));
         }
-    }, [filteredData, selectedCategory, selectedIncomeType, trendType, selectedJobFilter]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filteredData, selectedCategory, selectedIncomeType, trendType, selectedJobFilter, toDefault, dataVersion]);
 
     const trendOverview = useMemo(() => {
         const total = activeTrendData.reduce((acc, curr) => acc + curr.totalAmount, 0);
@@ -486,7 +518,8 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
                     totalExpenses={totalExpenses}
                     totalSavings={totalSavings}
                     savingsRate={savingsRate}
-                    dominantCurrency={dominantCurrency}
+                    dominantCurrency={defaultCurrency}
+                    excludedCount={excludedCount}
                     categoryStats={categoryStats}
                     incomeStats={incomeStats}
                     displayIncome={displayIncome}
@@ -537,7 +570,7 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
                     setSelectedJobFilter={setSelectedJobFilter}
                     jobOptions={jobOptions}
                     trendOverview={trendOverview}
-                    dominantCurrency={dominantCurrency}
+                    dominantCurrency={defaultCurrency}
                     activeTrendData={activeTrendData}
                     totalIncome={totalIncome}
                     categorySpending={categorySpending}

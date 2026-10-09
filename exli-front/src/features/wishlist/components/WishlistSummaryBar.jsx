@@ -3,6 +3,8 @@ import { Search, Filter, Layers, Flame, DollarSign } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { DEFAULT_CATEGORIES } from '../../../config/constants';
 import { getCurrencySymbol } from './WishlistCard';
+import { useFx } from '../../../lib/fx/useFx';
+import { Money } from '../../../components/Money';
 
 export const WishlistSummaryBar = ({
   items = [],
@@ -15,8 +17,10 @@ export const WishlistSummaryBar = ({
   categories = DEFAULT_CATEGORIES
 }) => {
   const { t } = useTranslation();
+  const { sum, defaultCurrency } = useFx();
 
-  // Calculate totals grouped by currency
+  // Calculate totals grouped by currency (the honest per-currency view, kept
+  // alongside the converted total below - docs/fx/01-fx-plan.md §7)
   const currencyTotals = items.reduce((acc, item) => {
     const curr = item.currency || 'ILS';
     const val = Number(item.price || 0);
@@ -25,6 +29,14 @@ export const WishlistSummaryBar = ({
   }, {});
 
   const totalCurrenciesList = Object.entries(currencyTotals);
+
+  // One combined total in the default currency, at the LATEST rate (these
+  // are future purchases, not past transactions - same reasoning as the
+  // per-item conversion in WishlistModal).
+  const { value: combinedTotal, excluded } = sum(
+    items.map((item) => ({ amount: Number(item.price || 0), currency: item.currency || 'ILS' }))
+  );
+  const showCombinedTotal = totalCurrenciesList.length > 1;
 
   return (
     <div className="bg-white border border-slate-200/80 rounded-2xl p-4 md:p-5 shadow-xs mb-6 space-y-4">
@@ -98,17 +110,24 @@ export const WishlistSummaryBar = ({
           <span>{t('wishlist.totalItems', { count: items.length, defaultValue: `${items.length} Items` })}</span>
         </div>
 
-        {/* Total Value Summary per currency */}
-        <div className="flex items-center gap-2">
+        {/* Total Value Summary per currency, plus one converted grand total
+            when there's more than one currency to add together */}
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-slate-400 font-medium">{t('wishlist.totalValue', 'Total Estimated Value')}:</span>
+          {showCombinedTotal && (
+            <span className="px-2.5 py-1 rounded-lg bg-pink-600 text-white font-bold font-mono text-xs">
+              <Money amount={combinedTotal} currency={defaultCurrency} />
+              {excluded.length > 0 && <span className="ms-1 opacity-75">({t('analytics.excludedFromTotals', { count: excluded.length })})</span>}
+            </span>
+          )}
           {totalCurrenciesList.length > 0 ? (
             <div className="flex items-center gap-2 flex-wrap">
-              {totalCurrenciesList.map(([curr, sum]) => (
+              {totalCurrenciesList.map(([curr, total]) => (
                 <span
                   key={curr}
                   className="px-2.5 py-1 rounded-lg bg-pink-50 text-pink-700 font-bold font-mono border border-pink-100 text-xs"
                 >
-                  {getCurrencySymbol(curr)} {sum.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                  {getCurrencySymbol(curr)} {total.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                 </span>
               ))}
             </div>

@@ -14,8 +14,9 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+# lib/ and lib64/ removed from this standard Python template - unanchored, they
+# were also matching exli-front/src/lib/ (this repo has no Python packaging
+# build that would create a real top-level lib/ dir anyway).
 parts/
 sdist/
 var/

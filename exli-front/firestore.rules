@@ -50,6 +50,13 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // 5. FX rates (docs/fx/01-fx-plan.md): read by any signed-in client, written only by the
+    // nightly ingestion job (Admin SDK bypasses rules).
+    match /fxRates/{doc} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
     // Default Lock
     match /{document=**} {
       allow read, write: if false;

@@ -16,6 +16,8 @@ from google.cloud import firestore
 from config import logger
 import services.split_catalog as split_catalog
 import services.income_ratio_service as income_ratio_service
+import services.fx_service as fx_service
+import services.currency_meta as currency_meta
 from services.split_engine import MEMBER_SPECIFIC_KINDS
 from services.currency_codes import VALID_CURRENCY_CODES
 
@@ -41,6 +43,110 @@ DEFAULT_SETTINGS = {
 # (plan 02 §3.3) — safe to drop outright since no groups have been created yet.
 
 VALID_ROLES = {"admin", "member"}
+
+# docs/fx/01-fx-plan.md §6. A group not yet carrying `currencySettings` (every
+# group created before this feature shipped) is read as if it had been
+# migrated to {mode: "merge", mergeCurrency: group.currency} - exactly
+# today's behavior - without ever needing an actual Firestore migration
+# write. New groups always write currencySettings explicitly.
+DEFAULT_CURRENCY = "ILS"
+CURRENCY_MODES = {"merge", "keep_original"}
+
+
+def get_currency_settings(group):
+    settings = group.get("currencySettings")
+    if settings:
+        return settings
+    return {"mode": "merge", "mergeCurrency": group.get("currency", DEFAULT_CURRENCY)}
+
+
+def _clean_currency(code, field_name="currency"):
+    code = (code or "").strip().upper()
+    if code not in currency_meta.supported_currencies():
+        raise ValidationError(f"Unknown or unsupported {field_name}: {code}")
+    return code
+
+
+def _build_currency_settings(mode, merge_currency):
+    if mode not in CURRENCY_MODES:
+        raise ValidationError(f"currencyMode must be one of {sorted(CURRENCY_MODES)}.")
+    if mode == "keep_original":
+        return {"mode": "keep_original", "mergeCurrency": None}
+    return {"mode": "merge", "mergeCurrency": _clean_currency(merge_currency or DEFAULT_CURRENCY, "mergeCurrency")}
+
+
+def _group_ledgers(group):
+    """[(currency, balances)] a group currently holds. keep_original: one per currency, plus the old flat
+    ledger when it carries history from before a merge -> keep_original switch (same rule as the frontend's
+    utils/ledgers.js)."""
+    by_currency = {c: dict(b or {}) for c, b in (group.get("balancesByCurrency") or {}).items()}
+    legacy_currency = group.get("currency") or DEFAULT_CURRENCY
+    flat = group.get("balances") or {}
+    if any(v != 0 for v in flat.values()) and legacy_currency not in by_currency:
+        by_currency[legacy_currency] = dict(flat)
+    return list(by_currency.items())
+
+
+def _resolve_currency_settings_patch(db, group, requested, group_ref=None):
+    """
+    Admin-initiated currency settings change (plan §6: "Admins edit it in
+    GroupSettings"). Handled here:
+      - merge -> keep_original: always allowed, nothing to convert (existing
+        flat `balances` is simply left as-is - it's still shown, see §6 Decision C).
+      - merge -> merge (just changing the settlement currency): converts the
+        existing flat balances at TODAY's rate and logs it, since there's no
+        single "the expenses that produced this balance" date to use.
+      - keep_original -> merge ("Merge history", Decision C): free when every balance is zero; otherwise the
+        caller must first show group_currency_merge_service's explanation and resend with `confirmMerge: true`, so real
+        debts never change silently.
+    """
+    current = get_currency_settings(group)
+    mode = requested.get("mode")
+    if mode not in CURRENCY_MODES:
+        raise ValidationError(f"currencySettings.mode must be one of {sorted(CURRENCY_MODES)}.")
+
+    if mode == "keep_original":
+        return {"currencySettings": {"mode": "keep_original", "mergeCurrency": None}}
+
+    new_currency = _clean_currency(requested.get("mergeCurrency") or DEFAULT_CURRENCY, "mergeCurrency")
+
+    if current["mode"] == "keep_original":
+        # Imported here: the merge service builds on this module.
+        import services.group_currency_merge_service as merge_svc
+        plan = merge_svc.plan_consolidation(db, group_ref, group, new_currency)
+        plan["target"] = new_currency
+        if plan["needsConfirm"] and not requested.get("confirmMerge"):
+            raise ConflictError(
+                "This group has expenses in other currencies. Review how they will be converted, then confirm.",
+                code="MERGE_HISTORY_REQUIRED",
+            )
+        return {
+            "currencySettings": {"mode": "merge", "mergeCurrency": new_currency},
+            "currency": new_currency,
+            "balances": plan["balances"],
+            "balancesByCurrency": {},
+            "lastMergedDate": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "_plan": plan,
+        }
+
+    old_currency = current.get("mergeCurrency") or DEFAULT_CURRENCY
+    updates = {"currencySettings": {"mode": "merge", "mergeCurrency": new_currency}, "currency": new_currency}
+    if new_currency == old_currency:
+        return updates
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    converted_balances = {}
+    for member_uid, amount_minor in (group.get("balances") or {}).items():
+        if not amount_minor:
+            converted_balances[member_uid] = 0
+            continue
+        result = fx_service.convert_minor(db, amount_minor, old_currency, new_currency, date_str=today)
+        if result["amountMinor"] is None:
+            raise ConflictError(f"No exchange rate available to convert {old_currency} to {new_currency} right now.")
+        converted_balances[member_uid] = result["amountMinor"]
+
+    updates["balances"] = converted_balances
+    return updates
 
 
 # ---------------------------------------------------------------------------
@@ -183,12 +289,14 @@ def _is_whitelisted(db, email):
 # Group CRUD
 # ---------------------------------------------------------------------------
 
-def create_group(db, uid, user_info, *, name, description=None, currency="ILS", emoji=None, group_type="other"):
+def create_group(db, uid, user_info, *, name, description=None, currency_mode="merge", merge_currency="ILS",
+                  emoji=None, group_type="other"):
     name = _clean_name(name)
     description = _clean_description(description)
     if not split_catalog.is_valid_type(group_type):
         raise ValidationError(f"Unknown group type: {group_type}")
 
+    currency_settings = _build_currency_settings(currency_mode, merge_currency)
     split_rules, default_split_rule_id = split_catalog.build_default_split_rules(group_type)
 
     group_ref = db.collection("groups").document()
@@ -210,7 +318,14 @@ def create_group(db, uid, user_info, *, name, description=None, currency="ILS", 
         "emoji": emoji,
         "type": group_type,
         "imageUrl": None,  # set later via POST /groups/<gid>/image (plan §7)
-        "currency": currency,  # Phase 1: single currency per group (multi-currency is a later, additive change)
+        "currencySettings": currency_settings,  # docs/fx/01-fx-plan.md §6 - the authoritative setting
+        # Mirrors mergeCurrency for merge mode (kept in sync by every write below) so
+        # older frontend code that still reads the flat `currency` field - and the
+        # frozen, pre-switch `balances` ledger after a merge -> keep_original change -
+        # always has a correct label to show, without every call site needing to
+        # know about currencySettings. None for a fresh keep_original group, which
+        # has no flat balance to label yet.
+        "currency": currency_settings.get("mergeCurrency"),
         "ownerId": uid,
         "memberIds": [uid],
         "members": {uid: member_entry},
@@ -218,6 +333,7 @@ def create_group(db, uid, user_info, *, name, description=None, currency="ILS", 
         "splitRules": split_rules,
         "defaultSplitRuleId": default_split_rule_id,
         "balances": {uid: 0},
+        "balancesByCurrency": {},  # only ever written to in keep_original mode (§6)
         "pendingRequestCount": 0,
         "status": "active",
         "version": SCHEMA_VERSION,
@@ -264,7 +380,9 @@ def update_group(db, uid, group_id, patch):
         updates["description"] = _clean_description(patch["description"])
     if "emoji" in patch:
         updates["emoji"] = patch["emoji"]
-    if "currency" in patch:
+    if "currencySettings" in patch:
+        updates.update(_resolve_currency_settings_patch(db, group, patch["currencySettings"], group_ref=snap.reference))
+    elif "currency" in patch:  # legacy flat relabel, superseded by currencySettings
         code = str(patch["currency"] or DEFAULT_CURRENCY).strip().upper()
         if code not in VALID_CURRENCY_CODES:
             raise ValidationError(f"Unknown currency: {patch['currency']}")
@@ -305,9 +423,15 @@ def update_group(db, uid, group_id, patch):
     if not updates:
         raise ValidationError("No valid fields to update.")
 
+    merge_plan = updates.pop("_plan", None)
+    if merge_plan:
+        import services.group_currency_merge_service as merge_svc
+        merge_svc.apply_plan(db, snap.reference, merge_plan, uid)  # idempotent; a retry only touches what is still foreign
     updates["updatedAt"] = firestore.SERVER_TIMESTAMP
     snap.reference.update(updates)
     log_activity(db, group_id, "SETTINGS_UPDATED", uid, metadata={"fields": list(updates.keys())})
+    if merge_plan:
+        merge_svc.log_merge(db, group_id, uid, merge_plan, merge_plan["target"])  # visible in the group history
     return True
 
 
@@ -337,18 +461,26 @@ def set_split_rules(db, uid, group_id, rules, default_split_rule_id):
     return True
 
 
-def get_income_ratio_preview(db, uid, group_id, for_date):
+def get_income_ratio_preview(db, uid, group_id, for_date, reference_currency=None):
     """
     Any active member can check whether "Split by Income" is usable right now
     (plan §3.7) — this is what lets the SplitPicker show "waiting on Dana's
     September income" before the rule can even be selected.
+
+    reference_currency: what currency the caller is currently drafting the
+    expense in (docs/fx/01-fx-plan.md §6) — defaults to the group's
+    mergeCurrency, or ILS for a keep_original group with nothing chosen yet.
     """
     snap = get_group_or_404(db, group_id)
     group = snap.to_dict()
     if active_role(group, uid) is None:
         raise ForbiddenError("You are not a member of this group.")
 
-    return income_ratio_service.get_income_ratios(db, group, for_date)
+    if not reference_currency:
+        settings = get_currency_settings(group)
+        reference_currency = settings.get("mergeCurrency") or DEFAULT_CURRENCY
+
+    return income_ratio_service.get_income_ratios(db, group, for_date, reference_currency=reference_currency)
 
 
 MAX_INCOME_MONTHS = 24
@@ -366,13 +498,14 @@ def get_income_ratio_months(db, uid, group_id, month_keys):
         raise ForbiddenError("You are not a member of this group.")
 
     keys = list(dict.fromkeys(month_keys or []))[:MAX_INCOME_MONTHS]
+    reference_currency = get_currency_settings(group).get("mergeCurrency") or DEFAULT_CURRENCY
     results = []
     for key in keys:
         try:
             for_date = datetime.strptime(key, "%Y-%m").date()
         except (TypeError, ValueError):
             raise ValidationError("months must be YYYY-MM values.")
-        results.append({"forMonth": key, **income_ratio_service.get_income_ratios(db, group, for_date)})
+        results.append({"forMonth": key, **income_ratio_service.get_income_ratios(db, group, for_date, reference_currency=reference_currency)})
     return results
 
 
@@ -825,7 +958,10 @@ def _remove_member_txn(transaction, group_ref, actor_uid, target_uid, is_self):
         _ensure_not_last_admin(group, exclude_uid=target_uid)
 
     balance = (group.get("balances") or {}).get(target_uid, 0)
-    if balance != 0:
+    has_foreign_balance = any(
+        bucket.get(target_uid, 0) != 0 for bucket in (group.get("balancesByCurrency") or {}).values()
+    )
+    if balance != 0 or has_foreign_balance:
         raise ConflictError("This member has an outstanding balance and can't be removed until it's settled.")
 
     group_update = {

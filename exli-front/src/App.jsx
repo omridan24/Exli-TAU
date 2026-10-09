@@ -9,6 +9,8 @@ import { useTranslation } from 'react-i18next';
 import { auth, db } from './config/firebase';
 import { DEFAULT_CATEGORIES } from './config/constants';
 import { useLanguage } from './hooks/useLanguage';
+import { useCurrencyPrefs } from './lib/fx/useCurrencyPrefs';
+import { CurrencyProvider } from './lib/fx/CurrencyContext';
 import LoginScreen from './features/auth/LoginScreen';
 import AccessDeniedScreen from './features/auth/AccessDeniedScreen';
 import { ExpenseNode } from './features/expenses/ExpenseNode';
@@ -44,6 +46,9 @@ export default function App() {
 
   // Initialize language hook at app level for RTL/LTR switching
   const { isRTL } = useLanguage(user?.uid);
+  // Currency preferences at app level too, so every screen's <Money>/useFx
+  // calls share one CurrencyProvider (docs/fx/01-fx-plan.md §5).
+  const { prefs: currencyPrefs } = useCurrencyPrefs(user?.uid);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
@@ -111,6 +116,7 @@ export default function App() {
   }
 
   return (
+    <CurrencyProvider defaultCurrency={currencyPrefs.defaultCurrency}>
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
       <header className="bg-white border-b border-slate-200 h-16 flex items-center px-6 justify-between sticky top-0 z-50">
         <div className="font-bold text-2xl text-emerald-600 flex gap-2 cursor-pointer" onClick={() => setActiveNode('dashboard')}><ExliLogo /> Exli</div>
@@ -203,5 +209,6 @@ export default function App() {
         />
       )}
     </div>
+    </CurrencyProvider>
   );
 }

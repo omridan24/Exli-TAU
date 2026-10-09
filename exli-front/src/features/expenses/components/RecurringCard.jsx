@@ -5,8 +5,11 @@ import { collection, getDocs, addDoc, deleteDoc, doc, serverTimestamp, query, wh
 import { db, CLOUD_RUN_URL } from '../../../config/firebase.js';
 import { Button } from '../../../components/UI.jsx';
 import { RecurringForm } from './RecurringForm.jsx';
+import { Money } from '../../../components/Money.jsx';
+import { useConvertInPlace } from '../../../lib/fx/useConvertInPlace';
 
 export const RecurringCard = ({ userId, categories, recurringExpenses, onUpdate }) => {
+    const { convertAmountRecord } = useConvertInPlace(userId);
     const { t } = useTranslation();
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [analyzeProgress, setAnalyzeProgress] = useState(null);
@@ -231,7 +234,10 @@ export const RecurringCard = ({ userId, categories, recurringExpenses, onUpdate 
                             </div>
                             <div className="flex items-center gap-3">
                                 <span className="font-bold text-purple-600">
-                                    {exp.amount} {exp.currency}
+                                    <Money
+                                        amount={exp.amount} currency={exp.currency} original={exp.original} fx={exp.fx}
+                                        onConvert={async () => { await convertAmountRecord('recurring_expenses', exp, exp.amount); onUpdate(); }}
+                                    />
                                 </span>
                                 <button
                                     onClick={(e) => { e.stopPropagation(); setDeleteModal({ show: true, expense: exp }); }}

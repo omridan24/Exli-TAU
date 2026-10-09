@@ -1,0 +1,99 @@
+{
+  "_comment": "Shared fixtures for exli-backend/services/fx_engine.py and exli-front/src/lib/fx/fxEngine.js (docs/fx/01-fx-plan.md §3). Every vector uses `table` unless it sets its own. Numeric fields (value, rate) are compared with a small tolerance; everything else must match exactly. Run: python -m pytest exli-backend/tests/test_fx_engine.py and node exli-front/scripts/verify-fx-vectors.mjs.",
+  "table": {
+    "daily": {
+      "2025-08-18": { "USD": 1.0, "ILS": 3.395 },
+      "2025-08-19": { "USD": 1.0, "ILS": 3.39, "EUR": 0.858 },
+      "2025-08-20": { "USD": 1.0, "ILS": 3.4013, "EUR": 0.8583 }
+    },
+    "monthlyAvg": {
+      "2025-08": { "USD": 1.0, "ILS": 3.41, "EUR": 0.857 }
+    },
+    "latest": {
+      "date": "2025-08-25",
+      "rates": { "USD": 1.0, "ILS": 3.45, "EUR": 0.86 }
+    }
+  },
+  "vectors": [
+    {
+      "description": "same currency short-circuits, no lookup needed",
+      "input": { "amount": 100, "from": "USD", "to": "USD", "date": "2025-08-20" },
+      "expected": { "value": 100, "rate": 1, "rateDate": null, "basis": null, "approximate": false }
+    },
+    {
+      "description": "same currency short-circuits even with no date/month at all",
+      "input": { "amount": 50, "from": "ILS", "to": "ILS" },
+      "expected": { "value": 50, "rate": 1, "rateDate": null, "basis": null, "approximate": false }
+    },
+    {
+      "description": "exact-day direct pivot, USD -> ILS",
+      "input": { "amount": 100, "from": "USD", "to": "ILS", "date": "2025-08-20" },
+      "expected": { "value": 340.13, "rate": 3.4013, "rateDate": "2025-08-20", "basis": "day", "approximate": false }
+    },
+    {
+      "description": "exact-day cross pivot, EUR -> ILS (through USD)",
+      "input": { "amount": 100, "from": "EUR", "to": "ILS", "date": "2025-08-20" },
+      "expected": { "value": 396.2833508097402, "rate": 3.962833508097402, "rateDate": "2025-08-20", "basis": "day", "approximate": false }
+    },
+    {
+      "description": "exact-day cross pivot the other direction, ILS -> EUR",
+      "input": { "amount": 340.13, "from": "ILS", "to": "EUR", "date": "2025-08-20" },
+      "expected": { "value": 85.83, "rate": 0.252344691735513, "rateDate": "2025-08-20", "basis": "day", "approximate": false }
+    },
+    {
+      "description": "missing day falls back 1 day to the previous available rate, marked approximate",
+      "input": { "amount": 100, "from": "USD", "to": "ILS", "date": "2025-08-21" },
+      "expected": { "value": 340.13, "rate": 3.4013, "rateDate": "2025-08-20", "basis": "day", "approximate": true }
+    },
+    {
+      "description": "lookback finds a day exactly at the 7-day edge of the window",
+      "input": { "amount": 200, "from": "USD", "to": "ILS", "date": "2025-08-27" },
+      "expected": { "value": 680.26, "rate": 3.4013, "rateDate": "2025-08-20", "basis": "day", "approximate": true }
+    },
+    {
+      "description": "lookback exhausted past 7 days falls back to latest, marked approximate",
+      "input": { "amount": 100, "from": "USD", "to": "ILS", "date": "2025-08-28" },
+      "expected": { "value": 345, "rate": 3.45, "rateDate": "2025-08-25", "basis": "latest", "approximate": true }
+    },
+    {
+      "description": "month-only record uses the monthly average, not approximate",
+      "input": { "amount": 100, "from": "EUR", "to": "ILS", "month": "2025-08" },
+      "expected": { "value": 397.899649941657, "rate": 3.97899649941657, "rateDate": "2025-08", "basis": "monthlyAvg", "approximate": false }
+    },
+    {
+      "description": "month with no average on file falls back to latest",
+      "input": { "amount": 100, "from": "USD", "to": "ILS", "month": "2099-01" },
+      "expected": { "value": 345, "rate": 3.45, "rateDate": "2025-08-25", "basis": "latest", "approximate": true }
+    },
+    {
+      "description": "neither date nor month given falls straight to latest",
+      "input": { "amount": 10, "from": "EUR", "to": "USD" },
+      "expected": { "value": 11.627906976744187, "rate": 1.162790697674419, "rateDate": "2025-08-25", "basis": "latest", "approximate": true }
+    },
+    {
+      "description": "a currency with no data anywhere in the table is unsupported, never silently summed",
+      "input": { "amount": 100, "from": "USD", "to": "ZZZ", "date": "2025-08-20" },
+      "expected": { "value": null, "rate": null, "rateDate": null, "basis": null, "approximate": false, "reason": "unsupported" }
+    },
+    {
+      "description": "an empty table is unsupported for anything other than same-currency",
+      "input": { "amount": 50, "from": "USD", "to": "ILS", "date": "2025-08-20" },
+      "table": { "daily": {}, "monthlyAvg": {}, "latest": null },
+      "expected": { "value": null, "rate": null, "rateDate": null, "basis": null, "approximate": false, "reason": "unsupported" }
+    }
+  ],
+  "errorVectors": [
+    {
+      "description": "missing amount raises FxError, not a silent NaN",
+      "input": { "from": "USD", "to": "ILS", "date": "2025-08-20" }
+    },
+    {
+      "description": "missing 'from' currency raises FxError",
+      "input": { "amount": 100, "to": "ILS", "date": "2025-08-20" }
+    },
+    {
+      "description": "missing 'to' currency raises FxError",
+      "input": { "amount": 100, "from": "USD", "date": "2025-08-20" }
+    }
+  ]
+}

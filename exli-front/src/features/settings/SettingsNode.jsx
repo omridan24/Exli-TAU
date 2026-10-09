@@ -15,6 +15,7 @@ import { CategoryEditorModal } from './components/CategoryEditorModal';
 import { ProfileTab } from './components/ProfileTab';
 import { CategoriesTab } from './components/CategoriesTab';
 import { HistoryTab } from './components/HistoryTab';
+import { CurrencyTab } from './components/CurrencyTab';
 
 export const SettingsNode = ({ userId }) => {
   const { t } = useTranslation();
@@ -145,7 +146,7 @@ export const SettingsNode = ({ userId }) => {
       {/* 1. STICKY TOP HEADER */}
       <div className="sticky top-0 z-40 bg-slate-50/90 backdrop-blur-md py-4 mb-8 -mx-6 px-6 border-b flex items-center justify-between">
         <div className="flex bg-slate-100 p-1 rounded-full">
-          {['profile', 'categories', 'history'].map(tab => (
+          {['profile', 'currency', 'categories', 'history'].map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`px-6 py-1.5 rounded-full text-sm font-bold transition-all ${activeTab === tab ? 'bg-white shadow-sm' : 'text-slate-500'}`}>{t(`settings.tabs.${tab}`)}</button>
           ))}
         </div>
@@ -197,6 +198,10 @@ export const SettingsNode = ({ userId }) => {
 
       <WorkplacePickerModal isOpen={!!showWorkplacePicker} occupationName={showWorkplacePicker} onClose={() => setShowWorkplacePicker(null)} onSelect={addWorkplace} />
       <DatePickerModal isOpen={showDatePicker} onClose={() => setShowDatePicker(false)} onSave={(v) => handleSaveProfile({ ...profile, birthdate: v })} />
+
+      {activeTab === 'currency' && (
+        <CurrencyTab userId={userId} />
+      )}
 
       {activeTab === 'categories' && (
         <CategoriesTab

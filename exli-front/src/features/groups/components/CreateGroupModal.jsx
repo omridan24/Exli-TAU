@@ -2,8 +2,15 @@ import React, { useState } from 'react';
 import { X, Camera, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '../../../components/UI';
+import { CurrencyPicker } from '../../../components/CurrencyPicker';
 import { GROUP_TYPES, GROUP_TYPE_COLOR_CLASSES } from '../utils/groupTypes';
 import { groupsApi } from '../../../config/groupsApi';
+
+// docs/fx/01-fx-plan.md §6: trip groups default to keeping every currency
+// separate (that's the whole point of a trip - $ there, ₪ at home), everything
+// else defaults to merging into one shared currency, as groups always did
+// before this feature existed.
+const KEEP_ORIGINAL_DEFAULT_TYPES = new Set(['trip']);
 
 /**
  * Group creation — type + details, per docs/groups/02-phase2-ui-and-splits-plan.md §1.
@@ -21,8 +28,21 @@ export const CreateGroupModal = ({ isOpen, onClose, onCreated }) => {
   const [imagePreview, setImagePreview] = useState(null);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currencyMode, setCurrencyMode] = useState('merge');
+  const [mergeCurrency, setMergeCurrency] = useState('ILS');
+  const [currencyModeTouched, setCurrencyModeTouched] = useState(false);
 
   if (!isOpen) return null;
+
+  const handleTypeChange = (newType) => {
+    setType(newType);
+    // Only auto-switch the currency mode as long as the admin hasn't
+    // deliberately picked one themselves — once touched, their choice sticks
+    // regardless of which type they click around to afterward.
+    if (!currencyModeTouched) {
+      setCurrencyMode(KEEP_ORIGINAL_DEFAULT_TYPES.has(newType) ? 'keep_original' : 'merge');
+    }
+  };
 
   const handleImageChange = (e) => {
     const file = e.target.files?.[0];
@@ -45,6 +65,8 @@ export const CreateGroupModal = ({ isOpen, onClose, onCreated }) => {
         name: name.trim(),
         description: description.trim() || null,
         type,
+        currencyMode,
+        mergeCurrency: currencyMode === 'merge' ? mergeCurrency : undefined,
       });
 
       if (imageFile) {
@@ -99,7 +121,7 @@ export const CreateGroupModal = ({ isOpen, onClose, onCreated }) => {
                   <button
                     key={groupType.id}
                     type="button"
-                    onClick={() => setType(groupType.id)}
+                    onClick={() => handleTypeChange(groupType.id)}
                     className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl border-2 transition-all ${
                       isActive ? `${colors.bgLight} border-current ${colors.text}` : 'border-slate-100 text-slate-500 hover:border-slate-200'
                     }`}
@@ -110,6 +132,38 @@ export const CreateGroupModal = ({ isOpen, onClose, onCreated }) => {
                 );
               })}
             </div>
+          </div>
+
+          {/* Currency mode — docs/fx/01-fx-plan.md §6 */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">
+              {t('groups.create.currencyModeTitle')}
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {['keep_original', 'merge'].map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => { setCurrencyMode(mode); setCurrencyModeTouched(true); }}
+                  className={`text-start p-3 rounded-xl border-2 transition-all ${
+                    currencyMode === mode ? 'border-indigo-500 bg-indigo-50' : 'border-slate-100 hover:border-slate-200'
+                  }`}
+                >
+                  <span className="text-xs font-bold text-slate-700 block">
+                    {t(`groups.create.currencyMode.${mode}.name`)}
+                  </span>
+                  <span className="text-[11px] text-slate-400 block mt-0.5">
+                    {t(`groups.create.currencyMode.${mode}.description`)}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {currencyMode === 'merge' && (
+              <div className="mt-2 flex items-center gap-2">
+                <span className="text-xs text-slate-500 font-medium">{t('groups.create.mergeCurrencyLabel')}</span>
+                <CurrencyPicker value={mergeCurrency} onChange={setMergeCurrency} />
+              </div>
+            )}
           </div>
 
           {/* Picture */}

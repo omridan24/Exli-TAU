@@ -1487,5 +1487,118 @@ def ingest_market_data():
         logger.error(f"Market data ingestion failed: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
+
+@app.route('/system/ingest-fx', methods=['POST'])
+def ingest_fx():
+    """
+    Trigger the daily FX (exchange rate) ingestion - Phase 1 of
+    docs/fx/01-fx-plan.md. Production-only, same as /system/ingest-market-data
+    (a request whose Host contains "dev" is refused immediately). Runs
+    independently of the stock ingestion job so currencies never share its
+    time budget again (see plan §0.2) - this is meant to be scheduled to run
+    BEFORE it, not folded into it.
+
+    Query params:
+    - force: skip the daily check and run anyway
+    - lookback: override the default lookback window in days (for testing)
+    """
+    from datetime import date, datetime
+    from google.cloud import firestore
+    import time as time_module
+
+    start_time = time_module.time()
+
+    auth_header = request.headers.get("X-System-Key")
+    if not auth_header or auth_header != Config.SYSTEM_API_KEY:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    # Production-only, same reasoning as /system/ingest-market-data: refuse
+    # before touching Firestore or TwelveData at all.
+    if "dev" in request.host.lower():
+        return jsonify({
+            "status": "skipped",
+            "message": "FX ingestion only runs against production. This is the dev environment."
+        })
+
+    force = request.args.get('force', 'false').lower() == 'true'
+    lookback = request.args.get('lookback', type=int, default=None)
+
+    if not Config.TWELVEDATA_API_KEY:
+        return jsonify({"error": "TWELVEDATA_API_KEY not configured"}), 500
+
+    try:
+        db = firestore.Client()
+        today = date.today().isoformat()
+
+        meta_ref = db.collection("_system").document("fxIngestMeta")
+        meta_doc = meta_ref.get()
+        if meta_doc.exists and not force:
+            last_ingestion = meta_doc.to_dict().get("lastIngestionDate", "")
+            if last_ingestion == today:
+                return jsonify({
+                    "status": "skipped",
+                    "message": f"Already ingested today ({today}). Use force=true to override.",
+                    "lastIngestion": last_ingestion
+                })
+
+        from services.providers.twelvedata_provider import TwelveDataProvider
+        from services.symbol_lists import CURRENCY_PAIRS
+        from services.fx_ingest_service import (
+            run_fx_ingestion,
+            usd_pivot_currencies,
+            check_staleness,
+            DEFAULT_LOOKBACK_DAYS,
+        )
+        from services.email_service import send_fx_ingestion_report
+
+        provider = TwelveDataProvider(Config.TWELVEDATA_API_KEY)
+        currencies = usd_pivot_currencies(CURRENCY_PAIRS)
+
+        outcome = run_fx_ingestion(
+            db, provider, currencies,
+            lookback_days=lookback if lookback is not None else DEFAULT_LOOKBACK_DAYS
+        )
+        staleness_warning = check_staleness(db)
+        duration_seconds = time_module.time() - start_time
+
+        meta_ref.set({
+            "lastIngestionDate": today,
+            "lastIngestionTime": datetime.utcnow().isoformat(),
+            "successCount": len(outcome["success"]),
+            "unsupportedCount": len(outcome["unsupported"]),
+            "failedCount": len(outcome["failed"]),
+            "rateLimited": outcome["rateLimited"],
+            "durationSeconds": round(duration_seconds)
+        })
+
+        send_fx_ingestion_report(
+            date=today,
+            success=outcome["success"],
+            unsupported=outcome["unsupported"],
+            failed=outcome["failed"],
+            rate_limited=outcome["rateLimited"],
+            newly_classified=outcome["newlyClassified"],
+            staleness_warning=staleness_warning,
+            duration_seconds=duration_seconds
+        )
+
+        return jsonify({
+            "status": "success",
+            "date": today,
+            "successCount": len(outcome["success"]),
+            "unsupportedCount": len(outcome["unsupported"]),
+            "failedCount": len(outcome["failed"]),
+            "failed": outcome["failed"],
+            "rateLimited": outcome["rateLimited"],
+            "newlyClassified": outcome["newlyClassified"],
+            "stalenessWarning": staleness_warning,
+            "durationSeconds": round(duration_seconds)
+        })
+
+    except Exception as e:
+        logger.error(f"FX ingestion failed: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))

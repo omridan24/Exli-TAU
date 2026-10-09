@@ -1,16 +1,20 @@
 import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowRight, Plus, Search, Settings, UserPlus } from 'lucide-react';
+import { ArrowRight, Plus, Search, Settings, UserPlus, Wallet } from 'lucide-react';
 import { GroupSettings } from './GroupSettings';
 import { InviteModal } from './InviteModal';
 import { useLanguage } from '../../../hooks/useLanguage';
 import { useGroup } from '../hooks/useGroup';
 import { getGroupType, GROUP_TYPE_COLOR_CLASSES } from '../utils/groupTypes';
-import { formatMinorAmount } from '../utils/money';
+import { mainCurrencyOf } from '../utils/groupStats';
+import { getCurrencySettings } from '../utils/currencySettings';
 import { groupsApi } from '../../../config/groupsApi';
 import { ExpenseForm } from './ExpenseForm';
 import { ExpenseListItem } from './ExpenseListItem';
 import { BalancesList } from './BalancesList';
+import { BalanceSummary } from './BalanceSummary';
+import { PayModal } from './PayModal';
+import { PaymentHandlesModal } from './PaymentHandlesModal';
 import { MemberBucketsView } from './MemberBucketsView';
 import { GroupStatsView } from './GroupStatsView';
 import { IncomeMonthlyBreakdown } from './IncomeMonthlyBreakdown';
@@ -35,11 +39,13 @@ const monthNamesFor = (locale) =>
 export const GroupPage = ({ groupId, userId, onBack }) => {
   const { t, i18n } = useTranslation();
   const { isRTL } = useLanguage(userId);
-  const { group, expenses, joinRequests, loading, notFound } = useGroup(groupId);
+  const { group, expenses, settlements, joinRequests, loading, notFound } = useGroup(groupId);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
+  const [settling, setSettling] = useState(null); // { tx, currency, mode } | null
+  const [showHandles, setShowHandles] = useState(false);
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'buckets' | 'stats'
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -53,9 +59,18 @@ export const GroupPage = ({ groupId, userId, onBack }) => {
     () => [...new Set(expenses.map((e) => String(e.date || '').slice(0, 7)).filter(Boolean))],
     [expenses]
   );
-  const totalExpensesMinor = useMemo(() => expenses.reduce((sum, e) => sum + (e.amountMinor || 0), 0), [expenses]);
 
   const isAdmin = group?.members?.[userId]?.role === 'admin';
+  // keep_original groups: the currency most expenses are in; the rest get the convert alert.
+  // merge-mode groups: expenses / payments still recorded in another currency (offered for conversion in Settings)
+  const foreignCount = useMemo(() => {
+    const settings = getCurrencySettings(group || {});
+    if (settings.mode !== 'merge') return 0;
+    const target = settings.mergeCurrency;
+    return expenses.filter((e) => (e.currency || group?.currency || 'ILS') !== target).length
+      + settlements.filter((st) => (st.currency || target) !== target).length;
+  }, [expenses, settlements, group]);
+  const mainCurrency = useMemo(() => mainCurrencyOf(expenses, group), [expenses, group]);
 
   const handleApprove = (targetUid) => groupsApi.approveRequest(groupId, targetUid).catch(console.error);
   const handleReject = (targetUid) => groupsApi.rejectRequest(groupId, targetUid).catch(console.error);
@@ -79,11 +94,10 @@ export const GroupPage = ({ groupId, userId, onBack }) => {
   const defaultRule = (group.splitRules || []).find((r) => r.id === group.defaultSplitRuleId);
   const showIncomeBreakdown = (!group.defaultFixedSplit && group.defaultSplitConfigured && defaultRule?.kind === 'income_ratio')
     || expenses.some((e) => getIncomeSplitInfo(e).isIncome);
-  const myBalance = (group.balances || {})[userId] || 0;
   const activeMembers = Object.entries(group.members || {}).filter(([, m]) => m.status === 'active');
 
   return (
-    <div className="p-6 space-y-6" dir={isRTL ? 'rtl' : 'ltr'}>
+    <div className="p-6 pb-28 space-y-6" dir={isRTL ? 'rtl' : 'ltr'}>
       <div className="flex items-center justify-between">
         <button onClick={onBack} className="flex items-center gap-2 text-slate-500 hover:text-indigo-600 font-medium text-sm">
           <ArrowRight className={`w-4 h-4 ${isRTL ? '' : 'rotate-180'}`} /> {t('groups.page.backToGroups')}
@@ -153,26 +167,10 @@ export const GroupPage = ({ groupId, userId, onBack }) => {
       {activeTab === 'buckets' ? (
         <MemberBucketsView group={group} expenses={expenses} />
       ) : activeTab === 'stats' ? (
-        <GroupStatsView group={group} expenses={expenses} />
+        <GroupStatsView group={group} expenses={expenses} settlements={settlements} userId={userId} isAdmin={isAdmin} />
       ) : (
         <>
-          {/* Balance summary */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-center">
-            {myBalance === 0 ? (
-              <p className="text-lg font-bold text-slate-400">{t('groups.page.allSettled')}</p>
-            ) : myBalance > 0 ? (
-              <p className="text-lg font-bold text-emerald-600">
-                {t('groups.page.youAreOwed', { amount: formatMinorAmount(myBalance, group.currency) })}
-              </p>
-            ) : (
-              <p className="text-lg font-bold text-rose-500">
-                {t('groups.page.youOwe', { amount: formatMinorAmount(-myBalance, group.currency) })}
-              </p>
-            )}
-            <p className="text-lg font-bold text-slate-700">
-              {t('groups.page.totalExpenses', { amount: formatMinorAmount(totalExpensesMinor, group.currency) })}
-            </p>
-          </div>
+          <BalanceSummary group={group} userId={userId} expenses={expenses} />
 
           {showIncomeBreakdown && (
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
@@ -182,11 +180,19 @@ export const GroupPage = ({ groupId, userId, onBack }) => {
             </div>
           )}
 
-          {/* Balances (who owes whom, simplified) */}
-          {activeMembers.length > 2 && (
+          {/* Who owes whom: net balances reduced to the fewest transfers, each with a "mark paid" action */}
+          {activeMembers.length >= 2 && (
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-              <h2 className="font-bold text-slate-800 mb-3">{t('groups.page.balancesTab')}</h2>
-              <BalancesList group={group} />
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <h2 className="font-bold text-slate-800">{t('groups.page.balancesTab')}</h2>
+                <button
+                  type="button" onClick={() => setShowHandles(true)}
+                  className="flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-700"
+                >
+                  <Wallet className="w-4 h-4" /> {t('groups.pay.myDetails')}
+                </button>
+              </div>
+              <BalancesList group={group} userId={userId} onSettle={(tx, currency, mode) => setSettling({ tx, currency, mode })} />
             </div>
           )}
 
@@ -253,12 +259,38 @@ export const GroupPage = ({ groupId, userId, onBack }) => {
               <p className="text-sm text-slate-400 text-center py-4">{t('groups.page.noSearchResults')}</p>
             ) : (
               filteredExpenses.map((expense) => (
-                <ExpenseListItem key={expense.id} expense={expense} group={group} onEdit={() => setEditingExpense(expense)} />
+                <ExpenseListItem
+                  key={expense.id} expense={expense} group={group} onEdit={() => setEditingExpense(expense)}
+                  mainCurrency={mainCurrency} canConvert={isAdmin || expense.createdBy === userId}
+                />
               ))
             )}
           </div>
         </>
       )}
+
+      {/* Floating quick actions, same pill style as Analytics' selection bar */}
+      {activeTab === 'overview' && !showExpenseForm && !editingExpense && !showSettings && !showInvite && !settling && !showHandles && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white p-1.5 rounded-full shadow-2xl flex items-center gap-1 z-50 animate-fade-in">
+          <button
+            type="button" onClick={() => setShowExpenseForm(true)}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-sm transition-colors"
+          >
+            <Plus className="w-4 h-4" /> {t('groups.expense.add')}
+          </button>
+          {isAdmin && (
+            <button
+              type="button" onClick={() => setShowInvite(true)}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-full hover:bg-white/10 font-bold text-sm transition-colors"
+            >
+              <UserPlus className="w-4 h-4" /> {t('groups.page.addPeople')}
+            </button>
+          )}
+        </div>
+      )}
+
+      {settling && <PayModal group={group} tx={settling.tx} currency={settling.currency} mode={settling.mode} onClose={() => setSettling(null)} />}
+      {showHandles && <PaymentHandlesModal group={group} userId={userId} onClose={() => setShowHandles(false)} />}
 
       {(showExpenseForm || editingExpense) && (
         <ExpenseForm
@@ -269,7 +301,7 @@ export const GroupPage = ({ groupId, userId, onBack }) => {
       )}
 
       {showSettings && (
-        <GroupSettings group={group} userId={userId} expenseCount={expenses.length} expenseMonths={expenseMonths} onClose={() => setShowSettings(false)} onDeleted={onBack} />
+        <GroupSettings group={group} userId={userId} expenseCount={expenses.length} expenseMonths={expenseMonths} foreignCount={foreignCount} onClose={() => setShowSettings(false)} onDeleted={onBack} />
       )}
 
       {showInvite && (

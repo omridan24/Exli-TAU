@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { X, Gift, Image, Flame, Zap, Droplet, Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button, CategoryIcon } from '../../../components/UI';
-import { DEFAULT_CATEGORIES, CURRENCIES } from '../../../config/constants';
+import { DEFAULT_CATEGORIES } from '../../../config/constants';
+import { CurrencyPicker } from '../../../components/CurrencyPicker';
 
 export const WishlistModal = ({ isOpen, onClose, onSave, itemToEdit, categories = DEFAULT_CATEGORIES }) => {
   const { t } = useTranslation();
@@ -71,10 +72,12 @@ export const WishlistModal = ({ isOpen, onClose, onSave, itemToEdit, categories 
 
     setIsSubmitting(true);
     try {
-      await onSave({
+      const payload = {
         ...formData,
-        price: parseFloat(formData.price)
-      });
+        price: parseFloat(formData.price),
+        currency: formData.currency
+      };
+      await onSave(payload);
       onClose();
     } catch (err) {
       console.error('Save wishlist item error:', err);
@@ -157,17 +160,11 @@ export const WishlistModal = ({ isOpen, onClose, onSave, itemToEdit, categories 
               <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
                 {t('wishlist.currency', 'Currency')}
               </label>
-              <select
+              <CurrencyPicker
                 value={formData.currency}
-                onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                className="w-full px-3 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 font-bold outline-none focus:bg-white focus:border-pink-500 transition-all"
-              >
-                {CURRENCIES.map((curr) => (
-                  <option key={curr} value={curr}>
-                    {curr}
-                  </option>
-                ))}
-              </select>
+                onChange={(c) => setFormData({ ...formData, currency: c })}
+                className="w-full"
+              />
             </div>
           </div>
 

@@ -8,8 +8,10 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "deploy": "npm run build && firebase deploy --only hosting",
-    "verify:split-vectors": "node scripts/verify-split-vectors.mjs"
+    "verify:fx-vectors": "node scripts/verify-fx-vectors.mjs",
+    "verify:split-vectors": "node scripts/verify-split-vectors.mjs",
+    "verify:debt-vectors": "node scripts/verify-debt-vectors.mjs",
+    "deploy": "npm run build && firebase deploy --only hosting"
   },
   "dependencies": {
     "firebase": "^12.6.0",

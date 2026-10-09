@@ -27,6 +27,9 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [allTransactions, setAllTransactions] = useState([]);
   const [processedTransactions, setProcessedTransactions] = useState([]);
+  // Set once the last transaction is categorized; an effect below then saves the whole batch
+  // (it must wait a render so processedTransactions includes that last one).
+  const [importReady, setImportReady] = useState(false);
   const [isCreatingCat, setIsCreatingCat] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [isEditingAmount, setIsEditingAmount] = useState(false);
@@ -222,7 +225,8 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
               amount: Math.abs(amount),
               originalCategory: row[columnMapping.category] || "Uncategorized",
               currency: row[columnMapping.currency] || "ILS",
-              sourceCard: card_info
+              sourceCard: card_info,
+              ...extractChargedAmount(row, columnMapping)
             };
           });
           queue = [...queue, ...fileTx];
@@ -244,6 +248,24 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // The card statement's own charged amount wins over the market rate
+  // (docs/fx/01-fx-plan.md §3 Decision B, Phase 5): some statements show
+  // both the original foreign amount AND the actual local-currency amount
+  // billed (including the card network/bank's own FX fee) - when the AI
+  // extraction or column mapping found such a column, it's the closest
+  // possible number to reality and is used verbatim instead of asking
+  // TwelveData for that day's market rate.
+  const extractChargedAmount = (row, columnMapping) => {
+    if (columnMapping.chargedAmount == null) return {};
+    const raw = row[columnMapping.chargedAmount];
+    const parsed = parseFloat(String(raw).replace(/[^0-9.-]+/g, ""));
+    if (isNaN(parsed) || parsed === 0) return {};
+    const chargedCurrency = columnMapping.chargedCurrency != null
+      ? (row[columnMapping.chargedCurrency] || 'ILS')
+      : 'ILS'; // statements pair a foreign amount with a local (usually ILS) charge
+    return { chargedAmount: Math.abs(parsed), chargedCurrency };
   };
 
   const mapBackendToIndices = (mapping, headers) => {
@@ -280,7 +302,8 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
           amount: Math.abs(amount),
           originalCategory: row[columnMapping.category] || "Uncategorized",
           currency: row[columnMapping.currency] || "ILS",
-          sourceCard: card_info
+          sourceCard: card_info,
+          ...extractChargedAmount(row, columnMapping)
         };
       });
       queue = [...queue, ...fileTx];
@@ -371,11 +394,13 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
     try {
       const expensesRef = collection(db, 'users', userId, 'expenses');
 
-      await addDoc(expensesRef, {
+      // Saved in the currency it was entered in; a ForeignCurrencyAlert offers the conversion later.
+      const resolved = { amount: parseFloat(manualData.amount), currency: manualData.currency };
+      const expenseDoc = {
         date: new Date(manualData.date).toISOString(),
         description: manualData.description,
-        amount: parseFloat(manualData.amount),
-        currency: manualData.currency,
+        amount: resolved.amount,
+        currency: resolved.currency,
         assignedCategory: categoryName,
         reportMonth: reportMonth,
         isRefund: isRefund,
@@ -383,7 +408,9 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
         source: 'manual',
         status: 'active',
         createdAt: serverTimestamp()
-      });
+      };
+
+      await addDoc(expensesRef, expenseDoc);
       logUserAction(userId, 'MANUAL_EXPENSE', `Added ${manualData.amount} for ${manualData.description}`);
       setStep(4);
     } catch (e) {
@@ -416,16 +443,58 @@ export const ExpenseNode = ({ userId, categories, expenses, onUpdateCategories, 
     if (isLoading) return;
     moveToNext();
   };
-  const moveToNext = () => currentIndex < allTransactions.length - 1 ? setCurrentIndex(prev => prev + 1) : finishImport();
+  const moveToNext = () => {
+    if (currentIndex < allTransactions.length - 1) {
+      setCurrentIndex(prev => prev + 1);
+      return;
+    }
+    // Last transaction just got categorized; processedTransactions won't reflect it until the
+    // next render (setProcessedTransactions above is still queued), so just flag it and let
+    // the effect below save.
+    setImportReady(true);
+  };
+
+  useEffect(() => {
+    if (importReady) {
+      setImportReady(false);
+      finishImport();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [importReady]);
 
   const finishImport = async () => {
     setIsLoading(true);
     try {
       const expensesRef = collection(db, 'users', userId, 'expenses');
 
+      // A row with its own statement-charged amount (Decision B, Phase 5) is stored in the
+      // charged currency - the closest possible number to what was actually billed, including
+      // the card's own FX fee. Every other row keeps the currency it was made in.
+      const resolvedTransactions = processedTransactions.map(tx => {
+        // chargedAmount/chargedCurrency are transient extraction fields, not
+        // meant to persist on the saved doc - whatever they resolve to lands
+        // in `fx` instead.
+        const { chargedAmount, chargedCurrency, ...baseTx } = tx;
+        if (chargedAmount != null && chargedCurrency && chargedCurrency !== tx.currency) {
+          return {
+            ...baseTx,
+            amount: chargedAmount,
+            currency: chargedCurrency,
+            original: { amount: tx.amount, currency: tx.currency },
+            fx: {
+              source: 'statement',
+              chargedAmount,
+              chargedCurrency,
+              convertedAt: new Date().toISOString()
+            }
+          };
+        }
+        return baseTx;
+      });
+
       // Group transactions by signature to handle legitimate duplicates (e.g., 2 coffees same day)
       const transactionGroups = {};
-      processedTransactions.forEach(tx => {
+      resolvedTransactions.forEach(tx => {
         const sig = `${tx.date.split('T')[0]}_${tx.amount}_${tx.description.replace(/[^a-zA-Z0-9]/g, '')}`;
         if (!transactionGroups[sig]) transactionGroups[sig] = [];
         transactionGroups[sig].push(tx);

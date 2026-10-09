@@ -225,3 +225,152 @@ Timestamp: {datetime.utcnow().isoformat()}Z
     except Exception as e:
         logger.error(f"Failed to send ingestion report email: {e}")
         return False
+
+
+def send_fx_ingestion_report(
+    date: str,
+    success: list,
+    unsupported: list,
+    failed: list,
+    rate_limited: bool = False,
+    newly_classified: dict = None,
+    staleness_warning: str = None,
+    duration_seconds: float = 0
+):
+    """
+    Send an email summary of the daily FX (exchange rate) ingestion -
+    docs/fx/01-fx-plan.md §2.3. Same visual style as send_ingestion_report(),
+    kept as its own function since FX ingestion tracks per-currency
+    success/unsupported/failed rather than stock-style success/failed/skipped
+    counts, plus a staleness alarm that has no stock equivalent.
+
+    Args:
+        date: Ingestion date
+        success: Currency codes successfully fetched today (includes USD)
+        unsupported: Currency codes TwelveData has no data for (permanent)
+        failed: Currency codes that errored this run (may succeed tomorrow)
+        rate_limited: Whether the run stopped early on a rate-limit signal
+        newly_classified: {currency: "direct"|"inverted"|"unsupported"} for
+            currencies classified for the first time this run
+        staleness_warning: Set if fxRates/latest is older than the threshold -
+            this is the alarm that would have caught the currencies-frozen-
+            since-January bug (§0.2) months earlier
+        duration_seconds: How long the ingestion took
+    """
+    if not SMTP_USER or not SMTP_PASSWORD:
+        logger.warning("Email not configured (SMTP_USER/SMTP_PASSWORD missing). Skipping FX notification.")
+        return False
+
+    try:
+        newly_classified = newly_classified or {}
+        subject = f"💱 Exli FX Ingestion - {date}"
+
+        if staleness_warning:
+            status_emoji, status_text = "🚨", "STALE DATA"
+        elif failed or rate_limited:
+            status_emoji, status_text = "⚠️", "PARTIAL SUCCESS"
+        else:
+            status_emoji, status_text = "✅", "SUCCESS"
+
+        if duration_seconds >= 60:
+            duration_str = f"{duration_seconds / 60:.1f} minutes"
+        else:
+            duration_str = f"{duration_seconds:.1f} seconds"
+
+        newly_classified_rows_html = "".join(
+            f"<tr><td>{currency}</td><td>{direction}</td></tr>"
+            for currency, direction in newly_classified.items()
+        )
+        newly_classified_text = "\n".join(
+            f"  {currency}: {direction}" for currency, direction in newly_classified.items()
+        )
+
+        html_body = f"""
+        <html>
+        <head>
+            <style>
+                body {{ font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }}
+                .container {{ max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; padding: 24px; }}
+                .header {{ text-align: center; margin-bottom: 24px; }}
+                .status {{ font-size: 24px; font-weight: bold; }}
+                .stats-grid {{ display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin: 24px 0; text-align: center; }}
+                .stat-card {{ background: #f8f9fa; border-radius: 8px; padding: 16px; }}
+                .stat-label {{ color: #666; font-size: 12px; text-transform: uppercase; }}
+                .stat-value {{ font-size: 24px; font-weight: bold; margin-top: 4px; }}
+                .success {{ color: #10b981; }}
+                .failed {{ color: #ef4444; }}
+                .skipped {{ color: #6b7280; }}
+                .warning {{ background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 12px; margin: 16px 0; }}
+                .meta {{ color: #666; font-size: 14px; border-top: 1px solid #eee; padding-top: 16px; margin-top: 24px; }}
+                table {{ width: 100%; border-collapse: collapse; margin-top: 16px; }}
+                th, td {{ padding: 8px 12px; text-align: left; border-bottom: 1px solid #eee; }}
+                th {{ background: #f8f9fa; font-weight: 600; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <div class="status">{status_emoji} {status_text}</div>
+                    <p>FX (Exchange Rate) Ingestion Report</p>
+                </div>
+
+                {"<div class='warning'>⚠️ " + staleness_warning + "</div>" if staleness_warning else ""}
+
+                <div class="stats-grid">
+                    <div class="stat-card"><div class="stat-label">Fetched</div><div class="stat-value success">{len(success)}</div></div>
+                    <div class="stat-card"><div class="stat-label">Unsupported</div><div class="stat-value skipped">{len(unsupported)}</div></div>
+                    <div class="stat-card"><div class="stat-label">Failed</div><div class="stat-value failed">{len(failed)}</div></div>
+                </div>
+
+                {"<h3>Newly Classified This Run</h3><table><tr><th>Currency</th><th>Direction</th></tr>" + newly_classified_rows_html + "</table>" if newly_classified else ""}
+
+                <div class="meta">
+                    <p><strong>Date:</strong> {date}</p>
+                    <p><strong>Duration:</strong> {duration_str}</p>
+                    {"<p><strong>Note:</strong> Stopped early - provider appeared to be rate-limited</p>" if rate_limited else ""}
+                    {"<p><strong>Failed currencies:</strong> " + ", ".join(failed) + "</p>" if failed else ""}
+                    <p><strong>Timestamp:</strong> {datetime.utcnow().isoformat()}Z</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+
+        text_body = f"""
+Exli FX Ingestion Report
+========================
+
+Status: {status_text}
+Date: {date}
+{"STALE: " + staleness_warning if staleness_warning else ""}
+
+Fetched: {len(success)}
+Unsupported: {len(unsupported)}
+Failed: {len(failed)}
+{chr(10) + "Failed currencies: " + ", ".join(failed) if failed else ""}
+{chr(10) + "Newly classified this run:" + chr(10) + newly_classified_text if newly_classified else ""}
+
+Duration: {duration_str}
+{"Stopped early - provider appeared to be rate-limited" if rate_limited else ""}
+Timestamp: {datetime.utcnow().isoformat()}Z
+        """
+
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = SMTP_USER
+        msg["To"] = NOTIFICATION_EMAIL
+
+        msg.attach(MIMEText(text_body, "plain"))
+        msg.attach(MIMEText(html_body, "html"))
+
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.sendmail(SMTP_USER, NOTIFICATION_EMAIL, msg.as_string())
+
+        logger.info(f"📧 FX ingestion report email sent to {NOTIFICATION_EMAIL}")
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to send FX ingestion report email: {e}")
+        return False

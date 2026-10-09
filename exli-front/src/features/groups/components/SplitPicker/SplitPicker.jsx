@@ -12,7 +12,10 @@ import { formatMonth } from '../../utils/expenseSplit';
  * "apply" mode only for now (plan §4.1) — picking a split when adding an expense.
  * "configure" (creation wizard) and "manage" (admin rule editor) land in a follow-up.
  */
-export const SplitPicker = ({ group, amountMinor, payerId, participantUids, dateStr, onConfirm, initialSplit, isSubmitting }) => {
+export const SplitPicker = ({
+  group, amountMinor, currency, payerId, participantUids, dateStr, onConfirm, initialSplit, isSubmitting,
+  incomeRatioCurrency,
+}) => {
   const { t, i18n } = useTranslation();
   const rules = (group.splitRules || []).filter((r) => !r.hidden);
   const isInitialCustom = !!initialSplit && !initialSplit.splitRuleId && initialSplit.kind === 'custom';
@@ -36,8 +39,10 @@ export const SplitPicker = ({ group, amountMinor, payerId, participantUids, date
   const hasIncomeRule = rules.some((r) => r.kind === 'income_ratio');
   useEffect(() => {
     if (!hasIncomeRule) return;
-    groupsApi.getIncomeRatioPreview(group.id, dateStr).then(setIncomeRatio).catch(() => setIncomeRatio({ ready: false, missing: [] }));
-  }, [hasIncomeRule, group.id, dateStr]);
+    groupsApi.getIncomeRatioPreview(group.id, dateStr, incomeRatioCurrency)
+      .then(setIncomeRatio)
+      .catch(() => setIncomeRatio({ ready: false, missing: [] }));
+  }, [hasIncomeRule, group.id, dateStr, incomeRatioCurrency]);
 
   // "Your Treat" is 2-person only — "your" is singular, so with 3+ participants
   // it'd silently become "split among everyone else" instead of pointing at one
@@ -142,7 +147,7 @@ export const SplitPicker = ({ group, amountMinor, payerId, participantUids, date
                 rule={rule}
                 shares={previewFor(rule)}
                 members={members}
-                currency={group.currency}
+                currency={currency}
                 isSelected={selectedRuleId === rule.id}
                 isDisabled={!!disabledReason}
                 disabledReason={disabledReason || ''}
@@ -165,7 +170,7 @@ export const SplitPicker = ({ group, amountMinor, payerId, participantUids, date
             ← {t('groups.create.back')}
           </button>
           <PourItYourself
-            participants={participants} amountMinor={amountMinor} currency={group.currency}
+            participants={participants} amountMinor={amountMinor} currency={currency}
             onChange={setCustomShares} initialAmounts={isInitialCustom ? initialSplit.params?.amounts : null}
           />
         </div>

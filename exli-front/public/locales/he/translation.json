@@ -185,7 +185,8 @@
                 "pastExceed": "תקופת העבר לא יכולה לעלות על 5 שנים (60 חודשים). בחרת {{months}} חודשים.",
                 "futureExceed": "תקופת העתיד לא יכולה לעלות על 5 שנים (60 חודשים). בחרת {{months}} חודשים.",
                 "frequencyExceed": "מרווח התדירות ({{frequency}} חודשים) לא יכול לעלות על טווח התקופה ({{period}} חודשים)",
-                "saveFailed": "שמירת ההוצאה הקבועה נכשלה"
+                "saveFailed": "שמירת ההוצאה הקבועה נכשלה",
+                "chooseCurrency": "אנא בחרו אם להמיר את מטבע הוצאה הזו לפני שממשיכים."
             },
             "periodPresets": {
                 "3months": "3 חודשים",
@@ -367,7 +368,8 @@
             "overridePension": "ערוך הפרשת עובד",
             "overrideOtherDeposit": "ערוך הפקדה אחרת",
             "employerPensionNote": "* הפרשות מעסיק ({{emp}}%) ופיצויים ({{sev}}%) משולמות ע\"י המעסיק ואינן מופחתות מהנטו.",
-            "saveButton": "שמור הכנסה"
+            "saveButton": "שמור הכנסה",
+            "taxConversionNote": "הומר ל-{{amount}} {{currency}} לצורך חישוב מס"
         },
         "recurringForm": {
             "newRecurring": "הכנסה קבועה חדשה",
@@ -437,7 +439,8 @@
             "nationalInsurance": "ביטוח לאומי",
             "pensionLabel": "פנסיה",
             "kerenHishtalmutLabel": "קרן השתלמות",
-            "kerenHishtalmut": "קרן השתלמות"
+            "kerenHishtalmut": "קרן השתלמות",
+            "taxConversionNote": "הומר ל-{{amount}} {{currency}} לצורך חישוב מס"
         },
         "recurringCard": {
             "title": "הכנסה קבועה",
@@ -529,7 +532,8 @@
         "tabs": {
             "profile": "פרופיל",
             "categories": "קטגוריות",
-            "history": "היסטוריה"
+            "history": "היסטוריה",
+            "currency": "מטבע"
         },
         "language": "שפה",
         "languageSection": {
@@ -598,6 +602,27 @@
             "citiesIn": "ערים ב{{country}}",
             "universitiesIn": "אוניברסיטאות ב{{country}}",
             "selectStatus": "בחר סטטוס"
+        },
+        "currency": {
+            "title": "מטבע",
+            "defaultCurrency": "מטבע ברירת מחדל",
+            "defaultCurrencyHint": "סכומים במטבעות אחרות יוצגו מומרים למטבע זה.",
+            "favorites": "מטבעות מועדפות",
+            "switch": {
+                "title": "מטבע ברירת המחדל הוא עכשיו {{to}}",
+                "mostIn": "{{count}} מתוך {{total}} הרשומות שלך הן ב-{{from}}, ושינית את ברירת המחדל ל-{{to}}. להמיר את הרשומות ל-{{to}}?",
+                "someIn": "{{count}} מהרשומות שלך במטבעות אחרים. להמיר אותן ל-{{to}}?",
+                "keepHint": "אם תשאיר, כל רשומה תישאר במטבע שבו נוצרה. שום דבר לא ישתנה עד שתאשר.",
+                "keep": "השאר כמו שהן",
+                "convert": "המר {{count}} רשומות",
+                "confirm": "הפעולה תשכתב {{count}} רשומות שמורות ל-{{currency}}.",
+                "confirmHint": "כל רשומה מומרת לפי שער החליפין של התאריך שלה, והסכום המקורי נשמר ברשומה.",
+                "confirmYes": "כן, המר {{count}}",
+                "working": "ממיר את הרשומות...",
+                "done": "הומרו {{count}} רשומות ל-{{currency}}.",
+                "skipped": "{{count}} לא ניתן היה להמיר (אין שער חליפין זמין).",
+                "failed": "משהו השתבש: {{error}}"
+            }
         }
     },
     "datePicker": {
@@ -853,6 +878,12 @@
         "recurringTag": "קבוע",
         "allJobs": "כל העבודות",
         "select": "בחר",
+        "excludedFromTotals": "{{count}} פריטים לא נכללו - אין שער חליפין זמין",
+        "foreignRecordsThisMonth": "{{count}} רשומות החודש הן במטבע אחר",
+        "convertMonthTo": "המרה ל-{{currency}}",
+        "convertMonthConfirm": "להמיר {{count}} רשומות ל-{{currency}}, לפי השער של כל תאריך?",
+        "convertMonthDone": "הומרו {{written}} רשומות.",
+        "convertMonthDoneWithSkipped": "הומרו {{written}} רשומות - {{skipped}} לא ניתן להמיר (אין שער זמין).",
         "moveToGroup": "העברה לקבוצה",
         "sharedInGroup": "משותף ב{{name}}",
         "sharedInGroupTooltip": "זה החלק שלך אחרי החלוקה בקבוצה",
@@ -1262,6 +1293,27 @@
         "shareMessage": "הוסף הודעה (רשות)",
         "shareMessagePlaceholder": "תראו את הפריט הזה מרשימת המשאלות שלי!"
     },
+    "money": {
+        "convertedFrom": "{{originalAmount}} × {{rate}} = הומר ל-{{currency}}",
+        "approximateNote": "שער מתאריך {{date}}",
+        "monthlyAvgNote": "שער ממוצע חודשי עבור {{month}}",
+        "unsupported": "אין שער חליפין זמין למטבע זה"
+    },
+    "foreignAlert": {
+        "tooltip": "ב-{{currency}}, לא במטבע ברירת המחדל {{defaultCurrency}}. לחצו לפרטים.",
+        "title": "הסכום הזה ב-{{currency}}",
+        "explain": "מטבע ברירת המחדל שלך הוא {{defaultCurrency}}, אבל הסכום נרשם ב-{{currency}}, ולכן הוא לא נספר בסיכומים ב-{{defaultCurrency}} כמו שאולי היית מצפה.",
+        "rate": "שער: 1 {{from}} = {{rate}} {{to}}",
+        "hint": "ההמרה שומרת ברשומה את הסכום המקורי ב-{{currency}}, כך שתמיד אפשר לראות מה הוא היה.",
+        "keep": "השאר ב-{{currency}}",
+        "convert": "המר ל-{{defaultCurrency}}"
+    },
+    "currencyPicker": {
+        "title": "בחרו מטבע",
+        "select": "בחרו מטבע",
+        "search": "חפשו מטבע...",
+        "favorites": "מועדפים"
+    },
     "groups": {
         "types": {
             "partner": {
@@ -1354,6 +1406,18 @@
             "create": "יצירת קבוצה",
             "creating": "יוצר...",
             "cancel": "ביטול",
+            "currencyModeTitle": "איך יתנהל הכסף בקבוצה הזו?",
+            "mergeCurrencyLabel": "מטבע משותף:",
+            "currencyMode": {
+                "merge": {
+                    "name": "מטבע משותף אחד",
+                    "description": "כל הוצאה מומרת אוטומטית למטבע אחד."
+                },
+                "keep_original": {
+                    "name": "לשמור על מטבעות נפרדים",
+                    "description": "לכל מטבע יש יתרה משלו — בלי המרות."
+                }
+            },
             "errors": {
                 "nameRequired": "נא להזין שם לקבוצה"
             }
@@ -1370,9 +1434,12 @@
             "buckets": {
                 "paid": "שילם",
                 "shouldPay": "צריך לשלם",
-                "ahead": "{{amount}} קדימה",
-                "behind": "{{amount}} מאחור",
-                "settled": "מאוזן"
+                "ahead": "זכאי ל-{{amount}}",
+                "behind": "חייב {{amount}}",
+                "settled": "מאוזן",
+                "legendPaid": "שילם עד כה",
+                "legendShouldPay": "אמור לשלם (החלק שלו)",
+                "legendGap": "פסים: הפער, מה שעדיין חייבים או ששולם ביתר"
             },
             "copyLink": "העתקת קישור",
             "copied": "הועתק!",
@@ -1390,7 +1457,14 @@
             "statsTab": "סטטיסטיקות נוספות",
             "totalExpenses": "סך ההוצאות בקבוצה: {{amount}}",
             "searchPlaceholder": "חיפוש לפי שם, תאריך או חודש (למשל מרץ, 2026-03)",
-            "noSearchResults": "לא נמצאו הוצאות התואמות לחיפוש."
+            "noSearchResults": "לא נמצאו הוצאות התואמות לחיפוש.",
+            "you": "את/ה",
+            "markPaid": "סמן ששולם",
+            "markReceived": "סמן שהתקבל",
+            "summaryOwedToYou": "חייבים לך",
+            "summaryYouOwe": "אתה חייב",
+            "summaryNet": "נטו",
+            "summaryMissingRate": "{{count}} יתרות לא נספרו: עדיין אין שער חליפין"
         },
         "join": {
             "askToJoin": "בקשה להצטרף",
@@ -1415,7 +1489,8 @@
             "editTitle": "עריכת הוצאה",
             "deleteConfirm": "למחוק את ההוצאה הזו? לא ניתן לבטל פעולה זו.",
             "delete": "מחיקת הוצאה זו",
-            "category": "קטגוריה"
+            "category": "קטגוריה",
+            "willConvertTo": "יומר ל-{{currency}} בשער היום/תאריך ההוצאה."
         },
         "splitPicker": {
             "confirm": "לחלק",
@@ -1440,7 +1515,23 @@
                 "shareMessage": "הצטרפו לקבוצה \"{{groupName}}\" באקסלי: {{link}}"
             },
             "currency": "מטבע",
-            "currencyHint": "משמש לכל הסכומים בקבוצה. שינוי המטבע משנה את התווית של הסכומים הקיימים ואינו ממיר אותם."
+            "currencyHint": "משמש לכל הסכומים בקבוצה. שינוי המטבע משנה את התווית של הסכומים הקיימים ואינו ממיר אותם.",
+            "merge": {
+                "title": "המרת ההוצאות ל-{{currency}}",
+                "explain": "כל הוצאה ותשלום במטבע אחר מומרים למטבע משותף אחד. כל הוצאה מומרת לפי שער החליפין של היום שבו נעשתה, והסכום המקורי נשמר עליה. אחר כך היתרות מחושבות מחדש מההוצאות, כך שהסכומים, הסטטיסטיקות ומי חייב למי נגזרים מהן. שום דבר לא משתנה עד האישור, וזה נרשם בהיסטוריית הקבוצה.",
+                "currencyTitle": "{{from}} אל {{to}}",
+                "expensesLine": "{{count}} הוצאות ב-{{from}} (סה\"כ {{total}}, מ-{{first}} עד {{last}}) הופכות ל-{{newTotal}}. שער ממוצע 1 {{from}} = {{rate}} {{to}}, השערים היומיים נעו בין {{min}} ל-{{max}}.",
+                "paymentsLine": "תשלומים שנרשמו ב-{{from}} ({{amount}}) מומרים באותו שער ממוצע, כך שחובות ששולמו כבר ב-{{from}} נשארים משולמים.",
+                "balancesTitle": "היתרות אחרי ההמרה",
+                "derivedNote": "מחושב מכל ההוצאות והתשלומים בקבוצה.",
+                "even": "מאוזן",
+                "owes": "חייב {{amount}}",
+                "isOwed": "זכאי ל-{{amount}}",
+                "was": "היה: {{value}}",
+                "confirm": "המר והמשך",
+                "leftover": "{{count}} הוצאות או תשלומים עדיין רשומים במטבע שאינו {{currency}}.",
+                "review": "בדוק והמר"
+            }
         },
         "transfer": {
             "selectTitle": "העברה לקבוצה",
@@ -1462,16 +1553,34 @@
             "title": "איך זה חולק"
         },
         "stats": {
-            "total": "סך הוצאות",
+            "total": "סה\"כ הוצאות",
             "count": "הוצאות",
             "average": "הוצאה ממוצעת",
-            "byMonth": "לפי חודש - מי שילם מה",
-            "paidBy": "שולם על ידי {{name}}",
-            "shareVsPaid": "חלק כל חבר מול מה ששילם",
-            "paidShare": "שילם {{paid}} · חלק {{share}} ({{pct}}%)",
-            "byCategory": "לפי קטגוריה",
+            "topPayer": "שילם הכי הרבה",
+            "paidAmount": "שילם {{amount}}",
+            "viewIn": "הצג ב",
+            "allConverted": "הכול, ב-{{currency}}",
+            "approxNote": "הכול מומר ל-{{currency}} לפי השער של תאריך כל הוצאה, ולכן הסכומים משוערים. שום דבר לא נשמר.",
+            "excluded": "{{count}} הוצאות לא נכללו כי אין שער חליפין זמין.",
+            "monthlySpending": "הוצאות לפי חודש",
+            "monthlyHint": "כל עמודה מחולקת לפי מי ששילם.",
+            "whereMoneyGoes": "על מה הולך הכסף",
             "uncategorized": "ללא קטגוריה",
-            "biggest": "ההוצאות הגדולות ביותר"
+            "paidVsShare": "ששילם מול החלק ההוגן",
+            "paidVsShareHint": "כמה כל אחד הכניס בהשוואה למה שהוא חייב על מה שהשתתף בו.",
+            "paid": "שילם",
+            "share": "חלק",
+            "even": "מאוזן",
+            "paidMore": "שילם {{amount}} יותר",
+            "paidLess": "שילם {{amount}} פחות",
+            "biggest": "ההוצאות הגדולות ביותר",
+            "payments": "תשלומים בין חברים",
+            "paymentsHint": "כל פעם שמישהו סימן חוב כשולם.",
+            "noPayments": "עוד לא תועדו תשלומים.",
+            "settledTotal": "הוחזר עד כה",
+            "sent": "שילם {{amount}}",
+            "received": "קיבל {{amount}}",
+            "undoPayment": "בטל את התשלום"
         },
         "defaultSplit": {
             "title": "חלוקת ברירת מחדל",
@@ -1500,6 +1609,48 @@
             "rowFallback": "אין נתוני הכנסה ל{{month}} - חלוקה שווה",
             "pickerResolved": "חלוקה לפי הכנסה ל{{month}}",
             "perMonthHint": "כל הוצאה תשתמש בחלוקה לפי ההכנסה של החודש שלה."
+        },
+        "pay": {
+            "titlePay": "תשלום ל{{name}}",
+            "titleReceived": "{{name}} שילם לך",
+            "amount": "סכום",
+            "fullAmount": "מלוא הסכום שאתה חייב.",
+            "partial": "תשלום חלקי. עדיין יישארו חייבים {{rest}}.",
+            "amountInvalid": "הכנס סכום בין 0 ל-{{max}}.",
+            "how": "איך משלמים?",
+            "pickMethod": "בחר איך משלמים כדי לראות פרטים.",
+            "methods": {
+                "bit": "Bit",
+                "paybox": "PayBox",
+                "venmo": "Venmo",
+                "paypal": "PayPal",
+                "cash": "מזומן / אחר",
+                "other": "אחר"
+            },
+            "openApp": "פתח את {{app}} עם הסכום",
+            "noHandle": "{{name}} עוד לא הוסיף שם משתמש ב-{{app}}.",
+            "noPhone": "{{name}} עוד לא הוסיף מספר טלפון ל-{{app}}.",
+            "venmoUsdOnly": "Venmo עובד רק בדולרים.",
+            "phoneHint": "שלח ב-{{app}} למספר של {{name}}. אי אפשר לפתוח Bit ו-PayBox עם הסכום מוכן, אז העתק את הפרטים.",
+            "copyPhone": "העתק מספר",
+            "copyAmount": "העתק סכום",
+            "copied": "הועתק",
+            "cashHint": "שלם להם ישירות ואז תעד כאן.",
+            "confirmPaid": "שילמתי, תעד",
+            "confirmReceived": "כן, קיבלתי",
+            "recordHint": "הקישור לאפליקציה רק עוזר לשלוח את הכסף. התשלום מתועד בקבוצה כשמאשרים כאן.",
+            "note": "Exli: {{group}}",
+            "myDetails": "פרטי התשלום שלי",
+            "handlesTitle": "פרטי התשלום שלי",
+            "handlesHint": "חברי הקבוצה רואים את אלה כשהם משלמים לך, כדי לפתוח את האפליקציה הנכונה. הכל אופציונלי.",
+            "handles": {
+                "phone": "טלפון (Bit / PayBox)",
+                "phonePlaceholder": "050-1234567",
+                "venmo": "שם משתמש ב-Venmo",
+                "venmoPlaceholder": "username",
+                "paypal": "שם ב-PayPal.me",
+                "paypalPlaceholder": "name"
+            }
         }
     }
 }

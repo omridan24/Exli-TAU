@@ -8,7 +8,14 @@ across users, unlike a client bound by Firestore rules — this is the exact
 justification for plan 01's "backend writes" model, Debate A). Everything this
 module hands back to a caller is a RATIO (integer percent), never a raw net
 income figure — see Debate Q on why that boundary matters.
+
+docs/fx/01-fx-plan.md §6: each member's income doc carries its OWN `currency`
+(normally everyone's tax-bracket currency, almost always ILS today, but not
+guaranteed - see OneTimeIncomeForm). A `reference_currency` is converted onto
+before computing ratios, so a USD earner and an ILS earner are never compared
+as raw numbers.
 """
+import services.fx_service as fx_service
 
 
 def income_month_key(for_date):
@@ -22,19 +29,31 @@ def income_month_key(for_date):
     return f"{for_date.year}-{for_date.month:02d}"
 
 
-def _net_income_for_month(db, uid, month_key):
+def _net_income_for_month(db, uid, month_key, reference_currency):
     """Sums `neto` across every users/{uid}/income doc for that month (a person can
-    have more than one income source in the same month). Returns None if nothing
-    was filled in for that month, or the sum was zero/negative."""
+    have more than one income source in the same month), converting each doc's
+    own currency onto `reference_currency` first (that month's average rate,
+    since income only has a month, not an exact date — plan §3 rule 3).
+    Returns None if nothing was filled in for that month, the sum was
+    zero/negative, or a doc's currency couldn't be converted."""
     docs = db.collection("users").document(uid).collection("income").where("month", "==", month_key).stream()
 
     total = 0.0
     found = False
     for doc in docs:
-        neto = (doc.to_dict() or {}).get("neto")
-        if neto is not None:
+        data = doc.to_dict() or {}
+        neto = data.get("neto")
+        if neto is None:
+            continue
+        currency = data.get("currency") or reference_currency
+        if currency == reference_currency:
             total += float(neto)
-            found = True
+        else:
+            result = fx_service.convert_amount(db, float(neto), currency, reference_currency, month_str=month_key)
+            if result["value"] is None:
+                return None  # can't safely compare ratios without a rate for this doc
+            total += result["value"]
+        found = True
 
     if not found or total <= 0:
         return None
@@ -58,11 +77,16 @@ def _incomes_to_percent(incomes):
     return floors
 
 
-def get_income_ratios(db, group, for_date):
+def get_income_ratios(db, group, for_date, reference_currency="ILS"):
     """
     group: dict with at least a "members" map.
     for_date: a date/datetime — usually the expense's own date, or today for a
               picker preview before an expense exists yet.
+    reference_currency: the currency every member's income is converted onto
+              before computing ratios (docs/fx/01-fx-plan.md §6) — the
+              expense's own canonical currency when called from
+              group_expenses_service, or the group's mergeCurrency for a
+              picker preview with no expense yet.
 
     Returns:
       {
@@ -80,7 +104,7 @@ def get_income_ratios(db, group, for_date):
     incomes = {}
     missing = []
     for uid in active_uids:
-        net = _net_income_for_month(db, uid, month_key)
+        net = _net_income_for_month(db, uid, month_key, reference_currency)
         if net is None:
             missing.append(uid)
         else:

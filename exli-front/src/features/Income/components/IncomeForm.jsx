@@ -4,12 +4,14 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '../../../components/UI.jsx';
 import { LogoImage } from './LogoImage';
 import { IncomeCard } from './IncomeCard';
+import { CurrencyPicker } from '../../../components/CurrencyPicker';
 
 export const IncomeForm = ({
     incomeData,
     handleInputChange,
     workplaces,
     currency,
+    onCurrencyChange,
     handleSave,
     isLoading,
     error,
@@ -61,6 +63,14 @@ export const IncomeForm = ({
                     </div>
                 )}
             </div>
+
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-4">
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    {t('settings.currency.defaultCurrency')}
+                </label>
+                <CurrencyPicker value={currency} onChange={onCurrencyChange} />
+            </div>
+
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <IncomeCard label={t('income.form.brutoIncome')} field="bruto" value={incomeData.bruto} onChange={handleInputChange} currency={currency} color="border-emerald-200 text-emerald-600" icon={DollarSign} />

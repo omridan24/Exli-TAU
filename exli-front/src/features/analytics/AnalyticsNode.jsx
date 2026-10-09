@@ -3,20 +3,12 @@ import { Calendar, ArrowRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { StatsOverview } from './components/StatsOverview';
 import { YearDashboard } from './components/YearDashboard';
+import { useFx } from '../../lib/fx/useFx';
 
 export const AnalyticsNode = ({ data, income, categories, userId }) => {
     const { t } = useTranslation();
     const [selectedYear, setSelectedYear] = useState(null);
-
-    const dominantCurrency = useMemo(() => {
-        if (!data.length) return 'ILS';
-        const counts = {};
-        data.forEach(d => {
-            const c = d.currency || 'ILS';
-            counts[c] = (counts[c] || 0) + 1;
-        });
-        return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b, 'ILS');
-    }, [data]);
+    const { sum, defaultCurrency, dataVersion } = useFx();
 
     const years = useMemo(() => {
         const allYears = new Set([...data.map(d => d.reportMonth?.split('-')[0]), ...income.map(d => d.month?.split('-')[0])].filter(Boolean));
@@ -27,13 +19,32 @@ export const AnalyticsNode = ({ data, income, categories, userId }) => {
         if (years.length === 1) setSelectedYear(years[0]);
     }, [years]);
 
+    // Sums each expense/income line in its OWN currency, converted to the
+    // user's default before adding up - a naive `+= curr.amount` here would
+    // silently add dollars to shekels (docs/fx/01-fx-plan.md §1's flagged
+    // bug: "$100 plus ₪100 shows as ₪200"). Anything that can't be
+    // converted (no rate available) is excluded and counted, never dropped
+    // in silently - see excludedCount below.
     const lifetimeTotals = useMemo(() => {
-        const exp = data.reduce((acc, curr) => acc + (curr.isForecast || curr.isRefund ? 0 : Number(curr.amount)), 0);
-        const incNet = income.reduce((acc, curr) => acc + (Number(curr.neto) || 0), 0);
-        const pension = income.reduce((acc, curr) => acc + (Number(curr.pension) || 0), 0);
+        const expenseMoneys = data
+            .filter(curr => !curr.isForecast && !curr.isRefund)
+            .map(curr => ({ amount: Number(curr.amount), currency: curr.currency || 'ILS', date: curr.date, month: curr.reportMonth }));
+        const incomeMoneys = income.map(curr => ({ amount: Number(curr.neto) || 0, currency: curr.currency || 'ILS', month: curr.month }));
+        const pensionMoneys = income.map(curr => ({ amount: Number(curr.pension) || 0, currency: curr.currency || 'ILS', month: curr.month }));
+
+        const { value: exp, excluded: expExcluded } = sum(expenseMoneys);
+        const { value: incNet, excluded: incExcluded } = sum(incomeMoneys);
+        const { value: pension, excluded: pensionExcluded } = sum(pensionMoneys);
         const wealth = (incNet - exp) + pension;
-        return { exp, incNet, wealth };
-    }, [data, income]);
+        const excludedCount = expExcluded.length + incExcluded.length + pensionExcluded.length;
+        return { exp, incNet, wealth, excludedCount };
+        // dataVersion: sum()'s underlying fx data can finish loading AFTER
+        // this memo first runs (see useFx.js) - without it in the deps, a
+        // background-loaded rate would never trigger a recompute. Not read
+        // inside the callback, so exhaustive-deps calls it "unnecessary" -
+        // it isn't.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [data, income, sum, dataVersion]);
 
     // Check if a year is fully forecasted
     const getYearStatus = (year) => {
@@ -55,7 +66,7 @@ export const AnalyticsNode = ({ data, income, categories, userId }) => {
     return (
         <div className="p-6 max-w-5xl mx-auto animate-fade-in">
             <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">{t('analytics.lifetimeOverview')}</h3>
-            <StatsOverview totals={lifetimeTotals} currency={dominantCurrency} />
+            <StatsOverview totals={lifetimeTotals} currency={defaultCurrency} />
             <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2"><Calendar className="w-5 h-5 text-slate-500" /> {t('analytics.selectFiscalYear')}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                 {years.map(year => {

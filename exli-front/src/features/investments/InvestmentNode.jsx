@@ -5,6 +5,8 @@ import { useLanguage } from '../../hooks/useLanguage';
 import { CLOUD_RUN_URL, db } from '../../config/firebase.js';
 import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, setDoc } from 'firebase/firestore';
 import { getInvestmentProfile, completeOnboarding } from '../../config/investmentProfileService';
+import { Money } from '../../components/Money';
+import { useFx } from '../../lib/fx/useFx';
 
 // Import strategy components
 import { StrategyPlayground } from './components/StrategyPlayground';
@@ -143,7 +145,9 @@ const StockCard = ({ data, periodKey, onRemove, t }) => {
 
             <div className="flex justify-between items-end">
                 <div className="text-xl font-bold text-slate-900">
-                    ${data.currentPrice?.toFixed(2) || '—'}
+                    {data.currentPrice != null
+                        ? <Money amount={data.currentPrice} currency={data.currency || 'USD'} />
+                        : '—'}
                 </div>
                 <div className={`flex items-center gap-1 ${changeColor} ${bgColor} px-2 py-1 rounded-lg text-sm font-medium`}>
                     {isPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
@@ -459,11 +463,36 @@ export const InvestmentNode = ({ userId, onComplete }) => {
     // Holdings state
     const [holdings, setHoldings] = useState([]);
 
+    // Currency rates (for conversion display) - live from fxRates via useFx,
+    // replacing the old hardcoded {USD:3.65, EUR:4.05} fallback and the
+    // separate (long-stale, see docs/fx/01-fx-plan.md §0.2) /market/currencies
+    // fetch. Holdings stay in their own trading currency (a USD stock IS in
+    // USD) - this is purely for the ILS-equivalent display, so no
+    // ConvertOffer applies here.
+    const { defaultCurrency, convertTo, dataVersion } = useFx();
+
+    // {currency: rate} where rate is "1 unit of that currency in defaultCurrency"
+    // - recomputed live from fxRates as they load (dataVersion is what makes
+    // that recomputation actually happen once a background load finishes,
+    // see useFx.js), for whichever currencies the actual holdings use.
+    const currencyRates = useMemo(() => {
+        const rates = {};
+        const currencies = new Set((holdings || []).map(h => h.currency).filter(Boolean));
+        currencies.add('USD'); // a sensible default even before holdings have loaded
+        currencies.forEach(cur => {
+            if (cur === defaultCurrency) { rates[cur] = 1; return; }
+            const result = convertTo({ amount: 1, currency: cur }, defaultCurrency);
+            if (result.value != null) rates[cur] = result.value;
+        });
+        return rates;
+        // dataVersion is intentionally listed to force a recompute once a
+        // background fx load finishes (see useFx.js) even though it isn't
+        // read inside this callback.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [holdings, convertTo, defaultCurrency, dataVersion]);
+
     // Mission plans - one per month, keyed 'YYYY-MM': { moneyToInvest, completedTaskIds }
     const [missionPlans, setMissionPlans] = useState({});
-
-    // Currency rates (for conversion display)
-    const [currencyRates, setCurrencyRates] = useState({ USD: 3.65, EUR: 4.05 });
 
     // Tab definitions - Goals first (new!), then Strategy, Portfolio, Mission
     const tabs = [
@@ -531,22 +560,6 @@ export const InvestmentNode = ({ userId, onComplete }) => {
                     }
                 }
 
-                // Load currency rates
-                try {
-                    const ratesRes = await fetch(`${CLOUD_RUN_URL}/market/currencies`);
-                    const ratesData = await ratesRes.json();
-                    if (ratesData && ratesData.length > 0) {
-                        const rates = {};
-                        ratesData.forEach(r => {
-                            if (r.baseCurrency && r.currentRate) {
-                                rates[r.baseCurrency] = r.currentRate;
-                            }
-                        });
-                        setCurrencyRates(rates);
-                    }
-                } catch (err) {
-                    console.error('Failed to load currency rates:', err);
-                }
             } catch (err) {
                 console.error('Failed to load investment data:', err);
             } finally {
@@ -909,7 +922,7 @@ export const InvestmentNode = ({ userId, onComplete }) => {
                                 initialLocks={investmentStrategy.bucketLocks}
                                 onAllocationsChange={handleAllocationsChange}
                                 userId={userId}
-                                userCurrency="ILS"
+                                userCurrency={defaultCurrency}
                             />
                             <div className="flex justify-center pt-4">
                                 <button
@@ -929,7 +942,7 @@ export const InvestmentNode = ({ userId, onComplete }) => {
                             holdings={holdings}
                             onHoldingsChange={saveHoldings}
                             targetAllocations={investmentStrategy.bucketAllocations}
-                            userCurrency="ILS"
+                            userCurrency={defaultCurrency}
                             currencyRates={currencyRates}
                         />
                     )}
@@ -940,7 +953,7 @@ export const InvestmentNode = ({ userId, onComplete }) => {
                             targetAllocations={investmentStrategy.bucketAllocations}
                             missionPlans={missionPlans}
                             onSavePlan={saveMissionPlan}
-                            userCurrency="ILS"
+                            userCurrency={defaultCurrency}
                         />
                     )}
                 </div>

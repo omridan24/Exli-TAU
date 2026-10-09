@@ -19,8 +19,11 @@ def db():
     return FakeClient()
 
 
-def set_income(db, uid, month, neto):
-    db.collection("users").document(uid).collection("income").add({"month": month, "neto": neto})
+def set_income(db, uid, month, neto, currency=None):
+    doc = {"month": month, "neto": neto}
+    if currency:
+        doc["currency"] = currency
+    db.collection("users").document(uid).collection("income").add(doc)
 
 
 def make_group(members):
@@ -149,3 +152,54 @@ class TestGetIncomeRatios:
         result = svc.get_income_ratios(db, group, date(2026, 10, 5))
 
         assert sum(result["ratios"].values()) == 100
+
+
+class TestCurrencyNormalization:
+    """docs/fx/01-fx-plan.md §6: a member's income is converted onto
+    reference_currency before ratios are computed, so a USD earner and an
+    ILS earner are never compared as raw numbers."""
+
+    def seed_rates(self, db):
+        db.collection("fxRates").document("2026").set({
+            "days": {}, "monthlyAvg": {"2026-10": {"ILS": 3.5, "USD": 1.0}},
+        })
+
+    def test_same_currency_as_reference_is_untouched(self, db):
+        set_income(db, "a", "2026-10", 10000, currency="ILS")
+        set_income(db, "b", "2026-10", 10000, currency="ILS")
+        group = make_group(["a", "b"])
+
+        result = svc.get_income_ratios(db, group, date(2026, 10, 5), reference_currency="ILS")
+
+        assert result["ratios"] == {"a": 50, "b": 50}
+
+    def test_foreign_currency_income_is_converted_before_ratios(self, db):
+        self.seed_rates(db)
+        set_income(db, "a", "2026-10", 10000, currency="ILS")  # ₪10,000
+        set_income(db, "b", "2026-10", 2000, currency="USD")   # $2,000 -> ₪7,000 at 3.5
+        group = make_group(["a", "b"])
+
+        result = svc.get_income_ratios(db, group, date(2026, 10, 5), reference_currency="ILS")
+
+        assert result["ready"] is True
+        assert result["ratios"] == {"a": 59, "b": 41}  # 10000:7000 ~ 58.8/41.2, largest-remainder rounds to 59/41
+
+    def test_unconvertable_currency_counts_as_missing(self, db):
+        self.seed_rates(db)
+        set_income(db, "a", "2026-10", 10000, currency="ILS")
+        set_income(db, "b", "2026-10", 5000, currency="XYZ")  # no rate for XYZ anywhere
+        group = make_group(["a", "b"])
+
+        result = svc.get_income_ratios(db, group, date(2026, 10, 5), reference_currency="ILS")
+
+        assert result["ready"] is False
+        assert "b" in result["missing"]
+
+    def test_defaults_to_ils_reference_when_not_specified(self, db):
+        set_income(db, "a", "2026-10", 10000, currency="ILS")
+        set_income(db, "b", "2026-10", 10000, currency="ILS")
+        group = make_group(["a", "b"])
+
+        result = svc.get_income_ratios(db, group, date(2026, 10, 5))
+
+        assert result["ratios"] == {"a": 50, "b": 50}

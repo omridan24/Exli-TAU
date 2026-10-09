@@ -14,6 +14,8 @@ from extensions import limiter
 from utils.auth import require_auth, require_whitelisted
 from services import groups_service as svc
 from services import group_expenses_service as expenses_svc
+from services import group_settlements_service as settle_svc
+from services import group_currency_merge_service as merge_svc
 from services import group_image_service as image_svc
 
 groups_bp = Blueprint("groups", __name__)
@@ -65,7 +67,8 @@ def create_group():
             _db(), g.uid, _user_info(),
             name=data.get("name"),
             description=data.get("description"),
-            currency=data.get("currency", "ILS"),
+            currency_mode=data.get("currencyMode", "merge"),
+            merge_currency=data.get("mergeCurrency", "ILS"),
             emoji=data.get("emoji"),
             group_type=data.get("type", "other"),
         )
@@ -143,13 +146,14 @@ def income_ratio_months(group_id):
 @require_whitelisted
 def income_ratio_preview(group_id):
     raw_date = request.args.get("date")
+    currency = request.args.get("currency")
 
     def run():
         try:
             for_date = datetime.strptime(raw_date, "%Y-%m-%d").date() if raw_date else date.today()
         except ValueError:
             raise svc.ValidationError("date must be in YYYY-MM-DD format.")
-        return jsonify(svc.get_income_ratio_preview(_db(), g.uid, group_id, for_date))
+        return jsonify(svc.get_income_ratio_preview(_db(), g.uid, group_id, for_date, reference_currency=currency))
 
     return _handled(run)
 
@@ -281,6 +285,7 @@ def _expense_kwargs_from_body(data):
     return {
         "description": data.get("description"),
         "amount_minor": data.get("amountMinor"),
+        "currency": data.get("currency", "ILS"),
         "date_str": data.get("date"),
         "category": data.get("category"),
         "payer_id": data.get("payerId"),
@@ -364,6 +369,81 @@ def edit_expense(group_id, expense_id):
     def run():
         expenses_svc.edit_expense(_db(), g.uid, group_id, expense_id, **_expense_kwargs_from_body(data))
         return jsonify({"status": "ok"})
+
+    return _handled(run)
+
+
+@groups_bp.route("/groups/<group_id>/expenses/<expense_id>/convert", methods=["POST"])
+@require_auth
+@require_whitelisted
+def convert_expense(group_id, expense_id):
+    data = request.get_json(silent=True) or {}
+
+    def run():
+        expenses_svc.convert_expense(_db(), g.uid, group_id, expense_id, data.get("toCurrency"))
+        return jsonify({"status": "ok"})
+
+    return _handled(run)
+
+
+@groups_bp.route("/groups/<group_id>/merge-preview", methods=["GET"])
+@require_auth
+@require_whitelisted
+def merge_preview(group_id):
+    def run():
+        return jsonify(merge_svc.preview(_db(), g.uid, group_id, request.args.get("currency")))
+
+    return _handled(run)
+
+
+@groups_bp.route("/groups/<group_id>/consolidate-currency", methods=["POST"])
+@require_auth
+@require_whitelisted
+def consolidate_currency(group_id):
+    data = request.get_json(silent=True) or {}
+
+    def run():
+        return jsonify(merge_svc.consolidate(_db(), g.uid, group_id, data.get("currency")))
+
+    return _handled(run)
+
+
+@groups_bp.route("/groups/<group_id>/settlements", methods=["POST"])
+@require_auth
+@require_whitelisted
+def record_settlement(group_id):
+    data = request.get_json(silent=True) or {}
+
+    def run():
+        settlement_id = settle_svc.record_settlement(
+            _db(), g.uid, group_id,
+            from_uid=data.get("from"), to_uid=data.get("to"), amount_minor=data.get("amountMinor"),
+            currency=data.get("currency"), method=data.get("method"), note=data.get("note"),
+        )
+        return jsonify({"id": settlement_id}), 201
+
+    return _handled(run)
+
+
+@groups_bp.route("/groups/<group_id>/settlements/<settlement_id>", methods=["DELETE"])
+@require_auth
+@require_whitelisted
+def delete_settlement(group_id, settlement_id):
+    def run():
+        settle_svc.delete_settlement(_db(), g.uid, group_id, settlement_id)
+        return jsonify({"status": "ok"})
+
+    return _handled(run)
+
+
+@groups_bp.route("/groups/<group_id>/me/payment-handles", methods=["PUT"])
+@require_auth
+@require_whitelisted
+def set_payment_handles(group_id):
+    data = request.get_json(silent=True) or {}
+
+    def run():
+        return jsonify(settle_svc.set_payment_handles(_db(), g.uid, group_id, data))
 
     return _handled(run)
 

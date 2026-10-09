@@ -54,6 +54,7 @@ def make_group(**overrides):
         "splitRules": [equal_rule()],
         "defaultSplitRuleId": "eq",
         "balances": {OWNER: 0, MEMBER: 0},
+        "balancesByCurrency": {},
         "pendingRequestCount": 0,
         "status": "active",
         "version": 1,
@@ -79,7 +80,7 @@ def group_dict(db, gid):
 
 def basic_kwargs(**overrides):
     kwargs = {
-        "description": "Groceries", "amount_minor": 10000, "date_str": "2026-10-05",
+        "description": "Groceries", "amount_minor": 10000, "currency": "ILS", "date_str": "2026-10-05",
         "category": "food", "payer_id": OWNER, "participants": [OWNER, MEMBER],
     }
     kwargs.update(overrides)
@@ -316,6 +317,237 @@ def seed_personal_expense(db, uid, doc_id="p1", **overrides):
     doc.update(overrides)
     db.collection("users").document(uid).collection("expenses").document(doc_id).set(doc)
     return doc_id
+
+
+def seed_fx_rates(db):
+    db.collection("fxRates").document("2026").set({
+        "days": {
+            "2026-10-05": {"ILS": 3.4, "EUR": 0.86},
+            "2026-10-06": {"ILS": 3.5, "EUR": 0.87},
+        },
+        "monthlyAvg": {"2026-10": {"ILS": 3.45, "EUR": 0.865}},
+    })
+    db.collection("fxRates").document("latest").set({
+        "date": "2026-10-06", "rates": {"ILS": 3.5, "EUR": 0.87},
+    })
+
+
+class TestMergeModeFxConversion:
+    """docs/fx/01-fx-plan.md §6: a merge group converts a foreign-currency
+    expense to the group's mergeCurrency and locks the rate on create; the
+    SAME currency amount is always the expense's currency/mergeCurrency."""
+
+    def test_same_currency_as_group_is_unconverted(self, db):
+        gid = seed_group(db)  # mergeCurrency ILS via legacy `currency` fallback
+        expense_id = svc.create_expense(db, OWNER, gid, **basic_kwargs(amount_minor=10000, currency="ILS"))
+
+        expense = db.collection("groups").document(gid).collection("expenses").document(expense_id).get().to_dict()
+        assert expense["currency"] == "ILS"
+        assert expense["amountMinor"] == 10000
+        assert expense["original"] is None
+        assert expense["fx"] is None
+
+    def test_foreign_currency_is_converted_and_locked(self, db):
+        seed_fx_rates(db)
+        gid = seed_group(db)
+        expense_id = svc.create_expense(
+            db, OWNER, gid, **basic_kwargs(amount_minor=10000, currency="USD", date_str="2026-10-05")
+        )
+
+        expense = db.collection("groups").document(gid).collection("expenses").document(expense_id).get().to_dict()
+        assert expense["currency"] == "ILS"
+        assert expense["amountMinor"] == round(100 * 3.4 * 100)
+        assert expense["original"] == {"amountMinor": 10000, "currency": "USD"}
+        assert expense["fx"]["rate"] == pytest.approx(3.4)
+
+        # Balances update in the GROUP's currency, the canonical one
+        group = group_dict(db, gid)
+        assert group["balances"][OWNER] == round(100 * 3.4 * 100) // 2
+        assert group["balances"][MEMBER] == -(round(100 * 3.4 * 100) // 2)
+
+    def test_unsupported_currency_pair_is_rejected(self, db):
+        seed_fx_rates(db)
+        gid = seed_group(db)
+        with pytest.raises(groups_svc.ValidationError):
+            svc.create_expense(
+                db, OWNER, gid, **basic_kwargs(amount_minor=10000, currency="XYZ", date_str="2026-10-05")
+            )
+
+    def test_editing_same_currency_and_date_reuses_the_locked_rate(self, db):
+        """plan §3 Decision B: 'editing anything else keeps it' — changing only
+        the amount while currency+date stay the same must NOT re-fetch a
+        (possibly different) day's rate."""
+        seed_fx_rates(db)
+        gid = seed_group(db)
+        expense_id = svc.create_expense(
+            db, OWNER, gid, **basic_kwargs(amount_minor=10000, currency="USD", date_str="2026-10-05")
+        )
+
+        # Mutate the stored rate for that same day, so reusing vs re-fetching is observable
+        db.collection("fxRates").document("2026").set({
+            "days": {"2026-10-05": {"ILS": 999.0}},  # if this got re-fetched, the result would be wildly different
+            "monthlyAvg": {},
+        })
+
+        svc.edit_expense(
+            db, OWNER, gid, expense_id,
+            **basic_kwargs(amount_minor=20000, currency="USD", date_str="2026-10-05"),
+        )
+
+        expense = db.collection("groups").document(gid).collection("expenses").document(expense_id).get().to_dict()
+        assert expense["fx"]["rate"] == pytest.approx(3.4)  # the ORIGINAL locked rate, not 999.0
+        assert expense["amountMinor"] == round(200 * 3.4 * 100)
+
+    def test_editing_with_a_new_date_recomputes_the_rate(self, db):
+        seed_fx_rates(db)
+        gid = seed_group(db)
+        expense_id = svc.create_expense(
+            db, OWNER, gid, **basic_kwargs(amount_minor=10000, currency="USD", date_str="2026-10-05")
+        )
+
+        svc.edit_expense(
+            db, OWNER, gid, expense_id,
+            **basic_kwargs(amount_minor=10000, currency="USD", date_str="2026-10-06"),
+        )
+
+        expense = db.collection("groups").document(gid).collection("expenses").document(expense_id).get().to_dict()
+        assert expense["fx"]["rate"] == pytest.approx(3.5)  # the 10-06 rate, not the original 10-05 one
+
+
+class TestKeepOriginalModeLedger:
+    """docs/fx/01-fx-plan.md §6: a keep_original group never converts — each
+    currency gets its own balance ledger in balancesByCurrency."""
+
+    def keep_original_group(self, db, **overrides):
+        return seed_group(db, currencySettings={"mode": "keep_original", "mergeCurrency": None}, **overrides)
+
+    def test_expense_stays_in_its_own_currency_unconverted(self, db):
+        gid = self.keep_original_group(db)
+        expense_id = svc.create_expense(db, OWNER, gid, **basic_kwargs(amount_minor=10000, currency="USD"))
+
+        expense = db.collection("groups").document(gid).collection("expenses").document(expense_id).get().to_dict()
+        assert expense["currency"] == "USD"
+        assert expense["amountMinor"] == 10000
+        assert expense["original"] is None
+        assert expense["fx"] is None
+
+        group = group_dict(db, gid)
+        assert group["balances"] == {OWNER: 0, MEMBER: 0}  # flat ledger untouched
+        assert group["balancesByCurrency"]["USD"] == {OWNER: 5000, MEMBER: -5000}
+
+    def test_two_currencies_keep_separate_ledgers(self, db):
+        gid = self.keep_original_group(db)
+        svc.create_expense(db, OWNER, gid, **basic_kwargs(amount_minor=10000, currency="USD"))
+        svc.create_expense(db, OWNER, gid, **basic_kwargs(amount_minor=5000, currency="EUR"))
+
+        group = group_dict(db, gid)
+        assert group["balancesByCurrency"]["USD"] == {OWNER: 5000, MEMBER: -5000}
+        assert group["balancesByCurrency"]["EUR"] == {OWNER: 2500, MEMBER: -2500}
+
+    def test_delete_reverses_only_that_currencys_bucket(self, db):
+        gid = self.keep_original_group(db)
+        usd_id = svc.create_expense(db, OWNER, gid, **basic_kwargs(amount_minor=10000, currency="USD"))
+        svc.create_expense(db, OWNER, gid, **basic_kwargs(amount_minor=5000, currency="EUR"))
+
+        svc.delete_expense(db, OWNER, gid, usd_id)
+
+        group = group_dict(db, gid)
+        assert group["balancesByCurrency"]["USD"] == {OWNER: 0, MEMBER: 0}
+        assert group["balancesByCurrency"]["EUR"] == {OWNER: 2500, MEMBER: -2500}
+
+    def test_editing_an_expenses_currency_moves_it_between_ledgers(self, db):
+        gid = self.keep_original_group(db)
+        expense_id = svc.create_expense(db, OWNER, gid, **basic_kwargs(amount_minor=10000, currency="USD"))
+
+        svc.edit_expense(db, OWNER, gid, expense_id, **basic_kwargs(amount_minor=10000, currency="EUR"))
+
+        group = group_dict(db, gid)
+        assert group["balancesByCurrency"]["USD"] == {OWNER: 0, MEMBER: 0}
+        assert group["balancesByCurrency"]["EUR"] == {OWNER: 5000, MEMBER: -5000}
+
+    def test_member_with_outstanding_foreign_balance_cannot_be_removed(self, db):
+        gid = self.keep_original_group(db)
+        svc.create_expense(db, OWNER, gid, **basic_kwargs(amount_minor=10000, currency="USD"))
+
+        with pytest.raises(groups_svc.ConflictError):
+            groups_svc.remove_member(db, OWNER, gid, MEMBER)
+
+
+class TestConvertExpense:
+    """The "foreign record" alert's Convert action for ONE keep_original expense."""
+
+    def keep_original_group(self, db):
+        seed_fx_rates(db)
+        return seed_group(db, currencySettings={"mode": "keep_original", "mergeCurrency": None})
+
+    def test_converts_at_the_expenses_date_and_moves_the_ledger(self, db):
+        gid = self.keep_original_group(db)
+        eid = svc.create_expense(db, OWNER, gid, **basic_kwargs(amount_minor=10000, currency="USD", date_str="2026-10-05"))
+
+        svc.convert_expense(db, OWNER, gid, eid, "ILS")
+
+        expense = db.collection("groups").document(gid).collection("expenses").document(eid).get().to_dict()
+        assert expense["currency"] == "ILS"
+        assert expense["amountMinor"] == round(100 * 3.4 * 100)
+        assert expense["original"] == {"amountMinor": 10000, "currency": "USD"}
+        assert expense["fx"]["rate"] == 3.4
+        assert sum(expense["shares"].values()) == expense["amountMinor"]
+        group = group_dict(db, gid)
+        assert group["balancesByCurrency"]["USD"] == {OWNER: 0, MEMBER: 0}
+        assert group["balancesByCurrency"]["ILS"] == {OWNER: 17000, MEMBER: -17000}
+
+    def test_custom_split_keeps_its_proportions(self, db):
+        gid = self.keep_original_group(db)
+        eid = svc.create_expense(
+            db, OWNER, gid,
+            **basic_kwargs(amount_minor=10000, currency="USD", date_str="2026-10-05",
+                           split_input={"kind": "custom", "params": {"amounts": {OWNER: 7500, MEMBER: 2500}}}),
+        )
+
+        svc.convert_expense(db, OWNER, gid, eid, "ILS")
+
+        expense = db.collection("groups").document(gid).collection("expenses").document(eid).get().to_dict()
+        assert expense["shares"] == {OWNER: 25500, MEMBER: 8500}
+
+    def test_same_currency_is_rejected(self, db):
+        gid = self.keep_original_group(db)
+        eid = svc.create_expense(db, OWNER, gid, **basic_kwargs(amount_minor=10000, currency="USD"))
+        with pytest.raises(groups_svc.ValidationError):
+            svc.convert_expense(db, OWNER, gid, eid, "USD")
+
+    def test_merge_group_rejects_conversion(self, db):
+        seed_fx_rates(db)
+        gid = seed_group(db)
+        eid = svc.create_expense(db, OWNER, gid, **basic_kwargs(amount_minor=10000, currency="USD", date_str="2026-10-05"))
+        with pytest.raises(groups_svc.ConflictError):
+            svc.convert_expense(db, OWNER, gid, eid, "USD")
+
+
+class TestCurrencySettingsPatch:
+    def test_merge_to_keep_original_is_always_allowed(self, db):
+        gid = seed_group(db)
+        groups_svc.update_group(db, OWNER, gid, {"currencySettings": {"mode": "keep_original"}})
+
+        group = group_dict(db, gid)
+        assert groups_svc.get_currency_settings(group) == {"mode": "keep_original", "mergeCurrency": None}
+
+    def test_changing_merge_currency_converts_existing_balances(self, db):
+        # Only `latest` is seeded (no day bucket for "today", whatever today's
+        # real date happens to be at test-run time) so the conversion is
+        # deterministically forced through the `latest` fallback rather than
+        # depending on which calendar day the suite runs on.
+        db.collection("fxRates").document("latest").set({
+            "date": "2026-01-01", "rates": {"ILS": 3.5, "EUR": 0.87},
+        })
+        gid = seed_group(db, balances={OWNER: 10000, MEMBER: -10000})  # ILS mergeCurrency via legacy fallback
+
+        groups_svc.update_group(db, OWNER, gid, {"currencySettings": {"mode": "merge", "mergeCurrency": "EUR"}})
+
+        group = group_dict(db, gid)
+        assert groups_svc.get_currency_settings(group)["mergeCurrency"] == "EUR"
+        expected = round(100 * (0.87 / 3.5) * 100)
+        assert group["balances"][OWNER] == expected
+        assert group["balances"][MEMBER] == -expected
 
 
 class TestTransferPersonalExpense:

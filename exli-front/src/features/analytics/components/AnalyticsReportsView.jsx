@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     PieChart, Pie, Cell, ResponsiveContainer, Tooltip
@@ -6,12 +6,15 @@ import {
 import {
     Trash2, DollarSign, Wallet, CheckSquare, Square,
     Check, X, Briefcase,
-    Flag, Calendar, Type, Repeat, HelpCircle, Users, AlertTriangle
+    Flag, Calendar, Type, Repeat, HelpCircle, Users, Globe2, Loader2, AlertTriangle
 } from 'lucide-react';
 import { Card } from '../../../components/UI';
 import { NoteModal } from '../../../components/NoteModal';
 import { IncomeEditModal } from '../../../components/IncomeEditModal';
 import { DEFAULT_CATEGORIES } from '../../../config/constants';
+import { useFx } from '../../../lib/fx/useFx';
+import { Money } from '../../../components/Money';
+import { commitInChunks, buildAmountConversion, buildIncomeConversion } from '../../../lib/fx/convertRecordsInPlace';
 import { useMyGroups } from '../../groups/hooks/useMyGroups';
 import { MoveToGroupFlow } from '../../groups/components/MoveToGroupFlow';
 import { BulkMoveToGroupFlow } from '../../groups/components/BulkMoveToGroupFlow';
@@ -20,7 +23,7 @@ import { ChangeDateModal } from './ChangeDateModal';
 import { getMonthMismatch } from '../utils/expenseDates';
 
 export const AnalyticsReportsView = ({
-    totalIncome, totalExpenses, totalSavings, savingsRate, dominantCurrency,
+    totalIncome, totalExpenses, totalSavings, savingsRate, dominantCurrency, excludedCount = 0,
     categoryStats, incomeStats, displayIncome, displayExpenses,
     selectedMonth, selectedIds, isForecastMonth, userId,
     handleIncomeDelete, executeDeleteMonth, isDeleteModalOpen, setIsDeleteModalOpen,
@@ -32,12 +35,73 @@ export const AnalyticsReportsView = ({
     onChangeDate, onFixMismatch, formatMonth
 }) => {
     const { t } = useTranslation();
+    // totalIncome/totalExpenses/totalSavings/categoryStats/incomeStats are
+    // already converted to `dominantCurrency` by YearDashboard - only the
+    // separate recurringTotal/oneTimeTotal split below needs its own
+    // conversion, since it re-derives from the raw displayExpenses.
+    const { toDefault, convertRecord, defaultCurrency, dataVersion } = useFx();
     const [hoveredIncome, setHoveredIncome] = useState(null);
     const [movingExpense, setMovingExpense] = useState(null);
     const [bulkMoving, setBulkMoving] = useState(false);
     const [changeDateFor, setChangeDateFor] = useState(null); // array of expenses
     const [groupActionsFor, setGroupActionsFor] = useState(null);
     const { groups: myGroups } = useMyGroups(userId);
+
+    // docs/fx/01-fx-plan.md §11: a per-record "Convert" action everywhere an
+    // amount is shown (via <Money>'s onConvert), plus one safe, CONFIRMED,
+    // chunked bulk action scoped to just the month in view - never "every
+    // record in this currency ever", which is what silently failed before.
+    const [confirmingBulkConvert, setConfirmingBulkConvert] = useState(false);
+    const [bulkConverting, setBulkConverting] = useState(false);
+    const [bulkConvertResult, setBulkConvertResult] = useState(null);
+
+    const foreignExpensesThisMonth = useMemo(
+        () => displayExpenses.filter((tx) => (tx.currency || 'ILS') !== defaultCurrency && !tx.fx),
+        [displayExpenses, defaultCurrency]
+    );
+    const foreignIncomeThisMonth = useMemo(
+        () => displayIncome.filter((inc) => (inc.currency || 'ILS') !== defaultCurrency && !inc.fx),
+        [displayIncome, defaultCurrency]
+    );
+    const foreignCountThisMonth = foreignExpensesThisMonth.length + foreignIncomeThisMonth.length;
+
+    const convertExpenseInPlace = async (tx) => {
+        const fields = buildAmountConversion({
+            amount: Number(tx.amount), currency: tx.currency || 'ILS', date: tx.date, month: tx.reportMonth, convertRecord,
+        });
+        if (!fields) throw new Error('No exchange rate available for this record.');
+        await commitInChunks([{ path: ['users', userId, 'expenses', tx.id], fields }]);
+    };
+
+    const convertIncomeInPlace = async (inc) => {
+        const fields = buildIncomeConversion({ ...inc, currency: inc.currency || 'ILS', toDefault, defaultCurrency });
+        if (!fields) throw new Error('No exchange rate available for this record.');
+        await commitInChunks([{ path: ['users', userId, 'income', inc.id], fields }]);
+    };
+
+    const handleBulkConvertMonth = async () => {
+        setBulkConverting(true);
+        setBulkConvertResult(null);
+        try {
+            const jobs = [];
+            let skipped = 0;
+            for (const tx of foreignExpensesThisMonth) {
+                const fields = buildAmountConversion({
+                    amount: Number(tx.amount), currency: tx.currency || 'ILS', date: tx.date, month: tx.reportMonth, convertRecord,
+                });
+                if (fields) jobs.push({ path: ['users', userId, 'expenses', tx.id], fields }); else skipped += 1;
+            }
+            for (const inc of foreignIncomeThisMonth) {
+                const fields = buildIncomeConversion({ ...inc, currency: inc.currency || 'ILS', toDefault, defaultCurrency });
+                if (fields) jobs.push({ path: ['users', userId, 'income', inc.id], fields }); else skipped += 1;
+            }
+            const written = await commitInChunks(jobs);
+            setBulkConvertResult({ written, skipped });
+        } finally {
+            setBulkConverting(false);
+            setConfirmingBulkConvert(false);
+        }
+    };
 
     const getCategoryName = (name) => {
         const defaultCat = DEFAULT_CATEGORIES.find(c => c.name === name);
@@ -59,10 +123,21 @@ export const AnalyticsReportsView = ({
         return new Date(b.date) - new Date(a.date);
     });
 
-    // Calculate recurring vs one-time stats
-    const recurringTotal = displayExpenses
-        .filter(exp => exp.isRecurring && !exp.isRefund)
-        .reduce((sum, exp) => sum + Math.abs(exp.amount), 0);
+    // Calculate recurring vs one-time stats. This re-derives from the raw
+    // displayExpenses (not categoryStats), so it needs its own conversion -
+    // otherwise oneTimeTotal (= the already-converted totalExpenses minus an
+    // unconverted recurringTotal) would mix currencies again.
+    const recurringTotal = useMemo(() => {
+        let total = 0;
+        displayExpenses
+            .filter(exp => exp.isRecurring && !exp.isRefund)
+            .forEach(exp => {
+                const converted = toDefault({ amount: Math.abs(Number(exp.amount) || 0), currency: exp.currency || 'ILS', date: exp.date, month: exp.reportMonth });
+                if (converted.value != null) total += converted.value;
+            });
+        return total;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [displayExpenses, toDefault, dataVersion]);
     const oneTimeTotal = totalExpenses - recurringTotal;
 
     // Check if any selected items are suspect or non-suspect
@@ -113,10 +188,65 @@ export const AnalyticsReportsView = ({
 
             {/* ... Top Cards ... */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                <Card className="p-4 flex flex-col justify-between"><div className="text-slate-400 text-xs font-bold uppercase">{t('analytics.netIncome')}</div><div className="text-2xl font-bold text-emerald-600">{dominantCurrency} {totalIncome.toLocaleString()}</div></Card>
-                <Card className="p-4 flex flex-col justify-between"><div className="text-slate-400 text-xs font-bold uppercase">{t('analytics.totalExpenses')}</div><div className="text-2xl font-bold text-slate-800">{dominantCurrency} {totalExpenses.toLocaleString()}</div></Card>
-                <Card className={`p-4 flex flex-col justify-between border-l-4 ${totalSavings >= 0 ? 'border-emerald-500' : 'border-red-500'}`}><div className="flex justify-between text-xs font-bold uppercase text-slate-400">{t('analytics.spareMoney')} <span className="text-emerald-600">{savingsRate.toFixed(1)}%</span></div><div className="text-2xl font-bold text-slate-800">{dominantCurrency} {totalSavings.toLocaleString()}</div></Card>
+                <Card className="p-4 flex flex-col justify-between"><div className="text-slate-400 text-xs font-bold uppercase">{t('analytics.netIncome')}</div><div className="text-2xl font-bold text-emerald-600"><Money amount={totalIncome} currency={dominantCurrency} /></div></Card>
+                <Card className="p-4 flex flex-col justify-between"><div className="text-slate-400 text-xs font-bold uppercase">{t('analytics.totalExpenses')}</div><div className="text-2xl font-bold text-slate-800"><Money amount={totalExpenses} currency={dominantCurrency} /></div></Card>
+                <Card className={`p-4 flex flex-col justify-between border-l-4 ${totalSavings >= 0 ? 'border-emerald-500' : 'border-red-500'}`}><div className="flex justify-between text-xs font-bold uppercase text-slate-400">{t('analytics.spareMoney')} <span className="text-emerald-600">{savingsRate.toFixed(1)}%</span></div><div className="text-2xl font-bold text-slate-800"><Money amount={totalSavings} currency={dominantCurrency} /></div></Card>
             </div>
+
+            {excludedCount > 0 && (
+                <div className="mb-4 text-xs text-amber-600 font-bold">
+                    {t('analytics.excludedFromTotals', { count: excludedCount })}
+                </div>
+            )}
+
+            {/* docs/fx/01-fx-plan.md §11.1: a safe bulk action, scoped to just this
+                month (never "every foreign record ever") - confirm first, then a
+                single chunked write, with a plain result message, not a silent
+                try-and-hope. Only shown for a specific month, not the yearly average. */}
+            {selectedMonth !== 'average' && foreignCountThisMonth > 0 && (
+                <div className="mb-4 bg-indigo-50 border border-indigo-200 rounded-xl p-4">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <span className="text-sm font-bold text-indigo-700 flex items-center gap-2">
+                            <Globe2 className="w-4 h-4" />
+                            {t('analytics.foreignRecordsThisMonth', { count: foreignCountThisMonth })}
+                        </span>
+                        {!confirmingBulkConvert ? (
+                            <button
+                                onClick={() => setConfirmingBulkConvert(true)}
+                                className="text-xs font-bold bg-indigo-600 text-white px-3 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
+                            >
+                                {t('analytics.convertMonthTo', { currency: defaultCurrency })}
+                            </button>
+                        ) : (
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs text-indigo-600">{t('analytics.convertMonthConfirm', { count: foreignCountThisMonth, currency: defaultCurrency })}</span>
+                                <button
+                                    onClick={handleBulkConvertMonth}
+                                    disabled={bulkConverting}
+                                    className="text-xs font-bold bg-indigo-600 text-white px-3 py-2 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                                >
+                                    {bulkConverting && <Loader2 className="w-3 h-3 animate-spin" />}
+                                    {t('common.confirm')}
+                                </button>
+                                <button
+                                    onClick={() => setConfirmingBulkConvert(false)}
+                                    disabled={bulkConverting}
+                                    className="text-xs font-bold text-indigo-500 px-2 py-2 hover:text-indigo-700"
+                                >
+                                    {t('common.cancel')}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                    {bulkConvertResult && (
+                        <p className="text-xs text-emerald-600 font-bold mt-2">
+                            {bulkConvertResult.skipped > 0
+                                ? t('analytics.convertMonthDoneWithSkipped', { written: bulkConvertResult.written, skipped: bulkConvertResult.skipped })
+                                : t('analytics.convertMonthDone', { written: bulkConvertResult.written })}
+                        </p>
+                    )}
+                </div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 {/* ... Pie Charts ... */}
@@ -194,7 +324,7 @@ export const AnalyticsReportsView = ({
                                 <span className="text-xs font-bold text-purple-900">{t('analytics.recurring')}</span>
                             </div>
                             <span className="text-sm font-bold text-purple-600">
-                                {dominantCurrency} {recurringTotal.toLocaleString()}
+                                <Money amount={recurringTotal} currency={dominantCurrency} />
                             </span>
                         </div>
                         <div className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between">
@@ -203,7 +333,7 @@ export const AnalyticsReportsView = ({
                                 <span className="text-xs font-bold text-slate-700">{t('analytics.oneTime')}</span>
                             </div>
                             <span className="text-sm font-bold text-slate-600">
-                                {dominantCurrency} {oneTimeTotal.toLocaleString()}
+                                <Money amount={oneTimeTotal} currency={dominantCurrency} />
                             </span>
                         </div>
                     </div>
@@ -222,11 +352,13 @@ export const AnalyticsReportsView = ({
                                     {displayIncome.map(inc => (
                                         <tr key={inc.id} onClick={() => { setSelectedIncome(inc); setIncomeEditModalOpen(true); }} className="hover:bg-emerald-50 cursor-pointer transition-colors">
                                             <td className="p-4 font-bold text-slate-800">{t(inc.source_name, { defaultValue: inc.source_name })}</td>
-                                            <td className="p-4 font-mono">{dominantCurrency}{Number(inc.bruto).toLocaleString()}</td>
-                                            <td className="p-4 font-mono text-red-400">-{dominantCurrency}{Number(inc.taxes).toLocaleString()}</td>
-                                            <td className="p-4 font-mono font-bold text-emerald-600">{dominantCurrency}{Number(inc.neto).toLocaleString()}</td>
+                                            <td className="p-4 font-mono"><Money amount={Number(inc.bruto)} currency={inc.currency || 'ILS'} month={inc.month} original={inc.original} fx={inc.fx} onConvert={() => convertIncomeInPlace(inc)} /></td>
+                                            <td className="p-4 font-mono text-red-400">-<Money amount={Number(inc.taxes)} currency={inc.currency || 'ILS'} month={inc.month} noAlert /></td>
+                                            <td className="p-4 font-mono font-bold text-emerald-600"><Money amount={Number(inc.neto)} currency={inc.currency || 'ILS'} month={inc.month} noAlert /></td>
                                             <td className="p-4 text-right">
-                                                <button onClick={(e) => { e.stopPropagation(); handleIncomeDelete(inc.id); }} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <button onClick={(e) => { e.stopPropagation(); handleIncomeDelete(inc.id); }} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
@@ -266,7 +398,7 @@ export const AnalyticsReportsView = ({
                                         <span className="text-xs font-bold text-purple-900">{t('analytics.recurring')}</span>
                                     </div>
                                     <span className="text-sm font-bold text-purple-600">
-                                        {dominantCurrency} {recurringTotal.toLocaleString()}
+                                        <Money amount={recurringTotal} currency={dominantCurrency} />
                                     </span>
                                 </div>
                                 <div className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between">
@@ -275,7 +407,7 @@ export const AnalyticsReportsView = ({
                                         <span className="text-xs font-bold text-slate-700">{t('analytics.oneTime')}</span>
                                     </div>
                                     <span className="text-sm font-bold text-slate-600">
-                                        {dominantCurrency} {oneTimeTotal.toLocaleString()}
+                                        <Money amount={oneTimeTotal} currency={dominantCurrency} />
                                     </span>
                                 </div>
                             </div>
@@ -344,7 +476,12 @@ export const AnalyticsReportsView = ({
                                                         </div>
                                                     ) : (
                                                         <div onClick={() => startEditAmount(tx)} className={`font-mono font-bold cursor-pointer hover:bg-slate-100 px-2 py-1 rounded inline-flex items-center gap-2 group-hover:text-blue-600 transition-colors ${isRefundItem ? 'text-emerald-500' : isGroupSharedItem ? 'text-orange-600' : 'text-slate-700'}`}>
-                                                            {isRefundItem ? '+' : ''}{dominantCurrency} {displayAmount}
+                                                            {isRefundItem ? '+' : ''}
+                                                            <Money
+                                                                amount={displayAmount} currency={tx.currency || 'ILS'} date={tx.date} month={tx.reportMonth}
+                                                                original={tx.original} fx={tx.fx}
+                                                                onConvert={(tx.currency || 'ILS') !== defaultCurrency && !tx.fx ? () => convertExpenseInPlace(tx) : undefined}
+                                                            />
                                                         </div>
                                                     )}
                                                     {isGroupSharedItem && (

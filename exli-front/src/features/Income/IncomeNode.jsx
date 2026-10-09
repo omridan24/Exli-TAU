@@ -12,6 +12,7 @@ import { RecurringIncomeCard } from './components/RecurringIncomeCard';
 import { RecurringIncomeForm } from './components/RecurringIncomeForm';
 import { OneTimeIncomeForm } from './components/OneTimeIncomeForm';
 import { IncomeBatchReview } from './components/IncomeBatchReview';
+import { useCurrencyPrefs } from '../../lib/fx/useCurrencyPrefs';
 
 export const IncomeNode = ({ userId, onComplete, compact = false }) => {
     const { t } = useTranslation();
@@ -22,7 +23,12 @@ export const IncomeNode = ({ userId, onComplete, compact = false }) => {
     const [files, setFiles] = useState([]);
     const [batchResults, setBatchResults] = useState([]);
     const [selectedResultIndex, setSelectedResultIndex] = useState(null);
-    const [currency, setCurrency] = useState('USD');
+    // Seeded from the user's real default currency (docs/fx/01-fx-plan.md §4)
+    // rather than a hardcoded 'USD' - still independently changeable here,
+    // since a job can pay in a different currency than the one you live in.
+    const { prefs: currencyPrefs } = useCurrencyPrefs(userId);
+    const [currency, setCurrency] = useState(currencyPrefs.defaultCurrency);
+    useEffect(() => { setCurrency(currencyPrefs.defaultCurrency); }, [currencyPrefs.defaultCurrency]);
     const [workplaces, setWorkplaces] = useState([]);
     const [incomeData, setIncomeData] = useState({
         source_name: '', bruto: '', neto: '', taxes: '', pension: '', other_deposits: ''
@@ -163,11 +169,15 @@ export const IncomeNode = ({ userId, onComplete, compact = false }) => {
         }
         setIsLoading(true);
         try {
+            const originalFields = {
+                bruto: Number(incomeData.bruto), neto: Number(incomeData.neto), taxes: Number(incomeData.taxes),
+                pension: Number(incomeData.pension), other_deposits: Number(incomeData.other_deposits)
+            };
+            // Saved in the currency it was entered in; a ForeignCurrencyAlert offers the conversion later.
             await addDoc(collection(db, 'users', userId, 'income'), {
                 ...incomeData,
-                bruto: Number(incomeData.bruto), neto: Number(incomeData.neto), taxes: Number(incomeData.taxes),
-                pension: Number(incomeData.pension), other_deposits: Number(incomeData.other_deposits),
-                month: reportMonth, currency: currency, createdAt: serverTimestamp(), source: 'manual'
+                ...originalFields,
+                month: reportMonth, currency, createdAt: serverTimestamp(), source: 'manual'
             });
             setStep(3);
         } catch (err) { setError("Failed to save income data."); } finally { setIsLoading(false); }
@@ -229,6 +239,7 @@ export const IncomeNode = ({ userId, onComplete, compact = false }) => {
                     handleInputChange={handleInputChange}
                     workplaces={workplaces}
                     currency={currency}
+                    onCurrencyChange={setCurrency}
                     handleSave={handleSave}
                     isLoading={isLoading}
                     error={error}

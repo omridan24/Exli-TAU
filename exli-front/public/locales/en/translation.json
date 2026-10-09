@@ -185,7 +185,8 @@
                 "pastExceed": "Past period cannot exceed 5 years (60 months). You selected {{months}} months.",
                 "futureExceed": "Future period cannot exceed 5 years (60 months). You selected {{months}} months.",
                 "frequencyExceed": "Frequency interval ({{frequency}} months) cannot exceed the period range ({{period}} months)",
-                "saveFailed": "Failed to save recurring expense"
+                "saveFailed": "Failed to save recurring expense",
+                "chooseCurrency": "Please choose whether to convert this expense's currency first."
             },
             "periodPresets": {
                 "3months": "3 Months",
@@ -367,7 +368,8 @@
             "overridePension": "Edit Employee Contribution",
             "overrideOtherDeposit": "Edit Other Deposit",
             "employerPensionNote": "* Employer contributions ({{emp}}%) and severance ({{sev}}%) are paid by the employer and are not deducted from net salary.",
-            "saveButton": "Save Income"
+            "saveButton": "Save Income",
+            "taxConversionNote": "Converted to {{amount}} {{currency}} for tax calculation"
         },
         "recurringForm": {
             "newRecurring": "New Recurring Income",
@@ -435,7 +437,8 @@
             "healthTax": "Health Tax",
             "nationalInsurance": "National Insurance",
             "pensionLabel": "Pension",
-            "kerenHishtalmutLabel": "Keren Hishtalmut"
+            "kerenHishtalmutLabel": "Keren Hishtalmut",
+            "taxConversionNote": "Converted to {{amount}} {{currency}} for tax calculation"
         },
         "recurringCard": {
             "title": "Recurring Income",
@@ -527,7 +530,8 @@
         "tabs": {
             "profile": "Profile",
             "categories": "Categories",
-            "history": "History"
+            "history": "History",
+            "currency": "Currency"
         },
         "language": "Language",
         "languageSection": {
@@ -596,6 +600,27 @@
             "citiesIn": "Cities in {{country}}",
             "universitiesIn": "Universities in {{country}}",
             "selectStatus": "Select Status"
+        },
+        "currency": {
+            "title": "Currency",
+            "defaultCurrency": "Default currency",
+            "defaultCurrencyHint": "Amounts in other currencies will be shown converted to this one.",
+            "favorites": "Favorite currencies",
+            "switch": {
+                "title": "Default currency is now {{to}}",
+                "mostIn": "{{count}} of your {{total}} records are in {{from}}, and you switched your default to {{to}}. Do you want to convert your records to {{to}}?",
+                "someIn": "{{count}} of your records are in other currencies. Do you want to convert them to {{to}}?",
+                "keepHint": "If you keep them, each record stays in the currency it was made in. Nothing changes until you confirm.",
+                "keep": "Keep as they are",
+                "convert": "Convert {{count}} records",
+                "confirm": "This will rewrite {{count}} saved records to {{currency}}.",
+                "confirmHint": "Each record is converted at the exchange rate of its own date, and its original amount is kept on the record.",
+                "confirmYes": "Yes, convert {{count}}",
+                "working": "Converting your records...",
+                "done": "Converted {{count}} records to {{currency}}.",
+                "skipped": "{{count}} could not be converted (no exchange rate available).",
+                "failed": "Something went wrong: {{error}}"
+            }
         }
     },
     "datePicker": {
@@ -849,6 +874,12 @@
         "recurringTag": "Recurring",
         "allJobs": "All Jobs",
         "select": "Select",
+        "excludedFromTotals": "{{count}} item(s) not included - no exchange rate available",
+        "foreignRecordsThisMonth": "{{count}} record(s) this month are in another currency",
+        "convertMonthTo": "Convert to {{currency}}",
+        "convertMonthConfirm": "Convert {{count}} records to {{currency}}, using each one's own date's rate?",
+        "convertMonthDone": "Converted {{written}} record(s).",
+        "convertMonthDoneWithSkipped": "Converted {{written}} record(s) - {{skipped}} couldn't be converted (no rate available).",
         "moveToGroup": "Move to group",
         "sharedInGroup": "Shared in {{name}}",
         "sharedInGroupTooltip": "This is your share after the group split",
@@ -1238,6 +1269,27 @@
         "shareMessage": "Add a note (optional)",
         "shareMessagePlaceholder": "Check out this item on my wishlist!"
     },
+    "money": {
+        "convertedFrom": "{{originalAmount}} × {{rate}} = converted to {{currency}}",
+        "approximateNote": "rate from {{date}}",
+        "monthlyAvgNote": "monthly average rate for {{month}}",
+        "unsupported": "No exchange rate available for this currency"
+    },
+    "foreignAlert": {
+        "tooltip": "In {{currency}}, not your default {{defaultCurrency}}. Click for details.",
+        "title": "This is in {{currency}}",
+        "explain": "Your default currency is {{defaultCurrency}}, but this was recorded in {{currency}}, so it is not counted in {{defaultCurrency}} totals the way you may expect.",
+        "rate": "Rate: 1 {{from}} = {{rate}} {{to}}",
+        "hint": "Converting saves the {{currency}} amount on the record, so you can always see what it was.",
+        "keep": "Keep in {{currency}}",
+        "convert": "Convert to {{defaultCurrency}}"
+    },
+    "currencyPicker": {
+        "title": "Choose a currency",
+        "select": "Select currency",
+        "search": "Search currency...",
+        "favorites": "Favorites"
+    },
     "groups": {
         "types": {
             "partner": {
@@ -1330,6 +1382,18 @@
             "create": "Create Group",
             "creating": "Creating...",
             "cancel": "Cancel",
+            "currencyModeTitle": "How should money work in this group?",
+            "mergeCurrencyLabel": "Shared currency:",
+            "currencyMode": {
+                "merge": {
+                    "name": "One shared currency",
+                    "description": "Every expense converts into one currency automatically."
+                },
+                "keep_original": {
+                    "name": "Keep currencies separate",
+                    "description": "Each currency gets its own balance — nothing converts."
+                }
+            },
             "errors": {
                 "nameRequired": "Please enter a group name"
             }
@@ -1348,7 +1412,10 @@
                 "shouldPay": "Should pay",
                 "ahead": "{{amount}} ahead",
                 "behind": "{{amount}} behind",
-                "settled": "Settled up"
+                "settled": "Settled up",
+                "legendPaid": "Paid so far",
+                "legendShouldPay": "Should pay (their share)",
+                "legendGap": "Striped: the gap, still owed or overpaid"
             },
             "copyLink": "Copy link",
             "copied": "Copied!",
@@ -1366,7 +1433,14 @@
             "statsTab": "Other stats",
             "totalExpenses": "Total expenses in this group: {{amount}}",
             "searchPlaceholder": "Search by name, date or month (e.g. March, 2026-03)",
-            "noSearchResults": "No expenses match your search."
+            "noSearchResults": "No expenses match your search.",
+            "you": "You",
+            "markPaid": "Mark paid",
+            "markReceived": "Mark received",
+            "summaryOwedToYou": "Owed to you",
+            "summaryYouOwe": "You owe",
+            "summaryNet": "Net",
+            "summaryMissingRate": "{{count}} balance(s) not counted: no exchange rate yet"
         },
         "join": {
             "askToJoin": "Ask to Join",
@@ -1391,7 +1465,8 @@
             "editTitle": "Edit Expense",
             "deleteConfirm": "Delete this expense? This can't be undone.",
             "delete": "Delete this expense",
-            "category": "Category"
+            "category": "Category",
+            "willConvertTo": "Will convert to {{currency}} at today's/the expense date's rate."
         },
         "splitPicker": {
             "confirm": "Split it",
@@ -1416,7 +1491,23 @@
                 "shareMessage": "Join \"{{groupName}}\" on Exli: {{link}}"
             },
             "currency": "Currency",
-            "currencyHint": "Used for every amount in this group. Changing it relabels existing amounts; it does not convert them."
+            "currencyHint": "Used for every amount in this group. Changing it relabels existing amounts; it does not convert them.",
+            "merge": {
+                "title": "Convert expenses into {{currency}}",
+                "explain": "Every expense and payment in another currency is converted into one shared currency. Each expense uses the exchange rate of the day it was made, and the original amount is kept on it. Balances are then recalculated from the expenses, so totals, stats and who owes whom all follow. Nothing changes until you confirm, and it is recorded in the group history.",
+                "currencyTitle": "{{from}} into {{to}}",
+                "expensesLine": "{{count}} expense(s) in {{from}} (total {{total}}, {{first}} to {{last}}) become {{newTotal}}. Average rate 1 {{from}} = {{rate}} {{to}}, daily rates from {{min}} to {{max}}.",
+                "paymentsLine": "Payments recorded in {{from}} ({{amount}}) are converted at that same average rate, so debts already paid in {{from}} stay paid.",
+                "balancesTitle": "Balances after the conversion",
+                "derivedNote": "Calculated from all the expenses and payments in the group.",
+                "even": "settled",
+                "owes": "owes {{amount}}",
+                "isOwed": "is owed {{amount}}",
+                "was": "was: {{value}}",
+                "confirm": "Convert and continue",
+                "leftover": "{{count}} expense(s) or payment(s) are still recorded in another currency than {{currency}}.",
+                "review": "Review and convert"
+            }
         },
         "transfer": {
             "selectTitle": "Move to a Group",
@@ -1441,13 +1532,31 @@
             "total": "Total spent",
             "count": "Expenses",
             "average": "Average expense",
-            "byMonth": "By month - who paid what",
-            "paidBy": "Paid by {{name}}",
-            "shareVsPaid": "Each member's share vs paid",
-            "paidShare": "Paid {{paid}} · Share {{share}} ({{pct}}%)",
-            "byCategory": "By category",
+            "topPayer": "Paid the most",
+            "paidAmount": "Paid {{amount}}",
+            "viewIn": "View in",
+            "allConverted": "All, in {{currency}}",
+            "approxNote": "Everything is converted to {{currency}} at the rate of each expense's date, so totals are approximate. Nothing is saved.",
+            "excluded": "{{count}} expense(s) left out because no exchange rate was available.",
+            "monthlySpending": "Spending by month",
+            "monthlyHint": "Each bar is split by who paid.",
+            "whereMoneyGoes": "Where the money goes",
             "uncategorized": "Uncategorized",
-            "biggest": "Biggest expenses"
+            "paidVsShare": "Paid vs fair share",
+            "paidVsShareHint": "What each person put in compared with what they owe for the things they shared in.",
+            "paid": "Paid",
+            "share": "Share",
+            "even": "Even",
+            "paidMore": "Paid {{amount}} more",
+            "paidLess": "Paid {{amount}} less",
+            "biggest": "Biggest expenses",
+            "payments": "Payments between members",
+            "paymentsHint": "Every time someone marked a debt as paid.",
+            "noPayments": "No payments recorded yet.",
+            "settledTotal": "Paid back so far",
+            "sent": "Paid {{amount}}",
+            "received": "Received {{amount}}",
+            "undoPayment": "Undo this payment"
         },
         "defaultSplit": {
             "title": "Default split",
@@ -1476,6 +1585,48 @@
             "rowFallback": "No income data for {{month}} - split equally",
             "pickerResolved": "Income split for {{month}}",
             "perMonthHint": "Each expense will use the income split of its own month."
+        },
+        "pay": {
+            "titlePay": "Pay {{name}}",
+            "titleReceived": "{{name}} paid you",
+            "amount": "Amount",
+            "fullAmount": "The full amount you owe.",
+            "partial": "Partial payment. {{rest}} will still be owed.",
+            "amountInvalid": "Enter an amount between 0 and {{max}}.",
+            "how": "How are you paying?",
+            "pickMethod": "Pick how you are paying to see the details.",
+            "methods": {
+                "bit": "Bit",
+                "paybox": "PayBox",
+                "venmo": "Venmo",
+                "paypal": "PayPal",
+                "cash": "Cash / other",
+                "other": "Other"
+            },
+            "openApp": "Open {{app}} with the amount filled in",
+            "noHandle": "{{name}} hasn't added a {{app}} username yet.",
+            "noPhone": "{{name}} hasn't added a phone number for {{app}} yet.",
+            "venmoUsdOnly": "Venmo only works with US dollars.",
+            "phoneHint": "Send it in {{app}} to {{name}}'s number. Bit and PayBox can't be opened with the amount filled in, so copy these.",
+            "copyPhone": "Copy number",
+            "copyAmount": "Copy amount",
+            "copied": "Copied",
+            "cashHint": "Pay them directly, then record it here.",
+            "confirmPaid": "I paid, record it",
+            "confirmReceived": "Yes, I received it",
+            "recordHint": "The app link only helps you send the money. The payment is recorded in the group when you confirm here.",
+            "note": "Exli: {{group}}",
+            "myDetails": "My payment details",
+            "handlesTitle": "My payment details",
+            "handlesHint": "Group members see these when they pay you back, so they can open the right app. All optional.",
+            "handles": {
+                "phone": "Phone (Bit / PayBox)",
+                "phonePlaceholder": "050-1234567",
+                "venmo": "Venmo username",
+                "venmoPlaceholder": "username",
+                "paypal": "PayPal.me name",
+                "paypalPlaceholder": "name"
+            }
         }
     }
 }

@@ -18,6 +18,7 @@ from services.groups_service import (
     active_role,
     ensure_permission,
     log_activity,
+    get_currency_settings,
     GroupServiceError,
     ValidationError,
     NotFoundError,
@@ -25,6 +26,8 @@ from services.groups_service import (
     ConflictError,
 )
 import services.income_ratio_service as income_ratio_service
+import services.fx_service as fx_service
+import services.currency_meta as currency_meta
 from services.split_engine import compute_shares, SplitError
 
 MAX_DESCRIPTION_LEN = 140
@@ -80,15 +83,76 @@ def _get_active_expense_or_404(group_ref, expense_id):
     return expense_ref, snap.to_dict()
 
 
+def _clean_expense_currency(code):
+    code = (code or "").strip().upper()
+    if code not in currency_meta.supported_currencies():
+        raise ValidationError(f"Unknown or unsupported currency: {code}")
+    return code
+
+
+# ---------------------------------------------------------------------------
+# Currency resolution — docs/fx/01-fx-plan.md §6.
+# ---------------------------------------------------------------------------
+
+def _resolve_currency(db, group, currency, amount_minor, date_str, existing=None):
+    """
+    Determines the CANONICAL currency/amount an expense's shares are actually
+    computed in:
+      - `keep_original` groups: the expense stays in whatever currency was
+        entered — never converted.
+      - `merge` groups: a foreign-currency expense is converted to the
+        group's mergeCurrency and the rate is LOCKED on the expense. Editing
+        without changing the currency or date reuses the locked rate instead
+        of re-fetching it (plan §3 Decision B: "editing anything else keeps it").
+
+    Returns (canonical_currency, canonical_amount_minor, original, fx).
+    `original`/`fx` are None unless this expense is a converted (locked) one.
+    `existing` is the expense's current stored doc when editing, else None.
+    """
+    currency = _clean_expense_currency(currency)
+    settings = get_currency_settings(group)
+
+    if settings["mode"] == "keep_original":
+        return currency, amount_minor, None, None
+
+    target = settings.get("mergeCurrency") or "ILS"
+    if currency == target:
+        return target, amount_minor, None, None
+
+    existing_original = (existing or {}).get("original")
+    existing_fx = (existing or {}).get("fx")
+    if (
+        existing_original and existing_fx
+        and existing_original.get("currency") == currency
+        and (existing or {}).get("date") == date_str
+    ):
+        canonical_amount_minor = fx_service.apply_rate_minor(amount_minor, currency, target, existing_fx["rate"])
+        fx = dict(existing_fx)
+    else:
+        result = fx_service.convert_minor(db, amount_minor, currency, target, date_str=date_str)
+        if result["amountMinor"] is None:
+            raise ValidationError(f"No exchange rate available to convert {currency} to {target} on {date_str}.")
+        canonical_amount_minor = result["amountMinor"]
+        fx = {"rate": result["rate"], "rateDate": result["rateDate"], "basis": result["basis"]}
+
+    original = {"amountMinor": amount_minor, "currency": currency}
+    return target, canonical_amount_minor, original, fx
+
+
 # ---------------------------------------------------------------------------
 # Split resolution — always server-side, never trusts a client-sent share.
 # ---------------------------------------------------------------------------
 
-def _resolve_split(db, group, expense_date, split_input, participants):
+def _resolve_split(db, group, expense_date, split_input, participants, reference_currency):
     """
     split_input, from the request:
       {"splitRuleId": "<id>"}                            -> use one of the group's saved rules
       {"kind": "custom", "params": {"amounts": {...}}}   -> Pour It Yourself (never a stored rule, plan §3.1)
+
+    reference_currency: what currency this expense's shares are computed in
+    (the canonical currency from _resolve_currency) — income_ratio needs this
+    to convert each member's own-currency `neto` onto one common footing
+    before computing ratios (docs/fx/01-fx-plan.md §6).
 
     Returns (split_rule_id_or_None, kind, params, resolved_ratios_or_None).
     """
@@ -125,7 +189,9 @@ def _resolve_split(db, group, expense_date, split_input, participants):
 
         if kind == "income_ratio":
             # Re-derived fresh every time (plan §3.7) — never trust a cached ratio.
-            ratio_result = income_ratio_service.get_income_ratios(db, group, expense_date)
+            ratio_result = income_ratio_service.get_income_ratios(
+                db, group, expense_date, reference_currency=reference_currency
+            )
             if not ratio_result["ready"] and from_default:
                 # Graceful fallback for the group DEFAULT only: the expense's month has no complete
                 # income data, so split equally and say so (split.params.incomeFallback).
@@ -154,8 +220,8 @@ def _resolve_split(db, group, expense_date, split_input, participants):
     return None, "custom", (split_input.get("params") or {}), None
 
 
-def _validate_and_resolve(db, group, *, description, amount_minor, date_str, category=None,
-                           payer_id=None, participants=None, split_input=None, note=None):
+def _validate_and_resolve(db, group, *, description, amount_minor, currency, date_str, category=None,
+                           payer_id=None, participants=None, split_input=None, note=None, existing=None):
     description = (description or "").strip()
     if not description:
         raise ValidationError("A description is required.")
@@ -179,12 +245,17 @@ def _validate_and_resolve(db, group, *, description, amount_minor, date_str, cat
     if invalid:
         raise ValidationError("All participants must be active members of this group.")
 
+    canonical_currency, canonical_amount_minor, original, fx = _resolve_currency(
+        db, group, currency, amount_minor, date_str, existing=existing
+    )
+
     split_rule_id, kind, params, resolved_ratios = _resolve_split(
-        db, group, expense_date, split_input or {"useDefault": True}, participants
+        db, group, expense_date, split_input or {"useDefault": True}, participants,
+        reference_currency=canonical_currency,
     )
 
     try:
-        shares = compute_shares(amount_minor, kind, participants, payer_id, params)
+        shares = compute_shares(canonical_amount_minor, kind, participants, payer_id, params)
     except SplitError as e:
         raise ValidationError(str(e))
 
@@ -196,8 +267,10 @@ def _validate_and_resolve(db, group, *, description, amount_minor, date_str, cat
         "description": description,
         "category": category,
         "date": date_str,
-        "amountMinor": amount_minor,
-        "currency": group.get("currency") or "ILS",
+        "amountMinor": canonical_amount_minor,
+        "currency": canonical_currency,
+        "original": original,
+        "fx": fx,
         "paidBy": payer_id,
         "participants": participants,
         "split": {
@@ -244,8 +317,32 @@ def _apply_deltas(balances, deltas):
     return updated
 
 
+def _apply_balance_updates(group, currency_settings, delta_entries):
+    """
+    delta_entries: list of (currency, deltas) pairs — an edit that changes an
+    expense's own currency in a `keep_original` group produces TWO entries
+    (reverse the old currency's bucket, apply the new one), since those are
+    different ledgers; everything else produces exactly one.
+
+    `merge` groups always write the single flat `balances` ledger (today's
+    behavior, unchanged). `keep_original` groups write into the matching
+    currency's bucket inside `balancesByCurrency` instead (plan §6: "The
+    ledger is kept per currency").
+    """
+    if currency_settings["mode"] == "keep_original":
+        by_currency = dict(group.get("balancesByCurrency") or {})
+        for currency, deltas in delta_entries:
+            by_currency[currency] = _apply_deltas(by_currency.get(currency) or {}, deltas)
+        return {"balancesByCurrency": by_currency}
+
+    balances = dict(group.get("balances") or {})
+    for _currency, deltas in delta_entries:
+        balances = _apply_deltas(balances, deltas)
+    return {"balances": balances}
+
+
 @firestore.transactional
-def _write_expense_and_balances_txn(transaction, group_ref, expense_ref, expense_fields, deltas, is_new):
+def _write_expense_and_balances_txn(transaction, group_ref, expense_ref, expense_fields, delta_entries, is_new):
     """
     Re-reads the group's balances FRESH inside the transaction (never the
     balances snapshot the caller resolved the split against), so concurrent
@@ -259,32 +356,34 @@ def _write_expense_and_balances_txn(transaction, group_ref, expense_ref, expense
     if not group_snap.exists:
         raise NotFoundError("Group not found.")
     group = group_snap.to_dict()
+    currency_settings = get_currency_settings(group)
 
-    balances = _apply_deltas(group.get("balances") or {}, deltas)
+    balance_updates = _apply_balance_updates(group, currency_settings, delta_entries)
 
     if is_new:
         transaction.set(expense_ref, expense_fields)
     else:
         transaction.update(expense_ref, expense_fields)
 
-    transaction.update(group_ref, {"balances": balances, "updatedAt": firestore.SERVER_TIMESTAMP})
+    transaction.update(group_ref, {**balance_updates, "updatedAt": firestore.SERVER_TIMESTAMP})
 
 
 @firestore.transactional
-def _delete_expense_txn(transaction, group_ref, expense_ref, reverse_deltas, deleter_uid):
+def _delete_expense_txn(transaction, group_ref, expense_ref, delta_entries, deleter_uid):
     group_snap = group_ref.get(transaction=transaction)
     if not group_snap.exists:
         raise NotFoundError("Group not found.")
     group = group_snap.to_dict()
+    currency_settings = get_currency_settings(group)
 
-    balances = _apply_deltas(group.get("balances") or {}, reverse_deltas)
+    balance_updates = _apply_balance_updates(group, currency_settings, delta_entries)
 
     transaction.update(expense_ref, {
         "deleted": True,
         "deletedBy": deleter_uid,
         "deletedAt": firestore.SERVER_TIMESTAMP,
     })
-    transaction.update(group_ref, {"balances": balances, "updatedAt": firestore.SERVER_TIMESTAMP})
+    transaction.update(group_ref, {**balance_updates, "updatedAt": firestore.SERVER_TIMESTAMP})
 
 
 # ---------------------------------------------------------------------------
@@ -318,7 +417,9 @@ def create_expense(db, uid, group_id, **kwargs):
     }
 
     transaction = db.transaction()
-    _write_expense_and_balances_txn(transaction, snap.reference, expense_ref, expense_doc, deltas, is_new=True)
+    _write_expense_and_balances_txn(
+        transaction, snap.reference, expense_ref, expense_doc, [(fields["currency"], deltas)], is_new=True
+    )
 
     log_activity(db, group_id, "EXPENSE_ADDED", uid, metadata={
         "expenseId": expense_ref.id, "amountMinor": fields["amountMinor"],
@@ -327,28 +428,93 @@ def create_expense(db, uid, group_id, **kwargs):
     return expense_ref.id
 
 
-def edit_expense(db, uid, group_id, expense_id, **kwargs):
+def edit_expense(db, uid, group_id, expense_id, extra_fields=None, **kwargs):
     """Full replace, not a partial patch — the caller resends every field (simpler and
-    harder to get subtly wrong than merging a partial patch onto stored state)."""
+    harder to get subtly wrong than merging a partial patch onto stored state).
+    `extra_fields` are stored as-is on top (used by convert_expense to record original/fx)."""
     snap = get_group_or_404(db, group_id)
     group = snap.to_dict()
 
     expense_ref, existing = _get_active_expense_or_404(snap.reference, expense_id)
     _ensure_can_edit_expense(group, uid, existing)
 
-    fields, new_shares = _validate_and_resolve(db, group, **kwargs)
+    fields, new_shares = _validate_and_resolve(db, group, existing=existing, **kwargs)
 
     old_deltas = _negate(_balance_deltas(existing["paidBy"], existing["amountMinor"], existing["shares"]))
     new_deltas = _balance_deltas(fields["paidBy"], fields["amountMinor"], new_shares)
-    combined_deltas = _combine_deltas(old_deltas, new_deltas)
 
-    update_fields = {**fields, "shares": new_shares, "updatedAt": firestore.SERVER_TIMESTAMP, "updatedBy": uid}
+    old_currency = existing.get("currency")
+    new_currency = fields["currency"]
+    if old_currency == new_currency:
+        delta_entries = [(new_currency, _combine_deltas(old_deltas, new_deltas))]
+    else:
+        # A keep_original expense whose currency itself changed — these are
+        # two DIFFERENT ledgers (balancesByCurrency buckets), not one to combine.
+        delta_entries = [(old_currency, old_deltas), (new_currency, new_deltas)]
+
+    update_fields = {**fields, **(extra_fields or {}), "shares": new_shares,
+                     "updatedAt": firestore.SERVER_TIMESTAMP, "updatedBy": uid}
 
     transaction = db.transaction()
-    _write_expense_and_balances_txn(transaction, snap.reference, expense_ref, update_fields, combined_deltas, is_new=False)
+    _write_expense_and_balances_txn(transaction, snap.reference, expense_ref, update_fields, delta_entries, is_new=False)
 
     log_activity(db, group_id, "EXPENSE_EDITED", uid, target_id=expense_id)
     return True
+
+
+def _scale_shares(shares, new_total):
+    """Scales each person's share by new_total / old_total, rounding so the result sums to new_total
+    exactly (largest remainder)."""
+    old_total = sum(shares.values())
+    if old_total <= 0:
+        raise ValidationError("This expense has no shares to convert.")
+    raw = {uid: v * new_total / old_total for uid, v in shares.items()}
+    scaled = {uid: int(r) for uid, r in raw.items()}
+    leftover = new_total - sum(scaled.values())
+    for uid in sorted(raw, key=lambda u: raw[u] - scaled[u], reverse=True)[:max(leftover, 0)]:
+        scaled[uid] += 1
+    return scaled
+
+
+def convert_expense(db, uid, group_id, expense_id, to_currency):
+    """
+    Converts ONE keep_original expense into `to_currency` at the rate of its own date
+    (docs/fx/01-fx-plan.md §6, the "foreign record" alert). The split keeps its rule (or its
+    proportions, for custom/percent splits); balances move from the old currency's ledger to the
+    new one's; `original` + `fx` are recorded on the expense so the conversion is traceable.
+    """
+    snap = get_group_or_404(db, group_id)
+    group = snap.to_dict()
+    if get_currency_settings(group)["mode"] != "keep_original":
+        raise ConflictError("Expenses in this group are already converted to one currency when they are added.")
+
+    _, existing = _get_active_expense_or_404(snap.reference, expense_id)
+    target = _clean_expense_currency(to_currency)
+    source = existing.get("currency") or group.get("currency") or "ILS"
+    if source == target:
+        raise ValidationError("This expense is already in that currency.")
+
+    result = fx_service.convert_minor(db, existing["amountMinor"], source, target, date_str=existing["date"])
+    if result["amountMinor"] is None or result["amountMinor"] <= 0:
+        raise ValidationError(f"No exchange rate available to convert {source} to {target} on {existing['date']}.")
+    new_amount = result["amountMinor"]
+
+    split = existing.get("split") or {}
+    if split.get("splitRuleId"):
+        split_input = {"splitRuleId": split["splitRuleId"]}
+    else:
+        split_input = {"kind": "custom", "params": {"amounts": _scale_shares(existing["shares"], new_amount)}}
+
+    extra = {
+        "original": {"amountMinor": existing["amountMinor"], "currency": source},
+        "fx": {"rate": result["rate"], "rateDate": result["rateDate"], "basis": result["basis"]},
+    }
+    return edit_expense(
+        db, uid, group_id, expense_id, extra_fields=extra,
+        description=existing.get("description"), amount_minor=new_amount, currency=target,
+        date_str=existing["date"], category=existing.get("category"), payer_id=existing["paidBy"],
+        participants=existing.get("participants"), split_input=split_input, note=existing.get("note"),
+    )
 
 
 def delete_expense(db, uid, group_id, expense_id):
@@ -363,7 +529,7 @@ def delete_expense(db, uid, group_id, expense_id):
     reverse_deltas = _negate(_balance_deltas(existing["paidBy"], existing["amountMinor"], existing["shares"]))
 
     transaction = db.transaction()
-    _delete_expense_txn(transaction, snap.reference, expense_ref, reverse_deltas, uid)
+    _delete_expense_txn(transaction, snap.reference, expense_ref, [(existing.get("currency"), reverse_deltas)], uid)
 
     log_activity(db, group_id, "EXPENSE_DELETED", uid, target_id=expense_id)
     return True
@@ -386,10 +552,11 @@ def _transfer_expense_txn(transaction, group_ref, expense_ref, expense_fields, d
         raise ConflictError("This expense has already been shared to a group.")
 
     group = group_snap.to_dict()
-    balances = _apply_deltas(group.get("balances") or {}, deltas)
+    currency_settings = get_currency_settings(group)
+    balance_updates = _apply_balance_updates(group, currency_settings, [(expense_fields["currency"], deltas)])
 
     transaction.set(expense_ref, expense_fields)
-    transaction.update(group_ref, {"balances": balances, "updatedAt": firestore.SERVER_TIMESTAMP})
+    transaction.update(group_ref, {**balance_updates, "updatedAt": firestore.SERVER_TIMESTAMP})
     transaction.update(personal_ref, {
         "amount": my_share_major,
         "originalAmount": personal.get("amount"),
@@ -423,7 +590,8 @@ def transfer_personal_expense(db, uid, group_id, personal_expense_id, split_inpu
     if personal.get("groupRef"):
         raise ConflictError("This expense has already been shared to a group.")
 
-    amount_minor = round(abs(float(personal.get("amount") or 0)) * 100)
+    personal_currency = _clean_expense_currency(personal.get("currency") or "ILS")
+    amount_minor = round(abs(float(personal.get("amount") or 0)) * (10 ** currency_meta.get_minor_units(personal_currency)))
     if amount_minor <= 0:
         raise ValidationError("This expense has no amount to share.")
 
@@ -431,14 +599,27 @@ def transfer_personal_expense(db, uid, group_id, personal_expense_id, split_inpu
         db, group,
         description=(personal.get("description") or "").strip() or "Expense",
         amount_minor=amount_minor,
+        currency=personal_currency,
         date_str=_personal_date_to_date_str(personal.get("date")),
         category=personal.get("assignedCategory"),
         payer_id=uid,
         participants=None,  # defaults to every active member (plan §12: no separate "split among" step)
         split_input=split_input,
     )
-    my_share_minor = shares.get(uid, 0)
-    deltas = _balance_deltas(uid, amount_minor, shares)
+    deltas = _balance_deltas(uid, fields["amountMinor"], shares)
+
+    # The caller's own remaining personal-expense amount must stay expressed
+    # in ITS OWN currency (personal_currency), not the group's canonical
+    # currency a merge group may have just converted into — invert the same
+    # locked rate rather than re-fetching a (possibly different) one.
+    my_share_canonical_minor = shares.get(uid, 0)
+    if fields["currency"] != personal_currency:
+        my_share_minor = fx_service.apply_rate_minor(
+            my_share_canonical_minor, fields["currency"], personal_currency, 1 / fields["fx"]["rate"]
+        )
+    else:
+        my_share_minor = my_share_canonical_minor
+    my_share_major = my_share_minor / (10 ** currency_meta.get_minor_units(personal_currency))
 
     expense_ref = snap.reference.collection("expenses").document()
     expense_doc = {
@@ -458,7 +639,7 @@ def transfer_personal_expense(db, uid, group_id, personal_expense_id, split_inpu
     transaction = db.transaction()
     _transfer_expense_txn(
         transaction, snap.reference, expense_ref, expense_doc, deltas,
-        personal_ref, my_share_minor / 100, group_id, group.get("name"),
+        personal_ref, my_share_major, group_id, group.get("name"),
     )
 
     log_activity(db, group_id, "EXPENSE_ADDED", uid, metadata={
@@ -532,7 +713,8 @@ def apply_default_split_to_existing(db, uid, group_id):
         try:
             participants = list(e.get("participants") or [])
             split_rule_id, kind, params, resolved = _resolve_split(
-                db, group, _parse_date(e.get("date")), {"useDefault": True}, participants
+                db, group, _parse_date(e.get("date")), {"useDefault": True}, participants,
+                reference_currency=e.get("currency") or group.get("currency") or "ILS",
             )
             new_shares = compute_shares(e["amountMinor"], kind, participants, e["paidBy"], params)
         except (GroupServiceError, SplitError) as err:
@@ -578,7 +760,7 @@ def apply_default_split_to_existing(db, uid, group_id):
 
 
 @firestore.transactional
-def _untransfer_expense_txn(transaction, group_ref, expense_ref, reverse_deltas, personal_ref):
+def _untransfer_expense_txn(transaction, group_ref, expense_ref, delta_entries, personal_ref):
     group_snap = group_ref.get(transaction=transaction)
     if not group_snap.exists:
         raise NotFoundError("Group not found.")
@@ -588,10 +770,11 @@ def _untransfer_expense_txn(transaction, group_ref, expense_ref, reverse_deltas,
     personal = personal_snap.to_dict()
 
     group = group_snap.to_dict()
-    balances = _apply_deltas(group.get("balances") or {}, reverse_deltas)
+    currency_settings = get_currency_settings(group)
+    balance_updates = _apply_balance_updates(group, currency_settings, delta_entries)
 
     transaction.update(expense_ref, {"deleted": True, "deletedBy": None, "deletedAt": firestore.SERVER_TIMESTAMP})
-    transaction.update(group_ref, {"balances": balances, "updatedAt": firestore.SERVER_TIMESTAMP})
+    transaction.update(group_ref, {**balance_updates, "updatedAt": firestore.SERVER_TIMESTAMP})
     transaction.update(personal_ref, {
         "amount": personal.get("originalAmount", personal.get("amount")),
         "originalAmount": firestore.DELETE_FIELD,
@@ -633,7 +816,9 @@ def remove_personal_expense_from_group(db, uid, group_id, personal_expense_id):
     reverse_deltas = _negate(_balance_deltas(existing["paidBy"], existing["amountMinor"], existing["shares"]))
 
     transaction = db.transaction()
-    _untransfer_expense_txn(transaction, snap.reference, expense_ref, reverse_deltas, personal_ref)
+    _untransfer_expense_txn(
+        transaction, snap.reference, expense_ref, [(existing.get("currency"), reverse_deltas)], personal_ref
+    )
 
     log_activity(db, group_id, "EXPENSE_DELETED", uid, target_id=group_ref_info["groupExpenseId"])
     return True

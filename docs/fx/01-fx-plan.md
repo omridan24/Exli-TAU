@@ -1,6 +1,6 @@
 # Foreign Exchange (FX) across Exli: Plan
 
-Status: **approved, implementation starting** (2026-09-26). All decisions below are final.
+Status: **Phases 0-3, 4, and 5 implemented, Phase 6 designed but explicitly not yet implemented** (`groups` merged into `main` 2026-09-30, `fx` has since merged `main` in to pick up that code). See §8 for the phase-by-phase breakdown and §11 for Phase 6's design. All decisions below are final except Decision H (§11.4, open).
 
 Goal: any money amount in Exli (expense, income, wishlist item, group expense, investment) can be in any currency. Each user has a **default currency**. When an amount is in a different currency, Exli **offers to convert it** at the **real historical rate on the day of the transaction**, or it can be kept in its original currency. In Groups, the group decides: keep every currency separate, or merge everything into one. Rates come from TwelveData. For example, $100 spent on 2025-08-20 converts at that day's rate of about 3.40, so it becomes about ₪340.
 
@@ -122,7 +122,7 @@ Why year buckets:
 - Size is about 260 business days × about 45 numbers × 2 maps, roughly 25–40k values, well under the 1 MB doc limit.
 - Past years never change, so the client can cache them forever (IndexedDB/localStorage with try/catch). Only the current year and `latest` need refreshing.
 
-Firestore rules: `match /fxRates/{doc} { allow read: if request.auth != null; allow write: if false; }`. The client reads directly, and only the backend service account writes.
+Firestore rules: `match /fxRates/{doc} { allow read: if request.auth != null; allow write: if false; }`. The client reads directly, and only the backend service account writes. Not added yet: `exli-front/firestore.rules` only exists on the still-unmerged `groups` branch, so this rule is queued for Phase 2 (when the client actually needs to read `fxRates`) rather than risking a rules file that drifts between two branches in the meantime. The backend ingestion job writes via the service account either way, unaffected by this.
 
 The old `currencyRates/*` collection stays read-only until the investments code moves over, then it gets deleted.
 
@@ -132,7 +132,32 @@ The old `currencyRates/*` collection stays read-only until the investments code 
 - Each run fetches the last 7 days for every pair (overlap makes missed days self-heal), merges them into `fxRates/{year}.days`, updates `monthlyAvg` for the months it touched, and updates `latest`. The job is idempotent, so reruns are harmless.
 - The breaker only counts real rate-limit signals (429, "run out of API credits"), same as the §0.1 fix.
 - **Backfill script** `scripts/backfill_fx.py --from 2015-01-01`: one `outputsize=5000` call per pair, writing one year doc at a time.
-- An email report goes out through the existing `send_ingestion_report` pattern. A **staleness alarm** fires if `latest.date` is more than 4 business days old. That would have caught §0.2 in February.
+- An email report goes out through the existing `send_ingestion_report` pattern (its own `send_fx_ingestion_report`, same visual style). A **staleness alarm** fires if `latest.date` is more than 4 business days old. That would have caught §0.2 in February.
+- Also production-only, same guard as `/system/ingest-market-data`: a request against the dev host is refused before touching Firestore or TwelveData.
+
+**Status: implemented** on the `fx` branch (2026-09-26) - `services/fx_ingest_service.py` (direction detection cached in `_system/fxPairs`, year-bucket merge, monthly average, staleness check), the `POST /system/ingest-fx` route, `send_fx_ingestion_report`, `scripts/backfill_fx.py`, and 28 new unit tests (all against a fake Firestore client + a fake provider, no live credentials needed). The `deploy-backend.yml` prod workflow now also syncs this job's auth header on every deploy, matching the stock job's pattern.
+
+**One manual step left**: the Cloud Scheduler job itself. `gcloud scheduler jobs create` needs an operator with `roles/cloudscheduler.admin` (blocked here by sandbox permissions on shared cloud infra, same as pausing the dev stock job in the prior PR) - run once:
+
+```bash
+SERVICE_URL=$(gcloud run services describe exli-processor \
+  --region europe-central2 --project exli-24 --format 'value(status.url)')
+
+gcloud scheduler jobs create http exli-fx-ingest-daily \
+  --project exli-24 \
+  --location europe-central2 \
+  --schedule "30 4 * * *" \
+  --time-zone "Etc/UTC" \
+  --uri "${SERVICE_URL}/system/ingest-fx" \
+  --http-method POST \
+  --headers "X-System-Key=${SYSTEM_API_KEY},Content-Type=application/json" \
+  --attempt-deadline 1800s \
+  --max-retry-attempts 3
+```
+
+(`SYSTEM_API_KEY` here is the same value already used for the stock job - pull it from wherever that's kept, e.g. the GitHub Actions secret; never commit it.) After this exists, `deploy-backend.yml`'s new "Sync FX ingestion scheduler auth header" step keeps its header current on every future deploy, same as the stock job's.
+
+Also still open from Phase 0: pausing the redundant `exli-market-ingest-daily` dev scheduler job is now optional (the code refuses dev outright either way) - do it if you want to stop it wasting a Cloud Run cold-start every night.
 
 ---
 
@@ -298,17 +323,18 @@ Existing groups migrate to `{ mode: "merge", mergeCurrency: group.currency }`, w
 | # | Scope | Branch |
 |---|---|---|
 | **0** | Fix ingestion (§0): dead-symbol tombstones, a breaker that counts only real rate limits, API-key redaction, dev-job schedule, drop the extra `quote` call. Tests with a fake provider | `fix-market-ingest` off `main` (ships fast, unrelated to groups) |
-| **1** | FX data layer on TwelveData: USD-pivot pairs + direction detection, `fxRates/{year}` + `monthlyAvg`, `/system/ingest-fx` at 04:30 UTC, backfill from 2015, staleness alarm, Firestore rule | `fx` |
-| **2** | Engine (py + js + vectors), `src/lib/fx` hooks, `<Money>`, `<CurrencyPicker>`, `<ConvertOffer>` + bulk, `currencyPrefs` in Settings | `fx` |
-| **3** | Personal features: expenses + imports, analytics totals bug, income (pay date), recurring, wishlist, investments, "review foreign records" | `fx` |
-| **4** | Groups: `currencySettings` (keep original / merge), locked rates on create/edit, per-currency ledger + simplifyDebts, create-wizard step, transfer flow, income ratio | `fx` (after `groups` merges) |
-| **5** (stretch) | Statement "actual charged" capture: AI import extracts original and charged amounts, `fx.source = "statement"` | `fx` |
+| **1** | ✅ **Implemented.** FX data layer on TwelveData: USD-pivot pairs + direction detection, `fxRates/{year}` + `monthlyAvg`, `/system/ingest-fx`, backfill script, staleness alarm. Firestore rule and the actual `gcloud scheduler jobs create` are the only pieces left (manual, see §2.3) | `fx` |
+| **2** | ✅ **Implemented** (2026-09-26): engine (py + js + vectors), `currencyMeta` (py + js), `src/lib/fx` hooks (fxRatesStore, useCurrencyPrefs, CurrencyContext, useFx), `<Money>`, `<CurrencyPicker>`, `currencyPrefs` Settings tab, `<ConvertOffer>`/`<BulkConvertOffer>` | `fx` |
+| **3** | ✅ **Implemented** (2026-09-26). The lifetime-stats AND yearly-report mixed-currency summing bugs (AnalyticsNode/StatsOverview/YearDashboard/AnalyticsReportsView - AnalyticsTrendsView needed no changes, audited); `<ConvertOffer>`/`<BulkConvertOffer>` wired into expenses (manual entry, AI import bulk offer, auto-review row), quick income entry (monthly average fallback, §4.2), recurring expense templates (today's rate), wishlist (latest rate, §7), investments (display + rate source swap, no offer needed - a stock's currency is its own, not foreign); "review foreign records" entry point in Settings. Also fixed along the way: OneTimeIncomeForm/RecurringIncomeForm's currency field was purely decorative - Israeli tax brackets ran on the raw entered number regardless of currency - now converts to the tax bracket's own currency BEFORE the marginal-tax math runs (user decision, 2026-09-26) | `fx` |
+| **4** | ✅ **Implemented** (2026-10-04). `group.currencySettings` (`keep_original` / `merge`, with a lazy fallback to `{mode: "merge", mergeCurrency: group.currency}` for groups that predate this field — no Firestore migration write needed); `services/fx_service.py` (backend Firestore-reading mirror of the frontend's fxRatesStore + useFx); a `merge` group's foreign-currency expense converts and LOCKS its rate on create, reusing the locked rate on an edit that doesn't change currency/date (Decision B) and re-fetching when it does; a `keep_original` group never converts and keeps a separate ledger per currency in the new `balancesByCurrency` field (`BalancesList`/`MemberBucketsView` render one simplified-debt/buckets section per currency); `transfer_personal_expense` reads the personal expense's own `currency`; `income_ratio_service` converts each member's `neto` onto the expense's canonical currency before computing ratios; CreateGroupModal's wizard gained a currency-mode step (trip groups default to `keep_original`, everything else to `merge`) and GroupSettings can change it later (merge→keep_original always allowed; changing an active merge group's currency converts existing balances at today's rate; keep_original→merge is deliberately rejected with `MERGE_HISTORY_REQUIRED` until the §6 Decision-C "Merge history" flow below is built). 59 new/updated backend tests (fx_service, merge-mode locking, keep_original ledger, settings-patch, income-ratio currency normalization), all 320 backend tests pass, frontend builds and lints clean. **Not built in this pass**: the "Merge history" weighted-average flow itself (§6 Decision C) — switching a `keep_original` group back to one currency needs it; the groups-list `GroupCard`'s one-line balance preview still only reflects the flat (merge) balance, not a `keep_original` group's per-currency ones | `fx` |
+| **5** (stretch) | ✅ **Implemented** (2026-09-26, user decision - built despite being optional): AI import (both the PDF line-item extractor and the CSV/Excel column mapper) now extracts a statement's own original + charged amounts when a row genuinely shows both; the charged figure wins over the market rate (`fx.source = "statement"`) and skips the bulk market-rate offer entirely for that row | `fx` |
+| **6** | 📝 **Planned, not started** (user feedback 2026-09-30, see §11 for the full design - not to be implemented until reviewed): safer bulk-convert (confirm + visible progress) in Review Records; clearer copy under the ask/convert/keep setting; Analytics *and* `keep_original` Groups show a badge on kept-foreign records with an individual convert action and a bulk-convert action, reusing the same confirm+progress pattern | `fx` |
 
 ### Decision E: Branching
 
-`groups` is not merged into `main` yet, and Phase 4 touches groups code. So:
-- Phase 0 (the ingestion fix) goes on its own `fix-market-ingest` branch off `main` with its own PR.
-- `fx` branches off `main` for Phases 1–3 and gets Phase 4 after `groups` merges.
+`groups` was not merged into `main` when this plan started, and Phase 4 touches groups code. So:
+- Phase 0 (the ingestion fix) went on its own `fix-market-ingest` branch off `main` with its own PR.
+- `fx` branched off `main` for Phases 1–3 and picked up Phase 4 once `groups` merged: `groups` merged into `main` 2026-09-30, and `fx` then merged `main` in (bringing the Groups feature onto `fx`) to unblock it.
 
 ---
 
@@ -332,3 +358,66 @@ Existing groups migrate to `{ mode: "merge", mergeCurrency: group.currency }`, w
 | E | Branching | Phase 0 on its own branch/PR off main. `fx` off main, with the groups part after `groups` merges (2026-09-26) |
 | F | Offer default | **Ask** every time, with a "remember my choice" option (2026-09-26) |
 | F | Offer default | _open_ (recommend: `ask`, with "remember my choice") |
+| H | What a `keep_original` group's expense is compared against to flag it "foreign" (§11.4) | _open_ (recommend: a group-level reference currency set once for display/flagging only - not a mode switch, doesn't touch `currencySettings`) |
+
+---
+
+## 11. Phase 6 (planned, not yet implemented): safer bulk-convert, clearer settings copy, after-the-fact conversion
+
+**Status: SUPERSEDED (2026-10-09). The Phase 6 design below was replaced by a simpler model, implemented on `fx`:**
+- Records always stay in the currency they were made in. The "when something is in a different currency" setting (ask / always convert / keep) and the "Review records in other currencies" tool are removed.
+- One shared component, `components/ForeignCurrencyAlert.jsx`, marks any record not in the default currency (via `<Money>`: Analytics expenses and income, Wishlist, Recurring expenses, and keep_original group expenses). Clicking it opens a popup that explains the mismatch, shows the converted value and rate, and offers "Convert to X" or "Keep in Y".
+- **Whose currency wins in a group:** the group's own setting, for everything shared (balances, splits, settlements). The personal default only drives personal screens, plus two conveniences inside groups: an "approximately X in my currency" hint under each group expense and the "All, in my currency" view on Other stats. In a `keep_original` group the alert marks only expenses that differ from the group's main currency (the one most expenses are in) and converts to that, creator or admin only; `merge` groups never show it.
+- **Merge history (Decision C) is built, and merges the EXPENSES, not the balances** (2026-10-09): every expense and recorded payment not in the merge currency is converted in place (an expense at its own date's rate, a payment at the amount-weighted average rate of that currency's expenses, so debts already paid in the foreign currency stay paid), keeping `original` + `fx`; the group's balances are then re-derived from all the expenses and payments. `GET /groups/<id>/merge-preview` returns what will change (per-currency totals and rates, each expense before/after, resulting balances vs the stored ones) for the confirmation panel in Group settings; the switch `keep_original -> merge` sends `confirmMerge: true` after the admin confirms, and `POST /groups/<id>/consolidate-currency` does the same for a group already in merge mode that still holds foreign documents. Logged as `HISTORY_MERGED`.
+- Personal records convert in place (`lib/fx/useConvertInPlace.js`, `convertRecordsInPlace.js`); group expenses convert through `POST /groups/<id>/expenses/<eid>/convert` (keep_original groups only; re-splits and moves the balance between currency ledgers).
+- Changing the default currency in Settings opens `SwitchDefaultCurrencyModal`: it names the currency most records are in and offers to convert all, behind a second confirmation.
+- Not built from the old design: chunked progress bar, blue row tint, bulk "convert selected" button. The month-scoped bulk convert already in Analytics remains.
+
+Original design (kept for history):
+
+Motivating feedback: running "Convert all to X" in Review Records left no way to tell whether it had finished - no confirmation before it ran, no progress while it ran, and only a small one-line result after. The three-way `onForeignAmount` setting works but doesn't explain itself. And neither Analytics nor a group's own expense list lets you look at an already-saved foreign-currency record and decide right there to convert it - today that's reachable only through the separate Settings tool.
+
+### 11.1 Bulk-convert safety (Review Foreign Records)
+
+Today: clicking "Convert all to {{currency}}" immediately fires one `writeBatch` covering every matching record in that currency, with no confirmation and no progress feedback beyond the button's own small spinner. For more than a handful of records there's no way to tell it's working versus stuck, and nothing to check if you navigate away and come back.
+
+- **Confirm step.** Clicking "Convert all" no longer converts immediately - it shows a confirmation screen first: how many records, from which currency to which, using each record's own historical rate, with Confirm/Cancel.
+- **Visible progress.** Replace the single atomic `writeBatch` with **small sequential chunks** (e.g. 10 records per batch) so a progress bar/counter can update as each chunk lands: "Converting 23 of 61...". A single all-or-nothing batch can't show partial progress; chunking trades strict atomicity (fine here - a currency's records are otherwise-unrelated line items, not one logical transaction) for the visibility the feedback is asking for.
+- **Resumable for free.** Because each record's `fx` field marks it done, a chunked run that's interrupted (tab closed, network drop) leaves already-converted records converted and the rest untouched - reopening "Review records" picks up exactly where it left off, with no extra resume logic needed (this already falls out of the existing per-record `data.fx` check in `scan()`).
+- **Explicit completion state.** A final screen states plainly "Converted 61 of 61" or "Converted 58 of 61 - 3 couldn't be converted (no rate available)", replacing the current one-line toast that's easy to miss once you've started moving on.
+- **Guard against leaving mid-run.** While a chunked conversion is in flight, the modal's close button is disabled (or confirms first) instead of a silent walk-away that reintroduces the exact "did it work?" uncertainty this is meant to fix.
+
+### 11.2 Clearer "when something is in a different currency" settings
+
+Today the three-way toggle (Ask every time / Always convert / Always keep the original) has no explanation beyond its own label. Add one line under each option, phrased as what actually happens the next time something is saved:
+
+- **Ask me every time**: "You'll be asked to convert or keep each time you save something in another currency."
+- **Always convert**: "New records in another currency are converted automatically, using that day's real rate. No prompt."
+- **Always keep the original**: "New records stay in their own currency. They're still shown converted everywhere, just never changed in storage."
+- One shared closing note under all three: "This only affects new records - existing ones are never touched automatically. Use 'Review records in other currencies' below to convert what's already saved."
+
+Copy-only change - `onForeignAmount`'s own behavior doesn't change.
+
+### 11.3 Analytics: flag kept-foreign records and offer to convert them from the report itself
+
+Today a kept-foreign expense displays via `<Money>` (converted for display, a hover explains the rate) but looks identical to a same-currency row - no color, no indicator, and the only way to actually convert it is the separate Settings tool. This mirrors the exact pattern already shipped for group-shared expenses (an orange row + a clickable badge that opens an actions popup - see `GroupedExpenseActionsModal`):
+
+- **New visual state**, `isForeignKept = record.currency !== defaultCurrency && !record.fx` - exactly `ReviewForeignRecords`'s own filter, factored out into one shared helper so the two can't drift apart. Gets its own row tint/left-border color, distinct from suspect (red) / recurring (purple) / group-shared (orange) - blue is free.
+- **Per-row badge**, "🌐 {{currency}}", clickable like the group-shared one - opens a small popup with two choices: "Convert to {{defaultCurrency}}" (that one record, at its own date - the same effect as accepting a `<ConvertOffer>` late) or "Keep in {{currency}}" (just closes - not a decision that needs recording anywhere).
+- **Bulk action.** The multi-select bottom bar gets a new "Convert to {{defaultCurrency}}" button (parallel to the existing "Move to group"), enabled whenever any selected rows are `isForeignKept`, reusing the confirm+progress pattern from §11.1 rather than a second bespoke implementation.
+- Applies the same way to the personal income table (it already has its own `currency` field and `<Money>` rendering).
+
+### 11.4 Groups (folded into Phase 4's scope): the same, for `keep_original` groups
+
+Applies only to **`keep_original`** groups - a `merge` group converts and locks every expense at entry, so there is never a "kept foreign" line to flag there.
+
+- **Per-row badge** in a group's expense list (`GroupPage.jsx`/`ExpenseListItem.jsx`), same visual pattern as §11.3, for any group expense whose currency differs from [**Decision H, open** - see the log above].
+- **Individual convert action** from that badge's popup: converts that one expense to the target currency at its own date's rate, re-splitting it in the new currency using the *same* split rule/shares it already has (the split ratios don't change - only the currency and the amounts they're computed against).
+- **Bulk convert action**: select several of a `keep_original` group's expenses and convert them to one target currency, same chunked-with-progress approach as §11.1/§11.3.
+- This is **narrower** than the existing "Merge history" button (Decision C, §6): "Merge history" changes the group's *mode* to `merge` and converts outstanding *balances* at a weighted-average rate. This new action converts individual *expenses* at each one's own date, without touching the group's mode. Both can coexist: this is the `keep_original` equivalent of what §11.3 does for personal Analytics, while "Merge history" stays the all-at-once mode-switch option for someone who wants to leave `keep_original` behind entirely.
+
+### What's needed before implementation starts
+
+1. Decision H (above): what a `keep_original` group's expense is compared against to be flagged foreign.
+2. Confirm the chunk size for progress reporting (10 records suggested - large enough to be fast, small enough to feel responsive).
+3. Confirm blue is an acceptable/available row-tint color in the current design system (checked against suspect/recurring/group-shared, not checked against anything else that might already use it elsewhere in Analytics).

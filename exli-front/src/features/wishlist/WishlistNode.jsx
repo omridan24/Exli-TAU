@@ -12,8 +12,10 @@ import { WishlistShareModal } from './components/WishlistShareModal';
 import { WishlistSummaryBar } from './components/WishlistSummaryBar';
 import { Gift, Plus, Sparkles } from 'lucide-react';
 import { Button, Card } from '../../components/UI';
+import { useConvertInPlace } from '../../lib/fx/useConvertInPlace';
 
 export const WishlistNode = ({ userId, categories = DEFAULT_CATEGORIES }) => {
+  const { convertAmountRecord } = useConvertInPlace(userId);
   const { t } = useTranslation();
   const [items, setItems] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -209,6 +211,9 @@ export const WishlistNode = ({ userId, categories = DEFAULT_CATEGORIES }) => {
                     }}
                     onDelete={(it) => setDeletingItem(it)}
                     onShare={(it) => setSharingItem(it)}
+                    onConvert={userId && !String(item.id).startsWith('temp_')
+                      ? (it) => convertAmountRecord('wishlist', it, it.price ?? it.amount, 'price')
+                      : undefined}
                   />
                 ))}
               </div>

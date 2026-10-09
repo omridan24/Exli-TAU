@@ -62,3 +62,16 @@ jobs:
             --project ${{ env.PROJECT_ID }} \
             --location ${{ env.REGION }} \
             --update-headers "X-System-Key=${{ secrets.SYSTEM_API_KEY }},Content-Type=application/json"
+
+      # FX (exchange rate) ingestion (docs/fx/01-fx-plan.md §2.3) has its own
+      # daily job, hitting /system/ingest-fx before the stock job runs so
+      # currencies never share its time budget again. See docs/fx/01-fx-plan.md
+      # §2.3 for the `gcloud scheduler jobs create` command that provisions it
+      # (one-time setup, not run by this workflow).
+      - name: Sync FX ingestion scheduler auth header
+        continue-on-error: true
+        run: |
+          gcloud scheduler jobs update http exli-fx-ingest-daily \
+            --project ${{ env.PROJECT_ID }} \
+            --location ${{ env.REGION }} \
+            --update-headers "X-System-Key=${{ secrets.SYSTEM_API_KEY }},Content-Type=application/json"
