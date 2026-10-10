@@ -5,7 +5,14 @@ import { Button, CategoryIcon } from '../../../components/UI';
 import { DEFAULT_CATEGORIES } from '../../../config/constants';
 import { CurrencyPicker } from '../../../components/CurrencyPicker';
 
-export const WishlistModal = ({ isOpen, onClose, onSave, itemToEdit, categories = DEFAULT_CATEGORIES }) => {
+export const WishlistModal = ({
+  isOpen,
+  onClose,
+  onSave,
+  itemToEdit,
+  categories = DEFAULT_CATEGORIES,
+  existingItems = [],
+}) => {
   const { t } = useTranslation();
 
   const getTodayISO = () => new Date().toISOString().split('T')[0];
@@ -56,9 +63,27 @@ export const WishlistModal = ({ isOpen, onClose, onSave, itemToEdit, categories 
 
   if (!isOpen) return null;
 
+  const trimmedName = formData.name.trim();
+  const isDuplicateName = Boolean(
+    trimmedName &&
+    existingItems.some(
+      (it) =>
+        it.id !== itemToEdit?.id &&
+        it.name &&
+        it.name.trim().toLowerCase() === trimmedName.toLowerCase()
+    )
+  );
+
   const validate = () => {
     const errs = {};
-    if (!formData.name.trim()) errs.name = t('wishlist.validation.nameRequired', 'Please enter an item name');
+    if (!trimmedName) {
+      errs.name = t('wishlist.validation.nameRequired', 'Please enter an item name');
+    } else if (isDuplicateName) {
+      errs.name = t(
+        'wishlist.validation.duplicateName',
+        'An item with this name already exists in your wishlist'
+      );
+    }
     if (!formData.price || isNaN(formData.price) || Number(formData.price) < 0) {
       errs.price = t('wishlist.validation.validPrice', 'Please enter a valid price amount');
     }
@@ -68,7 +93,7 @@ export const WishlistModal = ({ isOpen, onClose, onSave, itemToEdit, categories 
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validate()) return;
+    if (!validate() || isDuplicateName) return;
 
     setIsSubmitting(true);
     try {
@@ -126,14 +151,23 @@ export const WishlistModal = ({ isOpen, onClose, onSave, itemToEdit, categories 
             <input
               type="text"
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e) => {
+                setFormData({ ...formData, name: e.target.value });
+                if (errors.name) {
+                  setErrors((prev) => ({ ...prev, name: undefined }));
+                }
+              }}
               placeholder={t('wishlist.namePlaceholder', 'e.g. Wireless noise-canceling headphones, sneakers, desk lamp...')}
               className={`w-full px-4 py-3 rounded-xl border bg-slate-50 text-slate-800 font-medium outline-none focus:bg-white focus:border-pink-500 transition-all ${
-                errors.name ? 'border-rose-400 bg-rose-50/30' : 'border-slate-200'
+                errors.name || isDuplicateName ? 'border-rose-400 bg-rose-50/30' : 'border-slate-200'
               }`}
               autoFocus
             />
-            {errors.name && <p className="text-xs text-rose-500 mt-1 font-medium">{errors.name}</p>}
+            {(errors.name || isDuplicateName) && (
+              <p className="text-xs text-rose-500 mt-1 font-medium">
+                {errors.name || t('wishlist.validation.duplicateName', 'An item with this name already exists in your wishlist')}
+              </p>
+            )}
           </div>
 
           {/* Price & Currency */}
@@ -301,8 +335,10 @@ export const WishlistModal = ({ isOpen, onClose, onSave, itemToEdit, categories 
             </button>
             <Button
               type="submit"
-              disabled={isSubmitting}
-              className="bg-pink-600 hover:bg-pink-700 text-white shadow-pink-200"
+              disabled={isSubmitting || isDuplicateName}
+              className={`bg-pink-600 hover:bg-pink-700 text-white shadow-pink-200 ${
+                isDuplicateName ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
             >
               {isSubmitting
                 ? (itemToEdit ? t('wishlist.updating', 'Updating...') : t('wishlist.saving', 'Saving...'))

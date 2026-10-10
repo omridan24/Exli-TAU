@@ -53,7 +53,7 @@ const GoalPresetCard = ({ preset, presetKey, isSelected, onClick, t, isRTL }) =>
                 {preset?.icon} {t(`investments.goals.presets.${presetKey}`, preset?.name || presetKey)}
             </span>
             {isSelected && (
-                <div className="absolute top-2 right-2 w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center">
+                <div className="absolute top-2 end-2 w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center">
                     <Check className="w-3 h-3 text-white" />
                 </div>
             )}
@@ -395,7 +395,7 @@ const GoalCard = ({ goal, onEdit, onDelete, t, isRTL }) => {
                         })}
                     </div>
                 </div>
-                <div className="text-right">
+                <div className="text-end">
                     <div className="text-sm font-medium text-slate-700">
                         {t('investments.goals.card.monthsLeft', '{{months}} months left', { months: monthsLeft })}
                     </div>
@@ -555,7 +555,7 @@ export const GoalStudio = ({ userId, onGoalsChanged, embedded = false }) => {
                     </div>
 
                     {goals.length > 0 && (
-                        <div className="text-right">
+                        <div className="text-end">
                             <div className="text-2xl font-bold text-purple-600">
                                 ₪{Math.round(totalMonthlyRequired).toLocaleString()}/mo
                             </div>
@@ -636,7 +636,7 @@ export const GoalStudio = ({ userId, onGoalsChanged, embedded = false }) => {
 
             {/* Toast Notification */}
             {toast && (
-                <div className={`fixed bottom-4 right-4 px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 z-50 animate-in slide-in-from-bottom-4
+                <div className={`fixed bottom-4 end-4 px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 z-50 animate-in slide-in-from-bottom-4
                     ${toast.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
                     {toast.type === 'success' ? <Check className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
                     {toast.message}

@@ -11,6 +11,15 @@ import { saveInvestmentProfile } from '../../../config/investmentProfileService'
 // ============================================
 // THE 5 HISTORICAL SCENARIOS
 // ============================================
+// Display texts of a scenario, translated (the scenario data below stays language-neutral)
+const localizeScenario = (scenario, t) => ({
+    ...scenario,
+    name: t('investments.timeMachine.marketEvent', 'Market Event'),
+    headline: t(`investments.timeMachine.scenarios.${scenario.id}.headline`, scenario.headline),
+    context: t(`investments.timeMachine.scenarios.${scenario.id}.context`, scenario.context),
+    lesson: t(`investments.timeMachine.scenarios.${scenario.id}.lesson`, scenario.lesson)
+});
+
 const SCENARIOS = [
     {
         id: 'dotcom',
@@ -117,6 +126,7 @@ const AnimatedCounter = ({ value, prefix = '$', className = '' }) => {
 // HEADER HUD - Net Worth, Split Bar, Year
 // ============================================
 const HeaderHUD = ({ netWorth, invested, cash, year, scenarioName }) => {
+    const { t } = useTranslation();
     const total = invested + cash;
     const investedPercent = total > 0 ? (invested / total) * 100 : 50;
 
@@ -126,7 +136,7 @@ const HeaderHUD = ({ netWorth, invested, cash, year, scenarioName }) => {
             <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                     <Clock className="w-4 h-4 text-slate-400" />
-                    <span className="text-slate-400 text-sm">Year</span>
+                    <span className="text-slate-400 text-sm">{t('investments.misc.year', 'Year')}</span>
                     <span className="font-bold text-xl text-amber-400">{year}</span>
                 </div>
                 <span className="text-xs text-slate-500 max-w-[150px] truncate">{scenarioName}</span>
@@ -134,7 +144,7 @@ const HeaderHUD = ({ netWorth, invested, cash, year, scenarioName }) => {
 
             {/* Net Worth */}
             <div className="text-center mb-4">
-                <div className="text-xs text-slate-400 mb-1">Your Portfolio</div>
+                <div className="text-xs text-slate-400 mb-1">{t('investments.misc.yourPortfolio', 'Your Portfolio')}</div>
                 <AnimatedCounter
                     value={Math.round(netWorth)}
                     className="text-3xl font-bold"
@@ -183,6 +193,7 @@ const HeaderHUD = ({ netWorth, invested, cash, year, scenarioName }) => {
 // CONTINUOUS CHART - Progressive SVG Drawing
 // ============================================
 const ContinuousChart = ({ dataPoints, currentIndex }) => {
+    const { t } = useTranslation();
     const width = 400;
     const height = 150;
     const padding = { left: 40, right: 20, top: 20, bottom: 30 };
@@ -192,7 +203,7 @@ const ContinuousChart = ({ dataPoints, currentIndex }) => {
     if (visiblePoints.length < 2) {
         return (
             <div className="bg-slate-50 rounded-xl p-4 h-48 flex items-center justify-center">
-                <span className="text-slate-400">Starting simulation...</span>
+                <span className="text-slate-400">{t('investments.timeMachine.startingSimulation', 'Starting simulation...')}</span>
             </div>
         );
     }
@@ -349,9 +360,9 @@ const AllocationSlider = ({
 
                 {/* Labels */}
                 <div className="flex justify-between text-xs mt-2 text-slate-500">
-                    <span className="text-red-500">← Sell All</span>
-                    <span>Hold</span>
-                    <span className="text-purple-500">Buy Max →</span>
+                    <span className="text-red-500">{t('investments.timeMachine.sellAll', '← Sell All')}</span>
+                    <span>{t('investments.misc.hold', 'Hold')}</span>
+                    <span className="text-purple-500">{t('investments.timeMachine.buyMax', 'Buy Max →')}</span>
                 </div>
             </div>
 
@@ -375,6 +386,7 @@ const AllocationSlider = ({
 // SCENARIO OVERLAY - Headlines & Context
 // ============================================
 const ScenarioOverlay = ({ scenario, phase, children }) => {
+    const { t } = useTranslation();
     const isHeadline = phase === 'headline';
     const isReaction = phase === 'reaction';
 
@@ -390,7 +402,7 @@ const ScenarioOverlay = ({ scenario, phase, children }) => {
                 <span className="text-3xl">{scenario.emoji}</span>
                 <div>
                     <div className="text-xs text-slate-500 uppercase tracking-wide">
-                        {isHeadline ? 'Breaking News' : isReaction ? 'Market Update' : 'The Aftermath'}
+                        {isHeadline ? t('investments.timeMachine.breakingNews', 'Breaking News') : isReaction ? t('investments.timeMachine.marketUpdate', 'Market Update') : t('investments.timeMachine.aftermath', 'The Aftermath')}
                     </div>
                     <h3 className="font-bold text-slate-800">{scenario.name}</h3>
                 </div>
@@ -399,7 +411,7 @@ const ScenarioOverlay = ({ scenario, phase, children }) => {
             {/* Headline */}
             {isHeadline && (
                 <div className="space-y-3 mb-4">
-                    <div className="bg-amber-50 border-l-4 border-amber-400 p-3 rounded-r-lg">
+                    <div className="bg-amber-50 border-s-4 border-amber-400 p-3 rounded-e-lg">
                         <p className="font-medium text-amber-800">"{scenario.headline}"</p>
                     </div>
                     <p className="text-slate-600 text-sm">{scenario.context}</p>
@@ -408,11 +420,11 @@ const ScenarioOverlay = ({ scenario, phase, children }) => {
 
             {/* Reaction Phase */}
             {isReaction && (
-                <div className="bg-red-50 border-l-4 border-red-400 p-3 rounded-r-lg mb-4">
+                <div className="bg-red-50 border-s-4 border-red-400 p-3 rounded-e-lg mb-4">
                     <p className="font-medium text-red-800">
-                        📉 Market just dropped {scenario.shortTermDrop}%!
+                        {t('investments.timeMachine.marketDropped', { drop: Math.abs(scenario.shortTermDrop), defaultValue: '📉 Market just dropped {{drop}}%!' })}
                     </p>
-                    <p className="text-sm text-red-600 mt-1">How do you feel now? Adjust if needed.</p>
+                    <p className="text-sm text-red-600 mt-1">{t('investments.timeMachine.adjustHint', 'How do you feel now? Adjust if needed.')}</p>
                 </div>
             )}
 
@@ -452,6 +464,7 @@ const ResultsScreen = ({
 
         // Determine profile
         if (boughtOnDrop >= 4) return {
+            id: 'aggressive',
             name: 'Aggressive Investor',
             emoji: '🚀',
             description: "You bought the dips! You understand that crashes are opportunities.",
@@ -460,6 +473,7 @@ const ResultsScreen = ({
         };
 
         if (soldOnDrop >= 3) return {
+            id: 'conservative',
             name: 'Conservative Investor',
             emoji: '🛡️',
             description: "You protected your money during turbulence. Safety first!",
@@ -468,6 +482,7 @@ const ResultsScreen = ({
         };
 
         if (soldOnNews >= 3) return {
+            id: 'reactive',
             name: 'Reactive Investor',
             emoji: '⚡',
             description: "You react quickly to news. Consider waiting to see the full picture.",
@@ -476,6 +491,7 @@ const ResultsScreen = ({
         };
 
         if (held >= 5) return {
+            id: 'steady',
             name: 'Steady Hand Investor',
             emoji: '⚓',
             description: "You stayed calm through the storms. Discipline is your strength.",
@@ -484,6 +500,7 @@ const ResultsScreen = ({
         };
 
         return {
+            id: 'balanced',
             name: 'Balanced Investor',
             emoji: '⚖️',
             description: "You adapted your strategy based on conditions. Flexibility is key.",
@@ -527,10 +544,10 @@ const ResultsScreen = ({
                     transition={{ delay: 0.3 }}
                 >
                     <div className="text-sm text-purple-600 font-medium mb-1">
-                        ✨ Your Risk DNA Revealed ✨
+                        {t('investments.timeMachine.riskDnaRevealed', '✨ Your Risk DNA Revealed ✨')}
                     </div>
-                    <h2 className="text-2xl font-bold text-slate-800">{profile.name}</h2>
-                    <p className="text-slate-600 mt-2 max-w-sm mx-auto">{profile.description}</p>
+                    <h2 className="text-2xl font-bold text-slate-800">{t(`investments.timeMachine.profiles.${profile.id}.name`, profile.name)}</h2>
+                    <p className="text-slate-600 mt-2 max-w-sm mx-auto">{t(`investments.timeMachine.profiles.${profile.id}.description`, profile.description)}</p>
                 </motion.div>
             </div>
 
@@ -541,13 +558,13 @@ const ResultsScreen = ({
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.5 }}
             >
-                <div className="text-sm text-white/80 mb-1">25 Years of History</div>
+                <div className="text-sm text-white/80 mb-1">{t('investments.timeMachine.yearsOfHistory', '25 Years of History')}</div>
                 <div className="text-3xl font-bold mb-2">
                     ${Math.round(finalNetWorth).toLocaleString()}
                 </div>
                 <div className={`inline-flex items-center gap-1 px-3 py-1 rounded-full ${isPositive ? 'bg-white/20' : 'bg-red-500/30'}`}>
                     {isPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                    {isPositive ? '+' : ''}{returnPercent}% Total Return
+                    {t('investments.timeMachine.totalReturn', { sign: isPositive ? '+' : '', percent: returnPercent, defaultValue: '{{sign}}{{percent}}% Total Return' })}
                 </div>
             </motion.div>
 
@@ -560,8 +577,7 @@ const ResultsScreen = ({
             >
                 <Sparkles className="w-6 h-6 text-indigo-500 mx-auto mb-2" />
                 <p className="text-sm text-indigo-700">
-                    <strong>Secret:</strong> This wasn't just a game!
-                    Your 10 decisions revealed how you naturally handle market stress.
+                    <strong>{t('investments.timeMachine.secretLabel', 'Secret:')}</strong> {t('investments.timeMachine.secretText', "This wasn't just a game! Your 10 decisions revealed how you naturally handle market stress.")}
                 </p>
             </motion.div>
 
@@ -573,7 +589,7 @@ const ResultsScreen = ({
                 transition={{ delay: 1 }}
             >
                 <h3 className="font-bold text-slate-800 mb-4 text-center">
-                    📊 Your Personalized Allocation
+                    {t('investments.timeMachine.personalizedAllocation', '📊 Your Personalized Allocation')}
                 </h3>
 
                 <div className="space-y-3">
@@ -620,7 +636,7 @@ const ResultsScreen = ({
                 animate={{ opacity: 1 }}
                 transition={{ delay: 1.5 }}
             >
-                Apply This Strategy
+                {t('investments.timeMachine.applyStrategy', 'Apply This Strategy')}
                 <ChevronRight className="w-5 h-5" />
             </motion.button>
         </motion.div>
@@ -666,7 +682,7 @@ export const MarketTimeMachine = ({
     const netWorth = wallet.invested + wallet.cash;
 
     // Current scenario data
-    const scenario = SCENARIOS[currentScenario];
+    const scenario = localizeScenario(SCENARIOS[currentScenario], t);
 
     // Apply market change to invested portion
     const applyMarketChange = useCallback((changePercent) => {
@@ -813,24 +829,23 @@ export const MarketTimeMachine = ({
 
                     <div>
                         <h2 className="text-2xl font-bold text-slate-800 mb-2">
-                            🕰️ Market Time Machine
+                            {t('investments.timeMachine.title', '🕰️ Market Time Machine')}
                         </h2>
                         <p className="text-slate-600 max-w-sm mx-auto">
-                            Travel through 25 years of market history. You start with $100,000.
-                            Make decisions as events unfold.
+                            {t('investments.timeMachine.intro', 'Travel through 25 years of market history. You start with $100,000. Make decisions as events unfold.')}
                         </p>
                     </div>
 
                     {/* Starting Portfolio */}
                     <div className="bg-slate-50 rounded-2xl p-4 max-w-xs mx-auto">
-                        <div className="text-sm text-slate-500 mb-2">Your Starting Portfolio</div>
+                        <div className="text-sm text-slate-500 mb-2">{t('investments.misc.yourStartingPortfolio', 'Your Starting Portfolio')}</div>
                         <div className="text-3xl font-bold text-slate-800 mb-3">$100,000</div>
                         <div className="flex gap-2 text-sm justify-center">
                             <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full">
-                                📈 80% Invested
+                                {t('investments.timeMachine.invested80', '📈 80% Invested')}
                             </span>
                             <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full">
-                                💵 20% Cash
+                                {t('investments.timeMachine.cash20', '💵 20% Cash')}
                             </span>
                         </div>
                     </div>
@@ -843,7 +858,7 @@ export const MarketTimeMachine = ({
                         whileTap={{ scale: 0.95 }}
                     >
                         <Zap className="w-5 h-5" />
-                        Enter the Time Machine
+                        {t('investments.timeMachine.enter', 'Enter the Time Machine')}
                     </motion.button>
                 </motion.div>
             )}
@@ -906,7 +921,7 @@ export const MarketTimeMachine = ({
                             >
                                 <div className="text-4xl mb-2">📉</div>
                                 <div className="text-xl font-bold text-red-600">
-                                    Market dropping...
+                                    {t('investments.timeMachine.marketDropping', 'Market dropping...')}
                                 </div>
                             </motion.div>
                         )}
@@ -920,7 +935,7 @@ export const MarketTimeMachine = ({
                             >
                                 <div className="text-4xl mb-2">📈</div>
                                 <div className="text-xl font-bold text-emerald-600">
-                                    Markets recovering...
+                                    {t('investments.timeMachine.marketRecovering', 'Markets recovering...')}
                                 </div>
                             </motion.div>
                         )}
@@ -944,7 +959,7 @@ export const MarketTimeMachine = ({
                                         hover:bg-emerald-700 transition-colors"
                                     whileHover={{ scale: 1.05 }}
                                 >
-                                    {currentScenario < SCENARIOS.length - 1 ? 'Next Event →' : 'See Results →'}
+                                    {currentScenario < SCENARIOS.length - 1 ? t('investments.timeMachine.nextEvent', 'Next Event →') : t('investments.timeMachine.seeResults', 'See Results →')}
                                 </motion.button>
                             </motion.div>
                         )}

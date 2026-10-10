@@ -37,6 +37,89 @@
             "description": "המתנות שאני רוצה לקנות לעצמי",
             "subtitle": "מעקב, ארגון ותכנון רכישות עתידיות."
         },
+        "mainDashboard": {
+            "overview": "סקירה כללית",
+            "welcome": "שלום",
+            "todayIs": "היום",
+            "greeting": "שלום {{name}}, היום {{date}}.",
+            "greetingFallback": "שלום, היום {{date}}.",
+            "placeholderTitle": "לוח מרכזי",
+            "placeholderSubtitle": "מוכן לווידג'טים, מדדים ופעולות מהירות",
+            "customizable": "מרחב הניתן להתאמה",
+            "amountSaved": "סכום שנחסך",
+            "amountSavedExcluded_one": "פריט אחד ללא שער חליפין אינו נכלל",
+            "amountSavedExcluded_two": "{{count}} פריטים ללא שער חליפין אינם נכללים",
+            "amountSavedExcluded_other": "{{count}} פריטים ללא שער חליפין אינם נכללים",
+            "viewAnalytics": "לצפייה בניתוח",
+            "status": {
+                "topCategory": "קטגוריה מובילה",
+                "topCategoryDetail": "{{amount}} · {{share}}% מכלל ההוצאות",
+                "noExpenses": "אין הוצאות עדיין",
+                "totalSpent": "סך ההוצאות",
+                "perMonth": "כ-{{amount}} בחודש",
+                "savingsRate": "שיעור חיסכון",
+                "savingsRateDetail": "נשארו {{saved}} מתוך {{income}} שהרווחת",
+                "noIncome": "עדיין לא הועלתה הכנסה",
+                "investments": "השקעות",
+                "investmentsToday": "{{amount}} היום",
+                "investmentsValue": "שווי התיק הכולל",
+                "wishlistAffordable": "{{affordable}} מתוך {{total}}",
+                "wishlistDetail": "פריטים בטווח התקציב",
+                "investmentsMonth": "{{amount}} החודש"
+            },
+            "wishlistStatus": {
+                "withinBudget": "{{count}} פריטים ברשימה נמצאים במסגרת התקציב!",
+                "withinBudgetSingle": "פריט 1 ברשימה נמצא במסגרת התקציב!",
+                "noneWithinBudget": "אין פריטים ברשימה במסגרת התקציב עדיין",
+                "noItems": "אין פריטים ברשימה עדיין"
+            },
+            "notifications": {
+                "title": "התראות",
+                "empty": "הכל מעודכן",
+                "today": "היום",
+                "now": "עכשיו",
+                "placeholder": "הודעת התראה",
+                "dismiss": "הסר",
+                "paydayReminder": "דוח הכנסות לחודש {{month}} טרם הועלה",
+                "paydayReminderDesc": "",
+                "chargeDayReminder": "דוח הוצאות לחודש {{month}} טרם הועלה",
+                "chargeDayReminderDesc": "",
+                "wishlistSingleItemWithinBudget": "פריט חדש ברשימת המשאלות נמצא בתקציב!",
+                "wishlistMultipleItemsWithinBudget": "פריטים חדשים ברשימת המשאלות נמצאים בתקציב!",
+                "settingsProfileReminder": "השלם את פרטי הפרופיל הנותרים בהגדרות",
+                "welcomeNotification": "ברוכים הבאים ל-Exli!",
+                "groupSomeone": "מישהו",
+                "groupJoinRequests_one": "בקשת הצטרפות אחת ממתינה לאישור בקבוצה {{group}}",
+                "groupJoinRequests_two": "{{count}} בקשות הצטרפות ממתינות לאישור בקבוצה {{group}}",
+                "groupJoinRequests_other": "{{count}} בקשות הצטרפות ממתינות לאישור בקבוצה {{group}}",
+                "groupYouOwe": "יש לך חוב של {{amount}} כלפי {{name}} בקבוצה {{group}}",
+                "groupYouOweMany": "יש לך חוב של {{amount}} כלפי {{count}} אנשים בקבוצה {{group}}",
+                "groupOwedToYou": "מגיעים לך {{amount}} מאת {{name}} בקבוצה {{group}}",
+                "groupOwedToYouMany": "מגיעים לך {{amount}} מ-{{count}} אנשים בקבוצה {{group}}",
+                "groupPaymentReceived": "התקבל תשלום של {{amount}} מאת {{name}} בקבוצה {{group}}",
+                "settingsProfileMissing": "השלימו את הפרופיל בהגדרות: {{fields}}",
+                "profileFields": {
+                    "name": "שם מלא",
+                    "birthdate": "תאריך לידה",
+                    "status": "מצב משפחתי",
+                    "career": "עבודה וקריירה",
+                    "country": "מדינה",
+                    "city": "עיר",
+                    "university": "אוניברסיטה"
+                }
+            },
+            "areas": {
+                "status": "סטטוס",
+                "statusSubtitle": "הכסף שלך במבט אחד",
+                "statusPlaceholder": "שורות סטטוס יוצגו כאן",
+                "utils": "סטטוס",
+                "utilsSubtitle": "עדכוני פיצ'רים וזמינות",
+                "utilsPlaceholder": "שורות סטטוס יוצגו כאן",
+                "notifications": "התראות",
+                "notificationsSubtitle": "פעילות והודעות",
+                "notificationsPlaceholder": "הכל מעודכן"
+            }
+        },
         "comingSoon": "בקרוב"
     },
     "expenses": {
@@ -558,7 +641,17 @@
             "iAmStudent": "אני סטודנט/ית",
             "selectUniversity": "בחר אוניברסיטה...",
             "select": "בחר...",
-            "selectCountryFirst": "בחר מדינה קודם"
+            "selectCountryFirst": "בחר מדינה קודם",
+            "financialDates": "מועדים פיננסיים חודשיים",
+            "financialDatesDesc": "הגדר את יום כניסת המשכורת ואת יום חיוב האשראי לסנכרון המחזוריות הפיננסית שלך.",
+            "monthlyPayday": "יום כניסת משכורת",
+            "monthlyPaydayDesc": "יום בחודש שבו נכנסת המשכורת או ההכנסה העיקרית",
+            "monthlyChargeDay": "יום חיוב חודשי",
+            "monthlyChargeDayDesc": "יום בחודש שבו יורדים חיובי האשראי או ההורדות הקבועות",
+            "selectDay": "יום בחודש (1-31)",
+            "dayOfMonth": "ב-{{day}} לחודש",
+            "quickSelect": "בחירה מהירה:",
+            "lastDay": "31 (סוף חודש)"
         },
         "taxCredit": {
             "title": "מחשבון נקודות זיכוי",
@@ -664,7 +757,8 @@
         "pets": "חיות מחמד",
         "gifts": "מתנות",
         "entertainment": "בידור",
-        "other": "אחר"
+        "other": "אחר",
+        "uncategorized": "ללא קטגוריה"
     },
     "occupations": {
         "title": "תפקידים (מקסימום 3)",
@@ -759,7 +853,13 @@
         "more": "יותר",
         "less": "פחות",
         "approve": "אישור",
-        "reject": "דחייה"
+        "reject": "דחייה",
+        "saving": "שומר...",
+        "learnMore": "למידע נוסף",
+        "optional": "אופציונלי",
+        "reset": "איפוס",
+        "month": "חודש",
+        "optionalCap": "אופציונלי"
     },
     "categoryEditor": {
         "newCategory": "קטגוריה חדשה",
@@ -896,109 +996,168 @@
         }
     },
     "investments": {
+        "misc": {
+            "dismiss": "סגירה",
+            "year": "שנה",
+            "yourPortfolio": "התיק שלך",
+            "hold": "להחזיק",
+            "yourStartingPortfolio": "תיק ההתחלה שלך",
+            "symbol": "סימול",
+            "name": "שם",
+            "totalPortfolio": "סך התיק",
+            "startingBalance": "יתרת פתיחה",
+            "level": {
+                "High": "גבוה",
+                "Medium": "בינוני",
+                "Low": "נמוך"
+            },
+            "sharesLabel": "מניות",
+            "assetType": {
+                "stock": "מניה",
+                "etf": "תעודת סל",
+                "crypto": "קריפטו",
+                "bond": "אג״ח"
+            }
+        },
         "title": "השקעות",
         "subtitle": "בנה את העתיד הכלכלי שלך",
-        "searchPlaceholder": "Search stocks or ETFs...",
-        "stocks": "Stocks & ETFs",
-        "noStocks": "Search and add stocks or ETFs to track",
-        "onlyDbStocks": "Only stocks available in our database can be tracked",
-        "period30D": "30 Days",
-        "periodYTD": "YTD",
-        "period1Y": "1 Year",
-        "showingData": "Showing data for",
-        "pricesUpdated": "Prices updated daily",
-        "searching": "Searching...",
-        "noData": "No data",
-        "high": "High",
-        "low": "Low",
+        "searchPlaceholder": "חיפוש מניות או תעודות סל...",
+        "stocks": "מניות ותעודות סל",
+        "noStocks": "חפשו והוסיפו מניות או תעודות סל למעקב",
+        "onlyDbStocks": "ניתן לעקוב רק אחר מניות הקיימות במאגר שלנו",
+        "period30D": "30 יום",
+        "periodYTD": "מתחילת השנה",
+        "period1Y": "שנה",
+        "showingData": "מציג נתונים עבור",
+        "pricesUpdated": "המחירים מתעדכנים מדי יום",
+        "searching": "מחפש...",
+        "noData": "אין נתונים",
+        "high": "גבוה",
+        "low": "נמוך",
         "tabs": {
-            "goals": "Goals",
-            "track": "Watch",
-            "strategy": "Strategy",
-            "portfolio": "Portfolio",
-            "mission": "Mission"
+            "goals": "יעדים",
+            "track": "מעקב",
+            "strategy": "אסטרטגיה",
+            "portfolio": "תיק",
+            "mission": "משימה"
         },
         "strategy": {
-            "title": "Strategy Playground",
-            "subtitle": "Set your investment goals and see the magic of compound growth",
-            "sliderLabel": "I want to invest",
-            "sliderLabelEnd": "of my income",
-            "monthlyAmount": "Monthly investment",
-            "averageIncome": "Average Income",
-            "manualIncome": "Custom Income",
-            "enterIncome": "Enter income",
-            "yourAverage": "Your average income",
-            "noIncomeData": "No income data yet. Add income entries to calculate your average.",
-            "usingAverage": "Using your average monthly income from past records",
-            "customCalc": "custom calculation",
-            "annualReturn": "Return",
-            "returnLow": "Conservative",
-            "returnModerate": "Moderate",
-            "returnHigh": "Aggressive",
-            "returnVeryHigh": "Very High",
-            "returnNote": "Historical average is 7-10%. Higher returns = higher risk.",
+            "title": "מגרש המשחקים של האסטרטגיה",
+            "subtitle": "הגדירו את יעדי ההשקעה שלכם וראו את הקסם של ריבית דריבית",
+            "sliderLabel": "אני רוצה להשקיע",
+            "sliderLabelEnd": "מההכנסה שלי",
+            "monthlyAmount": "השקעה חודשית",
+            "averageIncome": "הכנסה ממוצעת",
+            "manualIncome": "הכנסה מותאמת",
+            "enterIncome": "הזינו הכנסה",
+            "yourAverage": "ההכנסה הממוצעת שלכם",
+            "noIncomeData": "אין עדיין נתוני הכנסה. הוסיפו הכנסות כדי לחשב ממוצע.",
+            "usingAverage": "משתמשים בהכנסה החודשית הממוצעת מהרישומים שלכם",
+            "customCalc": "חישוב מותאם אישית",
+            "annualReturn": "תשואה",
+            "returnLow": "שמרנית",
+            "returnModerate": "מתונה",
+            "returnHigh": "אגרסיבית",
+            "returnVeryHigh": "גבוהה מאוד",
+            "returnNote": "הממוצע ההיסטורי הוא 7-10%. תשואה גבוהה יותר = סיכון גבוה יותר.",
             "freedomScale": {
-                "title": "Freedom Scale",
-                "tortoise": "Tortoise Mode (Retire at 70+)",
-                "cruising": "Cruising (Retire at 60)",
-                "fire": "FIRE Mode (Retire Early!)"
+                "title": "סולם החופש",
+                "tortoise": "מצב צב (פרישה בגיל 70+)",
+                "cruising": "מצב שיוט (פרישה בגיל 60)",
+                "fire": "מצב FIRE (פרישה מוקדמת!)"
             },
             "projection": {
-                "title": "Melting vs. Growing",
-                "cashLine": "Cash Only (Inflation)",
-                "rocketLine": "With Investments",
-                "gapLabel": "The Cost of Waiting",
-                "in30Years": "in 30 years",
-                "inYears": "In {{years}} years",
-                "today": "Today",
-                "years": "years",
-                "assumption": "~7% annual return",
-                "costOfWaiting": "The Cost of Waiting",
-                "costExplanation": "If you keep your money as cash instead of investing, inflation eats away its purchasing power. Here's what you'd miss out on:",
-                "calculationNote": "Calculations assume {{return}}% annual return and ~2.5% annual inflation. Actual results will vary.",
-                "investedLabel": "🚀 Invested",
-                "debtSpiral": "⚠️ Debt Spiral",
-                "cashOnly": "🧊 Cash Only",
-                "cashScenarioNote": "* Cash scenario assumes saving ALL surplus ({{amount}}/mo) in cash, adjusted for inflation.",
-                "moreMultiplier": "{{count}}x more"
+                "title": "נמסים מול צומחים",
+                "cashLine": "מזומן בלבד (אינפלציה)",
+                "rocketLine": "עם השקעות",
+                "gapLabel": "המחיר של ההמתנה",
+                "in30Years": "בעוד 30 שנה",
+                "inYears": "בעוד {{years}} שנים",
+                "today": "היום",
+                "years": "שנים",
+                "assumption": "~7% תשואה שנתית",
+                "costOfWaiting": "המחיר של ההמתנה",
+                "costExplanation": "אם תשאירו את הכסף במזומן במקום להשקיע, האינפלציה שוחקת את כוח הקנייה שלו. הנה מה שתפסידו:",
+                "calculationNote": "החישובים מניחים תשואה שנתית של {{return}}% ואינפלציה שנתית של כ-2.5%. התוצאות בפועל ישתנו.",
+                "investedLabel": "🚀 מושקע",
+                "debtSpiral": "⚠️ ספירלת חובות",
+                "cashOnly": "🧊 מזומן בלבד",
+                "cashScenarioNote": "* תרחיש המזומן מניח חיסכון של כל העודף ({{amount}} לחודש) במזומן, בהתאמה לאינפלציה.",
+                "moreMultiplier": "פי {{count}} יותר",
+                "howItWorks": "איך ההשוואה עובדת:",
+                "investedExplain": "ה-{{amount}} שלכם בחודש, בריבית דריבית של {{rate}}% בשנה",
+                "cashExplain": "אותם {{amount}} בחודש במזומן, מאבדים כוח קנייה לאינפלציה של 2.5%",
+                "noteDisclaimer": "* ביצועי עבר אינם מבטיחים תוצאות עתידיות. האינפלציה מוערכת ב-2.5% בשנה."
             },
-            "usedForCalc": "Used for projections",
-            "disclaimer": "This is an estimation for educational purposes only. Past performance does not guarantee future results. This is not investment advice. Please consult a licensed financial advisor before making investment decisions."
+            "usedForCalc": "משמש לתחזיות",
+            "disclaimer": "זוהי הערכה לצורכי לימוד בלבד. ביצועי עבר אינם מבטיחים תוצאות עתידיות. זה אינו ייעוץ השקעות. יש להיוועץ ביועץ פיננסי מורשה לפני קבלת החלטות השקעה.",
+            "scenes": {
+                "fire": {
+                    "title": "מצב FIRE! 🔥",
+                    "message": "פרישה מוקדמת נפתחה! חיי חוף עם המשפחה!",
+                    "age": "45-50"
+                },
+                "cruising": {
+                    "title": "מצב שיוט",
+                    "message": "בדרך לפרישה נוחה! התחביבים מחכים!",
+                    "age": "55-60"
+                },
+                "tortoise": {
+                    "title": "מצב צב",
+                    "message": "לאט ובטוח זוכים במירוץ. ממשיכים לבנות!",
+                    "age": "65-67"
+                },
+                "struggle": {
+                    "title": "מצב מאבק",
+                    "message": "עדיין עובדים בגיל 75... מתחילים לחסוך עכשיו!",
+                    "age": "75+"
+                },
+                "retireAge": "גיל פרישה משוער:",
+                "justMore": "עוד {{remaining}}% כדי לפתוח"
+            },
+            "yourAverageIncome": "ההכנסה הממוצעת שלכם (מתוך הניתוח)",
+            "usingCustom": "⚙️ משתמשים בערך המותאם למטה",
+            "monthlyIncome": "הכנסה חודשית",
+            "milestones": {
+                "fire": "מצב FIRE 🔥",
+                "cruising": "מצב שיוט 🚴",
+                "tortoise": "מצב צב 🐢"
+            }
         },
         "buckets": {
-            "title": "Allocation Buckets",
-            "subtitle": "Your goals automatically fill these buckets by time horizon",
+            "title": "קטגוריות הקצאה",
+            "subtitle": "היעדים שלכם ממלאים אוטומטית את הקטגוריות האלה לפי טווח הזמן",
             "long": {
-                "name": "Long Range",
-                "shortName": "Long",
-                "timeRange": "10+ years",
-                "description": "Maximum growth potential • High volatility, highest returns"
+                "name": "טווח ארוך",
+                "shortName": "ארוך",
+                "timeRange": "10+ שנים",
+                "description": "פוטנציאל צמיחה מקסימלי • תנודתיות גבוהה, תשואות גבוהות"
             },
             "mid": {
-                "name": "Mid Range",
-                "shortName": "Mid",
-                "timeRange": "3-10 years",
-                "description": "Balanced growth • Moderate risk for medium-term goals"
+                "name": "טווח בינוני",
+                "shortName": "בינוני",
+                "timeRange": "3-10 שנים",
+                "description": "צמיחה מאוזנת • סיכון מתון ליעדים לטווח בינוני"
             },
             "short": {
-                "name": "Short Term",
-                "shortName": "Short",
-                "timeRange": "0-3 years",
-                "description": "Capital preservation • Low risk, always available"
+                "name": "טווח קצר",
+                "shortName": "קצר",
+                "timeRange": "0-3 שנים",
+                "description": "שמירה על ההון • סיכון נמוך, תמיד זמין"
             },
-            "locked": "Locked",
-            "unlock": "Lock",
-            "total": "Total",
-            "dragHint": "Goals are automatically assigned based on deadline",
+            "locked": "נעול",
+            "unlock": "נעילה",
+            "total": "סה״כ",
+            "dragHint": "היעדים משויכים אוטומטית לפי מועד היעד",
             "presets": {
-                "aggressive": "The Rocket 🚀",
-                "aggressiveDesc": "Maximum growth potential, for long-term investors",
-                "balanced": "Smart Investor 🎯",
-                "balancedDesc": "Balanced approach with steady growth",
-                "moderate": "The Steady Ship ⚓",
-                "moderateDesc": "Lower risk with reliable returns",
-                "conservative": "Safety First 🛡️",
-                "conservativeDesc": "Capital preservation with some growth"
+                "aggressive": "הרקטה 🚀",
+                "aggressiveDesc": "פוטנציאל צמיחה מקסימלי, למשקיעים לטווח ארוך",
+                "balanced": "משקיע חכם 🎯",
+                "balancedDesc": "גישה מאוזנת עם צמיחה יציבה",
+                "moderate": "הספינה היציבה ⚓",
+                "moderateDesc": "סיכון נמוך יותר עם תשואות אמינות",
+                "conservative": "ביטחון קודם 🛡️",
+                "conservativeDesc": "שמירה על ההון עם מעט צמיחה"
             },
             "safety": {
                 "name": "טווח קצר",
@@ -1011,152 +1170,168 @@
             "growth": {
                 "name": "טווח ארוך",
                 "desc": "לפנסיה ולטווח רחוק - צמיחה מקסימלית"
-            }
+            },
+            "educationTeaser": "למה הכסף שלכם צריך בתים שונים"
         },
         "goals": {
-            "title": "My Goals",
-            "subtitle": "What are you building towards?",
-            "addGoal": "Add New Goal",
-            "noGoals": "No goals yet. Let's plan your future!",
-            "totalMonthlyRequired": "Total monthly savings needed",
-            "goalAdded": "Goal added to {{bucket}} bucket!",
-            "goalDeleted": "Goal removed",
+            "title": "היעדים שלי",
+            "subtitle": "לקראת מה אתם בונים?",
+            "addGoal": "הוספת יעד חדש",
+            "noGoals": "אין עדיין יעדים. בואו נתכנן את העתיד שלכם!",
+            "totalMonthlyRequired": "סך החיסכון החודשי הנדרש",
+            "goalAdded": "היעד נוסף לקטגוריית {{bucket}}!",
+            "goalDeleted": "היעד הוסר",
             "presets": {
-                "wedding": "Wedding",
-                "house": "House Down Payment",
-                "baby": "Baby Fund",
-                "education": "Education",
-                "retirement": "Early Retirement",
-                "car": "New Car",
-                "travel": "Dream Vacation",
-                "emergency": "Emergency Fund",
-                "custom": "Custom Goal"
+                "wedding": "חתונה",
+                "house": "מקדמה לדירה",
+                "baby": "קרן לתינוק",
+                "education": "לימודים",
+                "retirement": "פרישה מוקדמת",
+                "car": "רכב חדש",
+                "travel": "חופשת חלומות",
+                "emergency": "קרן חירום",
+                "custom": "יעד מותאם אישית"
             },
             "estimator": {
-                "title": "Smart Estimator",
-                "whatsYourVibe": "What's your vibe?",
-                "budget": "Budget",
-                "standard": "Standard",
-                "luxe": "Luxe"
+                "title": "מעריך חכם",
+                "whatsYourVibe": "מה הסגנון שלכם?",
+                "budget": "חסכוני",
+                "standard": "סטנדרטי",
+                "luxe": "יוקרתי",
+                "slideToChoose": "החליקו כדי למצוא את התקציב המושלם",
+                "budgetLabel": "חסכוני",
+                "avgLabel": "ממוצע",
+                "luxeLabel": "יוקרתי"
             },
             "form": {
-                "goalName": "Goal Name",
-                "targetAmount": "Target Amount",
-                "deadline": "Target Date",
-                "save": "Save Goal"
+                "goalName": "שם היעד",
+                "targetAmount": "סכום יעד",
+                "deadline": "תאריך יעד",
+                "save": "שמירת יעד"
             },
             "card": {
-                "monthlyNeeded": "{{amount}}/mo needed",
-                "monthsLeft": "{{months}} months left",
-                "assignedTo": "Assigned to {{bucket}}"
-            }
+                "monthlyNeeded": "נדרשים {{amount}} לחודש",
+                "monthsLeft": "נותרו {{months}} חודשים",
+                "assignedTo": "משויך לקטגוריית {{bucket}}"
+            },
+            "editGoal": "עריכת יעד"
         },
         "onboarding": {
             "welcome": {
                 "title": "ברוכים הבאים להשקעות החכמות",
                 "subtitle": "בואו נבנה אסטרטגיה מותאמת אישית לחיים האמיתיים שלכם.",
-                "description": "We'll help you create a personalized plan in 3 simple steps:",
-                "step1": "Define your life goals",
-                "step2": "Test your risk comfort",
-                "step3": "Get your custom allocation",
-                "cta": "Let's Build My Strategy",
-                "start": "התחל"
+                "description": "נעזור לכם ליצור תוכנית אישית ב-3 צעדים פשוטים:",
+                "step1": "להגדיר את יעדי החיים שלכם",
+                "step2": "לבדוק את הנוחות שלכם עם סיכון",
+                "step3": "לקבל הקצאה מותאמת אישית",
+                "cta": "בואו נבנה את האסטרטגיה שלי",
+                "start": "התחל",
+                "step1Desc": "למה אתם חוסכים?",
+                "trustBadge": "בלי ניחושי מניות. בלי תזמון שוק. רק יעדים חכמים."
             },
             "stressTest": {
-                "title": "Risk Storm Simulator",
-                "subtitle": "Let's see how you handle market turbulence",
-                "hypothetical": "Imagine you have $100,000 invested...",
-                "dragSlider": "Drag the slider to simulate a market crash",
-                "sellButton": "😨 STOP! I Want to Sell!",
+                "title": "סימולטור סערת הסיכון",
+                "subtitle": "בואו נראה איך אתם מתמודדים עם תנודתיות בשוק",
+                "hypothetical": "דמיינו שיש לכם $100,000 מושקעים...",
+                "dragSlider": "גררו את המחוון כדי לדמות קריסת שוק",
+                "sellButton": "😨 עצרו! אני רוצה למכור!",
                 "events": {
-                    "inflation": "Inflation Scare",
-                    "covid": "COVID Crash",
-                    "crisis2008": "2008 Crisis"
+                    "inflation": "חשש מאינפלציה",
+                    "covid": "קריסת הקורונה",
+                    "crisis2008": "משבר 2008"
                 },
                 "educationalOverlay": {
-                    "mild": "Normal market fluctuation",
-                    "diversification": "Your Short Term bucket stayed safe! This is diversification at work.",
-                    "recovery": "Markets recovered from 2008 in about 18 months. Patience pays.",
-                    "sellWarning": "In 2008, many sold here and locked in permanent losses. Those who waited recovered fully."
+                    "mild": "תנודתיות רגילה בשוק",
+                    "diversification": "קטגוריית הטווח הקצר שלכם נשארה בטוחה! כך עובד פיזור.",
+                    "recovery": "השווקים התאוששו ממשבר 2008 תוך כ-18 חודשים. סבלנות משתלמת.",
+                    "sellWarning": "ב-2008 רבים מכרו כאן ונעלו הפסדים קבועים. מי שחיכה התאושש במלואו."
                 },
                 "sellModal": {
-                    "title": "Wait! Before You Sell...",
-                    "subtitle": "Selling now would lock in a {{loss}} loss. Let's look at what history tells us.",
-                    "showHistory": "Show Me The History",
-                    "historyTitle": "Market Recovery History",
-                    "sellAnyway": "Sell Anyway",
-                    "stayInvested": "Stay Invested"
+                    "title": "רגע! לפני שמוכרים...",
+                    "subtitle": "מכירה עכשיו תנעל הפסד של {{loss}}. בואו נראה מה ההיסטוריה מלמדת.",
+                    "showHistory": "הראו לי את ההיסטוריה",
+                    "historyTitle": "היסטוריית התאוששות השוק",
+                    "sellAnyway": "למכור בכל זאת",
+                    "stayInvested": "להישאר מושקעים"
                 },
-                "complete": "I'm Ready"
+                "complete": "אני מוכנ/ה"
             },
-            "step": "Step {{step}} of 3",
+            "step": "שלב {{step}} מתוך 3",
             "complete": {
-                "title": "You're All Set!",
-                "subtitle": "Your personalized investment strategy is ready",
-                "viewPlan": "View My Plan"
+                "title": "הכול מוכן!",
+                "subtitle": "אסטרטגיית ההשקעה האישית שלכם מוכנה",
+                "viewPlan": "לצפייה בתוכנית שלי"
+            },
+            "investmentStatus": {
+                "title": "כבר יש לכם השקעות?",
+                "subtitle": "זה עוזר לנו להתאים את החוויה עבורכם",
+                "newInvestor": "אני רק מתחיל/ה",
+                "newDesc": "התחלה חדשה! בואו נבנה יחד את התיק הראשון שלכם.",
+                "hasInvestments": "יש לי השקעות",
+                "hasDesc": "מצוין! נעזור לכם לארגן ולמטב."
             }
         },
         "consequence": {
-            "title": "Heads Up: This Change Has Consequences",
-            "currentPlan": "Current Plan",
-            "newPlan": "New Plan",
-            "retireAge": "Retirement Age",
-            "riskLevel": "Risk Level",
-            "expectedGrowth": "Expected Growth",
-            "delayImpact": "+{{years}} years to your goals!",
-            "defaultMessage": "Lowering risk now could delay your Retirement goal. Markets will feel scary—that's normal.",
-            "note": "💡 Remember: Your Short Term bucket is already protecting money you'll need soon. The Long bucket is designed to ride out storms.",
-            "keepPlan": "Keep My Plan",
-            "changeAnyway": "I Understand, Change It"
+            "title": "שימו לב: לשינוי הזה יש השלכות",
+            "currentPlan": "התוכנית הנוכחית",
+            "newPlan": "התוכנית החדשה",
+            "retireAge": "גיל פרישה",
+            "riskLevel": "רמת סיכון",
+            "expectedGrowth": "צמיחה צפויה",
+            "delayImpact": "+{{years}} שנים ליעדים שלכם!",
+            "defaultMessage": "הורדת הסיכון עכשיו עלולה לעכב את יעד הפרישה שלכם. השווקים יהיו מפחידים - וזה בסדר.",
+            "note": "💡 זכרו: קטגוריית הטווח הקצר כבר מגינה על כסף שתצטרכו בקרוב. קטגוריית הטווח הארוך נבנתה לעבור סערות.",
+            "keepPlan": "להשאיר את התוכנית",
+            "changeAnyway": "הבנתי, לשנות"
         },
         "lessons": {
-            "label": "Lesson",
-            "hubTitle": "📚 Investment Academy",
-            "hubSubtitle": "Master the fundamentals of smart investing",
+            "label": "שיעור",
+            "hubTitle": "📚 אקדמיית ההשקעות",
+            "hubSubtitle": "שלטו ביסודות של השקעה חכמה",
             "goalBased": {
-                "title": "Why Goal-Based Investing?",
-                "point1": "Traditional investing asks: \"How much risk can you handle?\" We ask: \"What are you dreaming of?\"",
-                "point2": "Each goal gets its own timeline and strategy. Your wedding fund shouldn't ride the same rollercoaster as your retirement.",
-                "point3": "When markets crash, you'll know exactly which goals are safe and which have time to recover.",
-                "takeaway": "💡 Takeaway: Goals first, investments second. Your money serves your dreams—not the other way around."
+                "title": "למה השקעה מבוססת יעדים?",
+                "point1": "השקעה מסורתית שואלת: \"כמה סיכון אתם יכולים לקחת?\" אנחנו שואלים: \"על מה אתם חולמים?\"",
+                "point2": "כל יעד מקבל ציר זמן ואסטרטגיה משלו. קרן החתונה שלכם לא צריכה לעבור את אותם עליות וירידות כמו הפרישה.",
+                "point3": "כשהשווקים קורסים, תדעו בדיוק אילו יעדים בטוחים ולאילו יש זמן להתאושש.",
+                "takeaway": "💡 לקחו איתכם: קודם יעדים, אחר כך השקעות. הכסף שלכם משרת את החלומות שלכם - לא להפך."
             },
             "timeHorizon": {
-                "title": "The Magic of Time Horizon",
-                "point1": "Short-term money (0-3 years): Keep it safe. A 30% crash right before your wedding? No thanks.",
-                "point2": "Mid-term money (3-10 years): Some risk is OK. You have time to recover from dips.",
-                "point3": "Long-term money (10+ years): Go for growth! History shows markets always recover over decades.",
-                "takeaway": "💡 Takeaway: Time is your superpower. The longer you can wait, the more risk (and reward) you can handle."
+                "title": "הקסם של אופק הזמן",
+                "point1": "כסף לטווח קצר (0-3 שנים): שמרו עליו בטוח. קריסה של 30% רגע לפני החתונה? לא תודה.",
+                "point2": "כסף לטווח בינוני (3-10 שנים): מעט סיכון זה בסדר. יש לכם זמן להתאושש מירידות.",
+                "point3": "כסף לטווח ארוך (10+ שנים): לכו על צמיחה! ההיסטוריה מראה ששווקים מתאוששים לאורך עשורים.",
+                "takeaway": "💡 לקחו איתכם: הזמן הוא כוח העל שלכם. ככל שתוכלו לחכות יותר, כך תוכלו לשאת יותר סיכון (ותשואה)."
             },
             "diversification": {
-                "title": "Diversification: Your Safety Net",
-                "point1": "Don't put all your eggs in one basket. When tech stocks crash, bonds might shine.",
-                "point2": "Our bucket system is diversification on steroids. Short-term = safe, Long-term = growth.",
-                "point3": "Even in 2008's worst crash, diversified portfolios recovered faster than all-stock portfolios.",
-                "takeaway": "💡 Takeaway: Diversification can't prevent losses, but it can prevent catastrophe."
+                "title": "פיזור: רשת הביטחון שלכם",
+                "point1": "אל תשימו את כל הביצים בסל אחד. כשמניות הטכנולוגיה קורסות, אג״ח עשויות לזהור.",
+                "point2": "שיטת הקטגוריות שלנו היא פיזור בסטרואידים. טווח קצר = בטוח, טווח ארוך = צמיחה.",
+                "point3": "גם בקריסה הקשה של 2008, תיקים מפוזרים התאוששו מהר יותר מתיקים של מניות בלבד.",
+                "takeaway": "💡 לקחו איתכם: פיזור לא מונע הפסדים, אבל הוא מונע אסון."
             },
             "compoundGrowth": {
-                "title": "Compound Growth: The 8th Wonder",
-                "point1": "₪1,000/month at 8% for 30 years = ₪1.5 million. You only put in ₪360,000!",
-                "point2": "The secret: your money makes money, which makes MORE money. Snowball effect.",
-                "point3": "Starting 10 years earlier can mean DOUBLE the final amount. Time beats everything.",
-                "takeaway": "💡 Takeaway: Start today. The best time to invest was yesterday. The second best time is now."
+                "title": "ריבית דריבית: הפלא השמיני",
+                "point1": "₪1,000 בחודש ב-8% במשך 30 שנה = ₪1.5 מיליון. הפקדתם רק ₪360,000!",
+                "point2": "הסוד: הכסף שלכם מייצר כסף, שמייצר עוד כסף. אפקט כדור השלג.",
+                "point3": "להתחיל 10 שנים מוקדם יותר יכול להכפיל את הסכום הסופי. הזמן מנצח הכול.",
+                "takeaway": "💡 לקחו איתכם: התחילו היום. הזמן הטוב ביותר להשקיע היה אתמול. השני הכי טוב הוא עכשיו."
             },
             "stayingCourse": {
-                "title": "The Hardest Part: Staying the Course",
-                "point1": "In 2008, those who sold at the bottom locked in 50% losses forever.",
-                "point2": "Those who held? Fully recovered in 18 months and went on to new highs.",
-                "point3": "Our bucket system helps: when markets crash, your Short-term bucket is safe. Sleep easy.",
-                "takeaway": "💡 Takeaway: The market will test you. Your plan is designed to handle it. Trust the process."
+                "title": "החלק הקשה: להישאר במסלול",
+                "point1": "ב-2008, מי שמכר בתחתית נעל הפסדים של 50% לתמיד.",
+                "point2": "ומי שהחזיק? התאושש לחלוטין תוך 18 חודשים והמשיך לשיאים חדשים.",
+                "point3": "שיטת הקטגוריות שלנו עוזרת: כשהשווקים קורסים, קטגוריית הטווח הקצר שלכם בטוחה. ישנו בשקט.",
+                "takeaway": "💡 לקחו איתכם: השוק יבחן אתכם. התוכנית שלכם נבנתה להתמודד עם זה. סמכו על התהליך."
             }
         },
         "tooltips": {
-            "volatility": "How much prices jump around. High volatility = bigger swings up AND down.",
-            "allocation": "How you split your money between safe and risky investments.",
-            "diversification": "Not putting all eggs in one basket. When stocks fall, bonds might not.",
-            "compoundGrowth": "Your money making money, which makes more money. Time is the magic ingredient.",
-            "shortBucket": "Money you'll need soon. We keep it safe so a market crash won't ruin your plans.",
-            "midBucket": "Goals 3-10 years away. There's time to recover from dips, but we still play it smart.",
-            "longBucket": "Your retirement fund, 10+ years away. We can ride out any storm for maximum growth."
+            "volatility": "עד כמה המחירים קופצים. תנודתיות גבוהה = תנודות גדולות יותר למעלה ולמטה.",
+            "allocation": "איך אתם מחלקים את הכסף בין השקעות בטוחות למסוכנות.",
+            "diversification": "לא לשים את כל הביצים בסל אחד. כשמניות יורדות, אג״ח אולי לא.",
+            "compoundGrowth": "הכסף שלכם מייצר כסף, שמייצר עוד כסף. הזמן הוא המרכיב הקסום.",
+            "shortBucket": "כסף שתצטרכו בקרוב. אנחנו שומרים עליו בטוח כדי שקריסת שוק לא תהרוס את התוכניות שלכם.",
+            "midBucket": "יעדים בעוד 3-10 שנים. יש זמן להתאושש מירידות, אבל אנחנו עדיין פועלים בחוכמה.",
+            "longBucket": "קרן הפרישה שלכם, בעוד 10+ שנים. אפשר לעבור כל סערה ולהשיג צמיחה מקסימלית."
         },
         "portfolio": {
             "title": "התיק שלי",
@@ -1167,7 +1342,7 @@
             "uploading": "מנתח...",
             "estimatedTime": "~דקה 1",
             "addManually": "הוסף ידנית",
-            "cryptoNudge": "Crypto is usually classified as Long Range, but you're the boss!",
+            "cryptoNudge": "קריפטו מסווג בדרך כלל לטווח ארוך, אבל אתם מחליטים!",
             "reviewExtraction": "בדוק את הנכסים שחולצו",
             "reviewNote": "אנא בדוק וערוך את הנתונים לפני הוספתם לתיק.",
             "statementAsOf": "הדו\"ח הזה משקף את התיק שלך נכון לתאריך {{date}} - המחירים והשווי עשויים להיות לא עדכניים אם זה היה לפני זמן מה.",
@@ -1189,7 +1364,35 @@
             "unverified": "לא מאומת",
             "unverifiedHint": "לא הצלחנו לאמת את הנייר הזה באופן עצמאי - כדאי לבדוק שהוא נכון",
             "notSureWhich": "לא בטוחים איזה נייר ערך זה — התכוונת ל:",
-            "noneOfThese": "אף אחד מהם, השאר כפי שהוקלד"
+            "noneOfThese": "אף אחד מהם, השאר כפי שהוקלד",
+            "alreadyExists": "המניה הזו כבר בתיק שלכם",
+            "backedTooltip": "מגובה על ידי Twelve Data · סונכרן לאחרונה {{date}}",
+            "backedTooltipPending": "מגובה על ידי Twelve Data · בודק מתי היה הסנכרון האחרון...",
+            "notBackedTooltip": "לא מקושר ל-Twelve Data - הוזן ידנית, ולכן המחיר והשם שלו לא יתעדכנו אוטומטית.",
+            "needsPrice": "נדרש מחיר",
+            "enterPrice": "הזינו מחיר ↓",
+            "name": "שם",
+            "enterManually": "הזנה ידנית",
+            "nameLocked": "נעול - מסונכרן מ-Twelve Data",
+            "symbol": "סימול",
+            "currentPrice": "מחיר נוכחי למניה",
+            "priceRequired": "המחיר לא נמצא - הזינו ידנית",
+            "assignToBucket": "שיוך לקטגוריה",
+            "analysisComplete": "הניתוח הושלם!",
+            "clickToReview": "לחצו כדי לבדוק {{count}} אחזקות",
+            "dropToUnassign": "גררו לכאן כדי לבטל שיוך",
+            "emptyBucket": "אין עדיין נכסים בקטגוריה זו",
+            "healthExplanation": "מראה עד כמה התיק שלכם תואם לאסטרטגיה",
+            "addStock": "הוספה לתיק",
+            "fetchingPrice": "טוען מחיר נוכחי...",
+            "priceNotAvailable": "המחיר אינו זמין",
+            "howManyUnits": "כמה מניות/יחידות יש לכם?",
+            "purchasePrice": "מחיר רכישה ממוצע למניה",
+            "estimatedValue": "שווי נוכחי משוער",
+            "addToPortfolio": "הוספה לתיק",
+            "extractFailed": "חילוץ האחזקות נכשל",
+            "uploadFailed": "ההעלאה נכשלה. נסו שוב.",
+            "perShare": "{{price}} למניה"
         },
         "mission": {
             "title": "משימה",
@@ -1221,11 +1424,200 @@
             "editSurplus": "ערוך חיסכון בפועל",
             "gapPositive": "חיסכון עודף!",
             "gapNegative": "הוצאות לא מדווחות?",
-            "gapDesc": "יש לך {{amount}} {{direction}} ממה שחושב על בסיס ההכנסות וההוצאות שדיווחת."
+            "gapDesc": "יש לך {{amount}} {{direction}} ממה שחושב על בסיס ההכנסות וההוצאות שדיווחת.",
+            "suggested": "מוצע",
+            "shares": "מניות",
+            "paid": "שולם",
+            "noPriceHint": "המחיר לא ידוע - הזינו את שניהם",
+            "bought": "נרכשו {{shares}} מניות תמורת {{amount}}",
+            "boughtNoShares": "שולם {{amount}}",
+            "markDone": "סמנו כבוצע",
+            "undo": "ביטול",
+            "monthComplete": "משימת החודש הושלמה",
+            "moneyToInvest": "כסף להשקעה",
+            "moneyToInvestHint": "בקרוב נמשוך זאת אוטומטית מהדשבורד - בינתיים, הזינו בעצמכם.",
+            "editAmount": "עריכת הסכום להשקעה",
+            "alignment": "התאמה לאסטרטגיה",
+            "setMoneyToInvest": "הזינו סכום למעלה כדי לקבל את משימת החודש.",
+            "assignBucket": "הוסיפו מניה לקטגוריית {{bucket}}",
+            "assignBucketDesc": "{{amount}} ממתינים להשקעה כאן, אך עדיין לא הוקצתה מניה לקטגוריה זו. הוסיפו אחת מלשונית התיק."
         },
         "tabStrategy": "אסטרטגיה",
         "tabPortfolio": "תיק השקעות",
-        "tabMission": "המשימה החודשית"
+        "tabMission": "המשימה החודשית",
+        "riskStory": {
+            "holdTitle": "להמשיך במסלול",
+            "holdDesc": "ברור לי שזה זמני. ההיסטוריה מראה ששווקים מתאוששים.",
+            "sellTitle": "להגן על הכסף שלי",
+            "sellDesc": "זה מלחיץ מדי. להעביר חלק מהכסף להשקעות בטוחות יותר.",
+            "badgeUnlocked": "נפתח תג!",
+            "yourRiskDNA": "ה-DNA הסיכוני שלכם",
+            "yourJourney": "המסע שלכם",
+            "recommendedAllocation": "התמהיל המומלץ עבורכם",
+            "applyStrategy": "החלת האסטרטגיה",
+            "title": "בואו נבחן את ה-DNA ההשקעתי שלכם",
+            "introDesc": "תעברו דרך 3 קריסות שוק אמיתיות עם $100,000. הבחירות שלכם יחשפו את סובלנות הסיכון האמיתית שלכם.",
+            "startJourney": "התחלת המסע",
+            "marketEvent": "אירוע שוק",
+            "unlock": "פותחים: {{name}}",
+            "marketRecovered": "השוק התאושש!",
+            "heldStrong": "החזיקו חזק",
+            "protected": "הגנו",
+            "youAreHere": "אתם כאן",
+            "chartStart": "התחלה",
+            "chartRecovery": "התאוששות",
+            "protectHint": "זה בסדר להגן על מה שיש לכם",
+            "stages": {
+                "correction": {
+                    "title": "מבזק חדשות: המתיחות העולמית עולה",
+                    "intro": "האינפלציה עולה בעולם, הבנקים המרכזיים מעלים ריבית, ואי הוודאות מורידה את השווקים.",
+                    "climax": "התיק שלכם ירד ב-15%. קריינים מזהירים משוק דובי ממושך.",
+                    "recovery": "אבל ההיסטוריה מראה שתיקונים הם דבר רגיל. השווקים התאוששו תוך 14 חודשים."
+                },
+                "flashCrash": {
+                    "title": "מבזק חדשות: הוכרז משבר עולמי",
+                    "intro": "משבר עולמי מכה. העולם נסגר. השווקים צונחים בקריסה המהירה ביותר בהיסטוריה האחרונה.",
+                    "climax": "התיק שלכם ירד ב-34% בתוך 4 שבועות בלבד. פאניקה בכל מקום.",
+                    "recovery": "מי שהחזיק ראה התאוששות תוך 5 חודשים בלבד. השוק הגיע לשיאים חדשים תוך שנה."
+                },
+                "greatRecession": {
+                    "title": "מבזק חדשות: מוסדות גדולים קורסים",
+                    "intro": "בנקים קורסים. מוסדות פיננסיים ענקיים נופלים. כל המערכת הפיננסית העולמית מתנדנדת.",
+                    "climax": "התיק שלכם נחתך בחצי. זה מרגיש כמו סוף העולם.",
+                    "recovery": "מי שהחזיק ראה התאוששות מלאה תוך 18 חודשים. השוק הכפיל את ערכו פי כמה בעשור שאחר כך."
+                }
+            },
+            "badges": {
+                "correction": {
+                    "name": "צמיחה יציבה",
+                    "desc": "עברתם את הסערה הראשונה"
+                },
+                "flashCrash": {
+                    "name": "ידיים של יהלום",
+                    "desc": "החזקתם דרך הפאניקה"
+                },
+                "greatRecession": {
+                    "name": "קיבה של ברזל",
+                    "desc": "שרדתם קריסת שוק היסטורית"
+                }
+            }
+        },
+        "retake": {
+            "title": "בטוחים?",
+            "text": "הרצה מחדש של הסימולציה תאפס את האסטרטגיה שלכם לפי הבחירות החדשות. להמשיך?",
+            "confirm": "כן, להריץ מחדש",
+            "cancelSimulation": "→ ביטול הסימולציה",
+            "button": "הרצה מחדש של סימולטור הסיכון"
+        },
+        "timeMachine": {
+            "marketEvent": "אירוע שוק",
+            "startingSimulation": "מתחילים סימולציה...",
+            "sellAll": "→ מכירת הכול",
+            "buyMax": "← קנייה מקסימלית",
+            "breakingNews": "מבזק חדשות",
+            "marketUpdate": "עדכון שוק",
+            "aftermath": "אחרי הסערה",
+            "marketDropped": "📉 השוק ירד זה עתה ב-{{drop}}%!",
+            "adjustHint": "איך אתם מרגישים עכשיו? אפשר לשנות אם צריך.",
+            "yearsOfHistory": "25 שנות היסטוריה",
+            "totalReturn": "תשואה כוללת: {{sign}}{{percent}}%",
+            "secretLabel": "סוד:",
+            "secretText": "זה לא היה סתם משחק! עשר ההחלטות שלכם חשפו איך אתם מתמודדים באופן טבעי עם לחץ בשוק.",
+            "riskDnaRevealed": "✨ נחשף ה-DNA הסיכוני שלכם ✨",
+            "personalizedAllocation": "📊 התמהיל האישי שלכם",
+            "applyStrategy": "החלת האסטרטגיה",
+            "title": "🕰️ מכונת הזמן של השוק",
+            "intro": "עברו דרך 25 שנות היסטוריה של השוק. אתם מתחילים עם $100,000. קבלו החלטות תוך כדי שהאירועים מתרחשים.",
+            "invested80": "📈 80% מושקע",
+            "cash20": "💵 20% מזומן",
+            "enter": "כניסה למכונת הזמן",
+            "marketDropping": "השוק יורד...",
+            "marketRecovering": "השווקים מתאוששים...",
+            "nextEvent": "האירוע הבא ←",
+            "seeResults": "לתוצאות ←",
+            "scenarios": {
+                "dotcom": {
+                    "headline": "מניות הטכנולוגיה בשיאים של כל הזמנים! חברות האינטרנט הן העתיד.",
+                    "context": "ההערכות שמיים. כולם קונים. השכן שלכם הרוויח זה עתה $50 אלף על טיפ למניה.",
+                    "lesson": "בועות מתפוצצות. קנייה בשיא כואבת, אבל סבלנות מרפאת."
+                },
+                "financial2008": {
+                    "headline": "מבזק חדשות: מוסדות גדולים קורסים",
+                    "context": "בנקים גדולים קורסים. הפאניקה מתפשטת. אנשים מאבדים את בתיהם.",
+                    "lesson": "העולם לא נגמר. החוסן השתלם בגדול."
+                },
+                "euro2011": {
+                    "headline": "פשיטות רגל של מדינות גוברות. האיחוד הכלכלי בסכנה.",
+                    "context": "אי ודאות גבוהה בשווקים העולמיים. הפוליטיקאים מתווכחים.",
+                    "lesson": "רעש פוליטי יוצר לרוב ירידות זמניות, לא נזק קבוע."
+                },
+                "covid2020": {
+                    "headline": "הוכרז משבר עולמי. הכלכלות נכנסות לסגר.",
+                    "context": "סגר עולמי חסר תקדים. אף אחד לא יודע כמה זמן זה יימשך.",
+                    "lesson": "הירידה המהירה ביותר בהיסטוריה, ואחריה ההתאוששות המהירה ביותר."
+                },
+                "inflation2022": {
+                    "headline": "האינפלציה בשיא של 40 שנה. הבנקים המרכזיים מעלים ריבית בתוקפנות.",
+                    "context": "מניות הטכנולוגיה צונחות. האג״ח יורדות. אין לאן לברוח.",
+                    "lesson": "ריבית גבוהה פוגעת בהתחלה, אבל חדשנות תמיד מניעה צמיחה."
+                }
+            },
+            "profiles": {
+                "aggressive": {
+                    "name": "משקיע/ה אגרסיבי/ת",
+                    "description": "קניתם בירידות! אתם מבינים שקריסות הן הזדמנויות."
+                },
+                "conservative": {
+                    "name": "משקיע/ה שמרני/ת",
+                    "description": "הגנתם על הכסף שלכם בזמן הסערה. ביטחון קודם כול!"
+                },
+                "reactive": {
+                    "name": "משקיע/ה תגובתי/ת",
+                    "description": "אתם מגיבים מהר לחדשות. כדאי לפעמים לחכות ולראות את התמונה המלאה."
+                },
+                "steady": {
+                    "name": "משקיע/ה ביד יציבה",
+                    "description": "נשארתם רגועים בסערות. המשמעת היא הכוח שלכם."
+                },
+                "balanced": {
+                    "name": "משקיע/ה מאוזן/ת",
+                    "description": "התאמתם את האסטרטגיה לפי התנאים. גמישות היא המפתח."
+                }
+            }
+        },
+        "riskStorm": {
+            "yourPortfolio": "התיק שלכם",
+            "crashes": {
+                "dotcom": {
+                    "label": "בועת הדוט-קום",
+                    "description": "בועת הדוט-קום התפוצצה לאחר שמניות האינטרנט תומחרו בצורה מופרזת.",
+                    "recovery": "6 שנים להתאוששות"
+                },
+                "crisis2008": {
+                    "label": "המשבר הפיננסי של 2008",
+                    "description": "משבר פיננסי עולמי שהתחיל בקריסת משכנתאות הסאב-פריים.",
+                    "recovery": "18 חודשים להתאוששות"
+                },
+                "covid": {
+                    "label": "קריסת הקורונה",
+                    "description": "שוק דובי מהיר ביותר בהיסטוריה בגלל החשש ממגפה עולמית.",
+                    "recovery": "5 חודשים להתאוששות"
+                }
+            },
+            "history": {
+                "crisis2008": "משבר 2008 (‎-50%)",
+                "crisis2008Result": "התאושש תוך 18 חודשים",
+                "covid": "קריסת הקורונה (‎-34%)",
+                "covidResult": "התאושש תוך 5 חודשים",
+                "inflation2022": "אינפלציה 2022 (‎-19%)",
+                "inflation2022Result": "התאושש תוך 14 חודשים",
+                "note": "* מי שמכר בתחתית הפסיד כסף באופן קבוע. מי שחיכה התאושש במלואו."
+            },
+            "overlay": {
+                "recoveryDesc": "השווקים התאוששו ממשבר 2008 תוך כ-18 חודשים. ה-S&P 500 הכפיל את עצמו פי 5 מהתחתית. סבלנות משתלמת.",
+                "sellWarningDesc": "ב-2008 רבים מכרו כאן ונעלו הפסדים קבועים. מי שחיכה התאושש במלואו - ואף יותר."
+            }
+        }
     },
     "wishlist": {
         "title": "רשימת משאלות",
@@ -1273,7 +1665,8 @@
         "searchPlaceholder": "חיפוש ברשימת המשאלות...",
         "validation": {
             "nameRequired": "אנא הזן שם פריט",
-            "validPrice": "אנא הזן סכום מחיר תקין"
+            "validPrice": "אנא הזן סכום מחיר תקין",
+            "duplicateName": "פריט בעל שם זה כבר קיים ברשימת המשאלות"
         },
         "shareItem": "שיתוף פריט",
         "shareTitle": "שיתוף פריט מהמשאלות",

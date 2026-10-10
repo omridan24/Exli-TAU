@@ -11,10 +11,10 @@ import { GroupPage } from './components/GroupPage';
  * same "activeNode holds a sub-selection" pattern App.jsx already uses (Debate N:
  * no router yet — selectedGroupId maps 1:1 to a future /groups/:id route).
  */
-export const GroupsNode = ({ userId }) => {
+export const GroupsNode = ({ userId, initialGroupId = null }) => {
   const { t } = useTranslation();
   const { groups, loading } = useMyGroups(userId);
-  const [selectedGroupId, setSelectedGroupId] = useState(null);
+  const [selectedGroupId, setSelectedGroupId] = useState(initialGroupId);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   if (selectedGroupId) {

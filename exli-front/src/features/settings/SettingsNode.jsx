@@ -17,14 +17,16 @@ import { CategoriesTab } from './components/CategoriesTab';
 import { HistoryTab } from './components/HistoryTab';
 import { CurrencyTab } from './components/CurrencyTab';
 
-export const SettingsNode = ({ userId }) => {
+export const SettingsNode = ({ userId, onUpdateProfile, categories, onUpdateCategories }) => {
   const { t } = useTranslation();
   const { language, setLanguage, isRTL } = useLanguage(userId);
 
   const [profile, setProfile] = useState({
-    name: '', birthdate: '1995-01-01', occupations: [], status: '',
+    name: '', birthdate: '', occupations: [], status: '',
     country: '', city: '', university: '', isStudent: false, preferredCurrency: 'ILS', workplaces: [],
-    taxCreditPoints: 2.25
+    taxCreditPoints: 2.25,
+    monthlyPayday: 10,
+    monthlyChargeDay: 10,
   });
   const [customCategories, setCustomCategories] = useState([]);
   const [history, setHistory] = useState([]);
@@ -55,7 +57,9 @@ export const SettingsNode = ({ userId }) => {
           ...prev,
           ...baseProfile,
           occupations: baseProfile.occupations || baseProfile.occupation || [],
-          workplaces: baseProfile.workplaces || []
+          workplaces: baseProfile.workplaces || [],
+          monthlyPayday: baseProfile.monthlyPayday !== undefined ? baseProfile.monthlyPayday : (data.monthlyPayday || 10),
+          monthlyChargeDay: baseProfile.monthlyChargeDay !== undefined ? baseProfile.monthlyChargeDay : (data.monthlyChargeDay || 10),
         }));
         setCustomCategories(data.customCategories || []);
       }
@@ -110,6 +114,9 @@ export const SettingsNode = ({ userId }) => {
   const handleSaveProfile = async (newProfile) => {
     const p = newProfile || profile;
     setProfile(p);
+    if (onUpdateProfile) {
+      onUpdateProfile(p);
+    }
     setIsLoading(true);
     try {
       await setDoc(doc(db, 'users', userId), {
@@ -118,7 +125,9 @@ export const SettingsNode = ({ userId }) => {
         occupations: p.occupations,
         workplaces: p.workplaces,
         country: p.country,
-        city: p.city
+        city: p.city,
+        monthlyPayday: p.monthlyPayday,
+        monthlyChargeDay: p.monthlyChargeDay
       }, { merge: true });
       await logUserAction(userId, 'PROFILE_UPDATE', 'Updated settings');
       setMsg(t('settings.savedSuccess'));

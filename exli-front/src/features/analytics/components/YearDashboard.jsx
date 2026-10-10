@@ -10,14 +10,14 @@ import { expensesApi } from '../../../config/expensesApi';
 import { AnalyticsTrendsView } from './AnalyticsTrendsView';
 import { useFx } from '../../../lib/fx/useFx';
 
-export const YearDashboard = ({ year, data, income, categories, userId, onBack }) => {
+export const YearDashboard = ({ year, data, income, categories, userId, onBack, initialViewMode = 'month', initialCategory }) => {
     const { t } = useTranslation();
     // Called early, before any useMemo below that depends on it - see the
     // FX plan §1's flagged bug (mixed-currency amounts summed as if they
     // were one) and the InvestmentNode.jsx TDZ mistake this project already
     // hit once from getting this ordering wrong.
     const { toDefault, defaultCurrency, dataVersion } = useFx();
-    const [viewMode, setViewMode] = useState('month');
+    const [viewMode, setViewMode] = useState(initialViewMode);
     const [trendType, setTrendType] = useState('expense');
     const [selectedMonth, setSelectedMonth] = useState('average');
     const [hoveredMonth, setHoveredMonth] = useState(null);
@@ -35,7 +35,7 @@ export const YearDashboard = ({ year, data, income, categories, userId, onBack }
     const [editingId, setEditingId] = useState(null);
     const [editAmountVal, setEditAmountVal] = useState('');
 
-    const [selectedCategory, setSelectedCategory] = useState(categories[0]?.name || '');
+    const [selectedCategory, setSelectedCategory] = useState(initialCategory || categories[0]?.name || '');
     const [selectedIncomeType, setSelectedIncomeType] = useState('neto');
     const [selectedJobFilter, setSelectedJobFilter] = useState('ALL_JOBS');
 

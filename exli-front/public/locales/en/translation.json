@@ -37,6 +37,87 @@
             "description": "The gifts I want to get for myself",
             "subtitle": "Track, organize, and plan your future purchases."
         },
+        "mainDashboard": {
+            "overview": "Overview",
+            "welcome": "Welcome",
+            "todayIs": "Today is",
+            "greeting": "Welcome {{name}}, today is {{date}}.",
+            "greetingFallback": "Welcome, today is {{date}}.",
+            "placeholderTitle": "Dashboard Canvas",
+            "placeholderSubtitle": "Ready for widgets, metrics, and quick actions",
+            "customizable": "Customizable space",
+            "amountSaved": "Amount Saved",
+            "amountSavedExcluded_one": "{{count}} item without an exchange rate is not included",
+            "amountSavedExcluded_other": "{{count}} items without an exchange rate are not included",
+            "viewAnalytics": "View analytics",
+            "status": {
+                "topCategory": "Top category",
+                "topCategoryDetail": "{{amount}} · {{share}}% of all spending",
+                "noExpenses": "No expenses yet",
+                "totalSpent": "Total spent",
+                "perMonth": "About {{amount}} a month",
+                "savingsRate": "Savings rate",
+                "savingsRateDetail": "{{saved}} kept of {{income}} earned",
+                "noIncome": "No income uploaded yet",
+                "investments": "Investments",
+                "investmentsToday": "{{amount}} today",
+                "investmentsValue": "Total portfolio value",
+                "wishlistAffordable": "{{affordable}} of {{total}}",
+                "wishlistDetail": "items within budget",
+                "investmentsMonth": "{{amount}} this month"
+            },
+            "wishlistStatus": {
+                "withinBudget": "{{count}} wishlist items are within budget!",
+                "withinBudgetSingle": "1 wishlist item is within budget!",
+                "noneWithinBudget": "No wishlist items are within budget yet",
+                "noItems": "No wishlist items added yet"
+            },
+            "notifications": {
+                "title": "Notifications",
+                "empty": "All caught up",
+                "today": "today",
+                "now": "now",
+                "placeholder": "Notification message",
+                "dismiss": "Dismiss",
+                "paydayReminder": "Income sheet for {{month}} hasn't been uploaded yet",
+                "paydayReminderDesc": "",
+                "chargeDayReminder": "Expense sheet for {{month}} hasn't been uploaded yet",
+                "chargeDayReminderDesc": "",
+                "wishlistSingleItemWithinBudget": "A new wishlist item is within budget!",
+                "wishlistMultipleItemsWithinBudget": "New wishlist items are within budget!",
+                "settingsProfileReminder": "Fill in remaining profile information in Settings",
+                "welcomeNotification": "Welcome to Exli!",
+                "groupSomeone": "Someone",
+                "groupJoinRequests_one": "A join request is waiting for approval in {{group}}",
+                "groupJoinRequests_other": "{{count}} join requests are waiting for approval in {{group}}",
+                "groupYouOwe": "You owe {{name}} {{amount}} in {{group}}",
+                "groupYouOweMany": "You owe {{count}} people {{amount}} in {{group}}",
+                "groupOwedToYou": "{{name}} owes you {{amount}} in {{group}}",
+                "groupOwedToYouMany": "{{count}} people owe you {{amount}} in {{group}}",
+                "groupPaymentReceived": "{{name}} paid you {{amount}} in {{group}}",
+                "settingsProfileMissing": "Complete your profile in Settings: {{fields}}",
+                "profileFields": {
+                    "name": "full name",
+                    "birthdate": "birthdate",
+                    "status": "family status",
+                    "career": "work & career",
+                    "country": "country",
+                    "city": "city",
+                    "university": "university"
+                }
+            },
+            "areas": {
+                "status": "Status",
+                "statusSubtitle": "Your money at a glance",
+                "statusPlaceholder": "Feature rows will appear here",
+                "utils": "Status",
+                "utilsSubtitle": "Feature updates & availability",
+                "utilsPlaceholder": "Feature rows will appear here",
+                "notifications": "Notifications",
+                "notificationsSubtitle": "Activity & alerts",
+                "notificationsPlaceholder": "All caught up"
+            }
+        },
         "comingSoon": "Coming Soon"
     },
     "expenses": {
@@ -556,7 +637,17 @@
             "iAmStudent": "I am a Student",
             "selectUniversity": "Select University...",
             "select": "Select...",
-            "selectCountryFirst": "Select country first"
+            "selectCountryFirst": "Select country first",
+            "financialDates": "Monthly Financial Dates",
+            "financialDatesDesc": "Set your regular monthly payday and credit card billing day to align your cashflow cycles.",
+            "monthlyPayday": "Monthly Payday",
+            "monthlyPaydayDesc": "Day of the month you receive your salary",
+            "monthlyChargeDay": "Monthly Charge Day",
+            "monthlyChargeDayDesc": "Day of the month your credit card or bank charges occur",
+            "selectDay": "Day of month (1-31)",
+            "dayOfMonth": "Day {{day}} of the month",
+            "quickSelect": "Quick select:",
+            "lastDay": "31 (End)"
         },
         "taxCredit": {
             "title": "Tax Credit Calculator",
@@ -662,7 +753,8 @@
         "pets": "Pets",
         "gifts": "Gifts",
         "entertainment": "Entertainment",
-        "other": "Other"
+        "other": "Other",
+        "uncategorized": "Uncategorized"
     },
     "occupations": {
         "title": "Occupations (Max 3)",
@@ -755,7 +847,13 @@
             "discard": "Discard"
         },
         "approve": "Approve",
-        "reject": "Reject"
+        "reject": "Reject",
+        "saving": "Saving...",
+        "learnMore": "Learn More",
+        "optional": "optional",
+        "reset": "Reset",
+        "month": "month",
+        "optionalCap": "Optional"
     },
     "categoryEditor": {
         "newCategory": "New Category",
@@ -892,6 +990,29 @@
         }
     },
     "investments": {
+        "misc": {
+            "dismiss": "Dismiss",
+            "year": "Year",
+            "yourPortfolio": "Your Portfolio",
+            "hold": "Hold",
+            "yourStartingPortfolio": "Your Starting Portfolio",
+            "symbol": "Symbol",
+            "name": "Name",
+            "totalPortfolio": "Total Portfolio",
+            "startingBalance": "Starting Balance",
+            "level": {
+                "High": "High",
+                "Medium": "Medium",
+                "Low": "Low"
+            },
+            "sharesLabel": "Shares",
+            "assetType": {
+                "stock": "STOCK",
+                "etf": "ETF",
+                "crypto": "CRYPTO",
+                "bond": "BOND"
+            }
+        },
         "title": "Investments",
         "subtitle": "Track your favorite stocks and ETFs",
         "searchPlaceholder": "Search stocks or ETFs...",
@@ -956,10 +1077,46 @@
                 "debtSpiral": "⚠️ Debt Spiral",
                 "cashOnly": "🧊 Cash Only",
                 "cashScenarioNote": "* Cash scenario assumes saving ALL surplus ({{amount}}/mo) in cash, adjusted for inflation.",
-                "moreMultiplier": "{{count}}x more"
+                "moreMultiplier": "{{count}}x more",
+                "howItWorks": "How this comparison works:",
+                "investedExplain": "Your {{amount}}/mo compounding at {{rate}}% annually",
+                "cashExplain": "Same {{amount}}/mo in cash, losing purchasing power to 2.5% inflation",
+                "noteDisclaimer": "* Past performance does not guarantee future results. Inflation assumed at 2.5%/year."
             },
             "usedForCalc": "Used for projections",
-            "disclaimer": "This is an estimation for educational purposes only. Past performance does not guarantee future results. This is not investment advice. Please consult a licensed financial advisor before making investment decisions."
+            "disclaimer": "This is an estimation for educational purposes only. Past performance does not guarantee future results. This is not investment advice. Please consult a licensed financial advisor before making investment decisions.",
+            "scenes": {
+                "fire": {
+                    "title": "FIRE Mode! 🔥",
+                    "message": "Early retirement unlocked! Beach life with the family!",
+                    "age": "45-50"
+                },
+                "cruising": {
+                    "title": "Cruising Mode",
+                    "message": "On track for comfortable retirement! Hobbies await!",
+                    "age": "55-60"
+                },
+                "tortoise": {
+                    "title": "Tortoise Mode",
+                    "message": "Slow and steady wins the race. Keep building!",
+                    "age": "65-67"
+                },
+                "struggle": {
+                    "title": "Struggle Mode",
+                    "message": "Still working at 75... Start saving now!",
+                    "age": "75+"
+                },
+                "retireAge": "Estimated retirement age:",
+                "justMore": "Just {{remaining}}% more to unlock"
+            },
+            "yourAverageIncome": "Your Average Income (from Analytics)",
+            "usingCustom": "⚙️ Using custom value below",
+            "monthlyIncome": "Monthly Income",
+            "milestones": {
+                "fire": "FIRE Mode 🔥",
+                "cruising": "Cruising 🚴",
+                "tortoise": "Tortoise 🐢"
+            }
         },
         "buckets": {
             "title": "Allocation Buckets",
@@ -995,7 +1152,8 @@
                 "moderateDesc": "Lower risk with reliable returns",
                 "conservative": "Safety First 🛡️",
                 "conservativeDesc": "Capital preservation with some growth"
-            }
+            },
+            "educationTeaser": "Why your money needs different homes"
         },
         "goals": {
             "title": "My Goals",
@@ -1021,7 +1179,11 @@
                 "whatsYourVibe": "What's your vibe?",
                 "budget": "Budget",
                 "standard": "Standard",
-                "luxe": "Luxe"
+                "luxe": "Luxe",
+                "slideToChoose": "Slide to find your perfect budget",
+                "budgetLabel": "Smart",
+                "avgLabel": "AVG",
+                "luxeLabel": "Luxe"
             },
             "form": {
                 "goalName": "Goal Name",
@@ -1033,7 +1195,8 @@
                 "monthlyNeeded": "{{amount}}/mo needed",
                 "monthsLeft": "{{months}} months left",
                 "assignedTo": "Assigned to {{bucket}}"
-            }
+            },
+            "editGoal": "Edit Goal"
         },
         "onboarding": {
             "welcome": {
@@ -1043,7 +1206,9 @@
                 "step1": "Define your life goals",
                 "step2": "Test your risk comfort",
                 "step3": "Get your custom allocation",
-                "cta": "Let's Build My Strategy"
+                "cta": "Let's Build My Strategy",
+                "step1Desc": "What are you saving for?",
+                "trustBadge": "No stock picking. No market timing. Just smart goals."
             },
             "stressTest": {
                 "title": "Risk Storm Simulator",
@@ -1077,6 +1242,14 @@
                 "title": "You're All Set!",
                 "subtitle": "Your personalized investment strategy is ready",
                 "viewPlan": "View My Plan"
+            },
+            "investmentStatus": {
+                "title": "Do you have any investments yet?",
+                "subtitle": "This helps us personalize your experience",
+                "newInvestor": "I'm Just Starting",
+                "newDesc": "Fresh start! Let's build your first portfolio together.",
+                "hasInvestments": "I Have Investments",
+                "hasDesc": "Great! We'll help you organize and optimize."
             }
         },
         "consequence": {
@@ -1172,7 +1345,35 @@
             "unverified": "Unverified",
             "unverifiedHint": "Couldn't independently confirm this ticker - double-check it's correct",
             "notSureWhich": "We're not sure which security this is — did you mean:",
-            "noneOfThese": "None of these, keep as typed"
+            "noneOfThese": "None of these, keep as typed",
+            "alreadyExists": "This stock is already in your portfolio",
+            "backedTooltip": "Backed by Twelve Data · Last synced {{date}}",
+            "backedTooltipPending": "Backed by Twelve Data · Checking last sync time...",
+            "notBackedTooltip": "Not linked to Twelve Data - this was entered manually, so its price and name won't auto-update.",
+            "needsPrice": "Needs price",
+            "enterPrice": "Enter price ↓",
+            "name": "Name",
+            "enterManually": "Enter manually",
+            "nameLocked": "Locked - synced from Twelve Data",
+            "symbol": "Symbol",
+            "currentPrice": "Current Price per Share",
+            "priceRequired": "Price not found - please enter manually",
+            "assignToBucket": "Assign to Bucket",
+            "analysisComplete": "Analysis Complete!",
+            "clickToReview": "Click to review {{count}} holdings",
+            "dropToUnassign": "Drag items here to unassign",
+            "emptyBucket": "No assets in this bucket yet",
+            "healthExplanation": "Showing how closely your portfolio matches your strategy",
+            "addStock": "Add to Portfolio",
+            "fetchingPrice": "Getting current price...",
+            "priceNotAvailable": "Price not available",
+            "howManyUnits": "How many shares/units do you hold?",
+            "purchasePrice": "Average purchase price per share",
+            "estimatedValue": "Estimated current value",
+            "addToPortfolio": "Add to Portfolio",
+            "extractFailed": "Failed to extract holdings",
+            "uploadFailed": "Upload failed. Please try again.",
+            "perShare": "{{price}} per share"
         },
         "mission": {
             "title": "Mission",
@@ -1200,7 +1401,196 @@
             "noBudget": "No budget calculated for this month yet.",
             "addIncomeExpenses": "Add Income & Expenses",
             "addIncomeDesc": "Add your income and expenses for this month to calculate your investable budget automatically.",
-            "buy": "Buy"
+            "buy": "Buy",
+            "suggested": "Suggested",
+            "shares": "shares",
+            "paid": "Paid",
+            "noPriceHint": "Price unknown - enter both",
+            "bought": "Bought {{shares}} shares for {{amount}}",
+            "boughtNoShares": "Paid {{amount}}",
+            "markDone": "Mark done",
+            "undo": "Undo",
+            "monthComplete": "This month's mission is complete",
+            "moneyToInvest": "Money to Invest",
+            "moneyToInvestHint": "We'll pull this from your dashboard automatically soon - for now, enter it yourself.",
+            "editAmount": "Edit amount to invest",
+            "alignment": "Alignment with strategy",
+            "setMoneyToInvest": "Enter an amount above to get this month's mission.",
+            "assignBucket": "Add a stock to your {{bucket}} bucket",
+            "assignBucketDesc": "{{amount}} is waiting to be invested here, but no stock is assigned to this bucket yet. Add one from the Portfolio tab."
+        },
+        "riskStory": {
+            "holdTitle": "Stay the Course",
+            "holdDesc": "I understand this is temporary. History shows markets recover.",
+            "sellTitle": "Protect My Money",
+            "sellDesc": "This is too stressful. Move some money to safer investments.",
+            "badgeUnlocked": "Badge Unlocked!",
+            "yourRiskDNA": "Your Risk DNA",
+            "yourJourney": "Your Journey",
+            "recommendedAllocation": "Your Recommended Mix",
+            "applyStrategy": "Apply This Strategy",
+            "title": "Let's Test Your Investor DNA",
+            "introDesc": "You'll travel through 3 real market crashes with $100,000. Your choices will reveal your true risk tolerance.",
+            "startJourney": "Start the Journey",
+            "marketEvent": "Market Event",
+            "unlock": "Unlock: {{name}}",
+            "marketRecovered": "Market Recovered!",
+            "heldStrong": "Held Strong",
+            "protected": "Protected",
+            "youAreHere": "You're here",
+            "chartStart": "Start",
+            "chartRecovery": "Recovery",
+            "protectHint": "It's okay to protect what you have",
+            "stages": {
+                "correction": {
+                    "title": "Breaking News: Global Tensions Rising",
+                    "intro": "Inflation is rising globally, central banks are hiking rates, and uncertainty is driving markets down.",
+                    "climax": "Your portfolio is down 15%. News anchors warn of a prolonged bear market.",
+                    "recovery": "But history shows corrections are normal. Markets recovered within 14 months."
+                },
+                "flashCrash": {
+                    "title": "Breaking News: Global Crisis Declared",
+                    "intro": "A global crisis hits. The world shuts down. Markets freefall in the fastest crash in recent history.",
+                    "climax": "Your portfolio dropped 34% in just 4 weeks. Panic is everywhere.",
+                    "recovery": "Those who held saw recovery in just 5 months. The market hit new highs within a year."
+                },
+                "greatRecession": {
+                    "title": "Breaking News: Major Institutions Collapsing",
+                    "intro": "Banks are failing. Major financial institutions collapse. The entire global financial system is shaking.",
+                    "climax": "Your portfolio is cut in HALF. It feels like the end of the world.",
+                    "recovery": "Those who held saw full recovery in 18 months. The market went on to multiply its value over the next decade."
+                }
+            },
+            "badges": {
+                "correction": {
+                    "name": "Steady Growth",
+                    "desc": "Weathered your first storm"
+                },
+                "flashCrash": {
+                    "name": "Diamond Hands",
+                    "desc": "Held through the panic"
+                },
+                "greatRecession": {
+                    "name": "Iron Stomach",
+                    "desc": "Survived a historic market crash"
+                }
+            }
+        },
+        "retake": {
+            "title": "Are you sure?",
+            "text": "Retaking the simulation will reset your strategy based on your new choices. Do you want to proceed?",
+            "confirm": "Yes, Retake Simulator",
+            "cancelSimulation": "← Cancel Simulation",
+            "button": "Retake Risk Simulator"
+        },
+        "timeMachine": {
+            "marketEvent": "Market Event",
+            "startingSimulation": "Starting simulation...",
+            "sellAll": "← Sell All",
+            "buyMax": "Buy Max →",
+            "breakingNews": "Breaking News",
+            "marketUpdate": "Market Update",
+            "aftermath": "The Aftermath",
+            "marketDropped": "📉 Market just dropped {{drop}}%!",
+            "adjustHint": "How do you feel now? Adjust if needed.",
+            "yearsOfHistory": "25 Years of History",
+            "totalReturn": "{{sign}}{{percent}}% Total Return",
+            "secretLabel": "Secret:",
+            "secretText": "This wasn't just a game! Your 10 decisions revealed how you naturally handle market stress.",
+            "riskDnaRevealed": "✨ Your Risk DNA Revealed ✨",
+            "personalizedAllocation": "📊 Your Personalized Allocation",
+            "applyStrategy": "Apply This Strategy",
+            "title": "🕰️ Market Time Machine",
+            "intro": "Travel through 25 years of market history. You start with $100,000. Make decisions as events unfold.",
+            "invested80": "📈 80% Invested",
+            "cash20": "💵 20% Cash",
+            "enter": "Enter the Time Machine",
+            "marketDropping": "Market dropping...",
+            "marketRecovering": "Markets recovering...",
+            "nextEvent": "Next Event →",
+            "seeResults": "See Results →",
+            "scenarios": {
+                "dotcom": {
+                    "headline": "Tech stocks hit all-time highs! Internet companies are the future.",
+                    "context": "Valuations are sky-high. Everyone is buying. Your neighbor just made $50k on a stock tip.",
+                    "lesson": "Bubbles burst. Buying at the peak hurts, but patience heals."
+                },
+                "financial2008": {
+                    "headline": "Breaking News: Major Institutions Collapsing",
+                    "context": "Major banks are failing. Panic is spreading. People are losing their homes.",
+                    "lesson": "The world didn't end. Resilience paid off massively."
+                },
+                "euro2011": {
+                    "headline": "Debt Defaults Rise. Global Economic Union in Danger.",
+                    "context": "High uncertainty in global markets. Politicians are arguing.",
+                    "lesson": "Political noise often creates temporary dips, not permanent damage."
+                },
+                "covid2020": {
+                    "headline": "Global Crisis Declared. Economies enter lockdown.",
+                    "context": "Unprecedented global shutdown. No one knows how long this will last.",
+                    "lesson": "Fastest drop in history, followed by the fastest recovery."
+                },
+                "inflation2022": {
+                    "headline": "Inflation hits 40-year high. Central Banks hike rates aggressively.",
+                    "context": "Tech stocks are plummeting. Bonds are down. Nowhere to hide.",
+                    "lesson": "Interest rates hurt initially, but innovation always drives growth."
+                }
+            },
+            "profiles": {
+                "aggressive": {
+                    "name": "Aggressive Investor",
+                    "description": "You bought the dips! You understand that crashes are opportunities."
+                },
+                "conservative": {
+                    "name": "Conservative Investor",
+                    "description": "You protected your money during turbulence. Safety first!"
+                },
+                "reactive": {
+                    "name": "Reactive Investor",
+                    "description": "You react quickly to news. Consider waiting to see the full picture."
+                },
+                "steady": {
+                    "name": "Steady Hand Investor",
+                    "description": "You stayed calm through the storms. Discipline is your strength."
+                },
+                "balanced": {
+                    "name": "Balanced Investor",
+                    "description": "You adapted your strategy based on conditions. Flexibility is key."
+                }
+            }
+        },
+        "riskStorm": {
+            "yourPortfolio": "Your Portfolio",
+            "crashes": {
+                "dotcom": {
+                    "label": "Dotcom Bubble",
+                    "description": "The dot-com bubble burst after internet stocks became wildly overvalued.",
+                    "recovery": "6 years to recover"
+                },
+                "crisis2008": {
+                    "label": "2008 Financial Crisis",
+                    "description": "Global financial crisis triggered by subprime mortgage collapse.",
+                    "recovery": "18 months to recover"
+                },
+                "covid": {
+                    "label": "COVID Crash",
+                    "description": "Fastest bear market in history due to global pandemic fears.",
+                    "recovery": "5 months to recover"
+                }
+            },
+            "history": {
+                "crisis2008": "2008 Crisis (-50%)",
+                "crisis2008Result": "Recovered in 18 months",
+                "covid": "COVID Crash (-34%)",
+                "covidResult": "Recovered in 5 months",
+                "inflation2022": "2022 Inflation (-19%)",
+                "inflation2022Result": "Recovered in 14 months",
+                "note": "* Those who sold at the bottom permanently lost money. Those who waited recovered fully."
+            },
+            "overlay": {
+                "recoveryDesc": "Markets recovered from 2008 in about 18 months. The S&P 500 went on to 5x from the bottom. Patience pays.",
+                "sellWarningDesc": "In 2008, many sold here and locked in permanent losses. Those who waited recovered fully—and then some."
+            }
         }
     },
     "wishlist": {
@@ -1249,7 +1639,8 @@
         "searchPlaceholder": "Search wishlist items...",
         "validation": {
             "nameRequired": "Please enter an item name",
-            "validPrice": "Please enter a valid price amount"
+            "validPrice": "Please enter a valid price amount",
+            "duplicateName": "An item with this name already exists in your wishlist"
         },
         "shareItem": "Share Item",
         "shareTitle": "Share Item",

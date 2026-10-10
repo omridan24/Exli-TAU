@@ -315,10 +315,10 @@ export const AllocationBuckets = ({
                 >
                     {/* Fill level with gradient */}
                     <div
-                        className={`absolute bottom-0 left-0 right-0 ${colors.bgGradient} transition-all duration-150 ease-out`}
+                        className={`absolute bottom-0 start-0 end-0 ${colors.bgGradient} transition-all duration-150 ease-out`}
                         style={{ height: `${allocation}%` }}
                     >
-                        <div className="absolute top-0 left-0 right-0 h-2 bg-white/20 rounded-t-full" />
+                        <div className="absolute top-0 start-0 end-0 h-2 bg-white/20 rounded-t-full" />
                     </div>
 
                     {/* Percentage label */}
@@ -330,7 +330,7 @@ export const AllocationBuckets = ({
 
                     {/* Lock indicator */}
                     {isLocked && (
-                        <div className="absolute top-2 right-2 w-5 h-5 bg-slate-700 rounded-full flex items-center justify-center">
+                        <div className="absolute top-2 end-2 w-5 h-5 bg-slate-700 rounded-full flex items-center justify-center">
                             <Lock className="w-3 h-3 text-white" />
                         </div>
                     )}
@@ -382,7 +382,7 @@ export const AllocationBuckets = ({
                             <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white">
                                 <Timer className="w-5 h-5" />
                             </div>
-                            <div className="text-left">
+                            <div className="text-start">
                                 <h3 className="font-bold text-indigo-700">
                                     {t('investments.lessons.timeHorizon.title', 'The Magic of Time Horizon')}
                                 </h3>
@@ -474,7 +474,7 @@ export const AllocationBuckets = ({
 
             {/* Help text */}
             <div className="text-center text-xs text-slate-500 px-4">
-                <Sparkles className="w-3 h-3 inline mr-1" />
+                <Sparkles className="w-3 h-3 inline me-1" />
                 {t('investments.buckets.dragHint', 'Goals are automatically assigned based on deadline')}
             </div>
 

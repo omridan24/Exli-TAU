@@ -154,7 +154,7 @@ export const LessonCard = ({
                     <div className={`w-10 h-10 ${colors.accent} rounded-xl flex items-center justify-center text-white shadow-md`}>
                         <Icon className="w-5 h-5" />
                     </div>
-                    <div className="flex-1 text-left">
+                    <div className="flex-1 text-start">
                         <h3 className={`font-bold ${colors.text}`}>
                             {t(lesson.titleKey, lesson.titleFallback)}
                         </h3>
@@ -194,7 +194,7 @@ export const LessonCard = ({
         <div className={`${colors.bg} ${colors.border} border-2 rounded-3xl p-6 transition-all duration-300 relative overflow-hidden`}
             dir={isRTL ? 'rtl' : 'ltr'}>
             {/* Decorative background */}
-            <div className="absolute top-0 right-0 text-8xl opacity-10 select-none pointer-events-none">
+            <div className="absolute top-0 end-0 text-8xl opacity-10 select-none pointer-events-none">
                 {lesson.illustration}
             </div>
 
@@ -219,7 +219,7 @@ export const LessonCard = ({
                         onClick={onDismiss}
                         className="text-slate-400 hover:text-slate-600 transition-colors"
                     >
-                        <span className="sr-only">Dismiss</span>
+                        <span className="sr-only">{t('investments.misc.dismiss', 'Dismiss')}</span>
                         ×
                     </button>
                 )}

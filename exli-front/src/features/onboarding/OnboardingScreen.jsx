@@ -35,7 +35,8 @@ export default function OnboardingScreen({ user, categories, onUpdateCategories,
     try {
       await setDoc(doc(db, 'users', user.uid), {
         hasCompletedOnboarding: true,
-        profile: { ...profile },
+        isNewAccount: true,
+        profile: { ...profile, isNewAccount: true },
         occupations: profile.occupations
       }, { merge: true });
       onComplete();

@@ -95,7 +95,7 @@ const TaskCard = ({ rec, isDone, actual, onConfirm, onUndo, formatCurrency, curr
                             <div className="mt-2 flex items-end gap-3 flex-wrap">
                                 <div>
                                     <label className="text-[11px] text-slate-500 block mb-0.5">
-                                        {t('investments.mission.shares', 'Shares')}
+                                        {t('investments.misc.sharesLabel', 'Shares')}
                                     </label>
                                     <input
                                         type="number"
@@ -415,7 +415,7 @@ export const MonthlyMission = ({
             <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl p-4 border border-purple-100 shadow-sm">
                 {/* Money to Invest */}
                 <div className="flex justify-between items-center mb-4 pb-4 border-b border-purple-100/50">
-                    <div className="text-left">
+                    <div className="text-start">
                         <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold block mb-1">
                             {t('investments.mission.moneyToInvest', 'Money to Invest')}
                         </span>
@@ -424,13 +424,13 @@ export const MonthlyMission = ({
                         </span>
                     </div>
 
-                    <div className="text-right flex-shrink-0">
+                    <div className="text-end flex-shrink-0">
                         {isEditingAmount ? (
                             <div className="flex items-center justify-end gap-1">
                                 <span className="text-purple-600 font-bold">{currencySymbol}</span>
                                 <input
                                     type="number"
-                                    className="w-24 px-2 py-1 text-right border border-purple-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                    className="w-24 px-2 py-1 text-end border border-purple-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
                                     value={editValue}
                                     onChange={(e) => setEditValue(e.target.value)}
                                     onKeyDown={(e) => {

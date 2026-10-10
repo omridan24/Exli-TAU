@@ -91,6 +91,18 @@ export const WishlistNode = ({ userId, categories = DEFAULT_CATEGORIES }) => {
 
   // Add or Edit item handler
   const handleSaveItem = async (itemData) => {
+    const trimmedName = itemData.name?.trim();
+    if (!trimmedName) return;
+
+    // Prevent duplicate item names (case-insensitive)
+    const isDuplicate = items.some(
+      (it) =>
+        it.id !== editingItem?.id &&
+        it.name &&
+        it.name.trim().toLowerCase() === trimmedName.toLowerCase()
+    );
+    if (isDuplicate) return;
+
     if (editingItem) {
       // Edit mode
       const updatedList = items.map((item) =>
@@ -273,6 +285,7 @@ export const WishlistNode = ({ userId, categories = DEFAULT_CATEGORIES }) => {
         onSave={handleSaveItem}
         itemToEdit={editingItem}
         categories={categories}
+        existingItems={items}
       />
 
       {/* Delete Confirmation Modal */}

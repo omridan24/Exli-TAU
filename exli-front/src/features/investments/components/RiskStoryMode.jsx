@@ -11,6 +11,23 @@ import { saveInvestmentProfile } from '../../../config/investmentProfileService'
 // ============================================
 // STORY STAGES - The 3 Acts of Market History
 // ============================================
+// Display texts of a stage, translated (the stage data below stays language-neutral)
+const localizeStage = (stage, t) => ({
+    ...stage,
+    name: t('investments.riskStory.marketEvent', 'Market Event'),
+    narrative: {
+        title: t(`investments.riskStory.stages.${stage.id}.title`, stage.narrative.title),
+        intro: t(`investments.riskStory.stages.${stage.id}.intro`, stage.narrative.intro),
+        climax: t(`investments.riskStory.stages.${stage.id}.climax`, stage.narrative.climax),
+        recovery: t(`investments.riskStory.stages.${stage.id}.recovery`, stage.narrative.recovery)
+    },
+    badgeOnHold: {
+        ...stage.badgeOnHold,
+        name: t(`investments.riskStory.badges.${stage.id}.name`, stage.badgeOnHold.name),
+        desc: t(`investments.riskStory.badges.${stage.id}.desc`, stage.badgeOnHold.desc)
+    }
+});
+
 const STORY_STAGES = [
     {
         id: 'correction',
@@ -150,6 +167,7 @@ const BucketBar = ({ allocation, balance, isDropping }) => {
 // ANIMATED CHART COMPONENT (SVG-based)
 // ============================================
 const StoryChart = ({ dataPoints, currentIndex, isRecovering }) => {
+    const { t } = useTranslation();
     const width = 400;
     const height = 200;
     const padding = 40;
@@ -234,7 +252,7 @@ const StoryChart = ({ dataPoints, currentIndex, isRecovering }) => {
                         textAnchor="middle"
                         className="text-[9px] fill-slate-600 font-medium"
                     >
-                        You're here
+                        {t('investments.riskStory.youAreHere', "You're here")}
                     </text>
                 </motion.g>
             </svg>
@@ -283,7 +301,7 @@ const ChoiceOverlay = ({ stage, balance, onChoice, t }) => {
                         onClick={() => onChoice('HOLD')}
                         onMouseEnter={() => setHoveredChoice('HOLD')}
                         onMouseLeave={() => setHoveredChoice(null)}
-                        className={`w-full p-4 rounded-xl border-2 transition-all text-left
+                        className={`w-full p-4 rounded-xl border-2 transition-all text-start
                             ${hoveredChoice === 'HOLD'
                                 ? 'border-emerald-500 bg-emerald-50 shadow-lg scale-[1.02]'
                                 : 'border-slate-200 hover:border-emerald-300'}`}
@@ -309,7 +327,7 @@ const ChoiceOverlay = ({ stage, balance, onChoice, t }) => {
                                         animate={{ opacity: 1 }}
                                     >
                                         <Award className="w-3 h-3" />
-                                        Unlock: {stage.badgeOnHold.name}
+                                        {t('investments.riskStory.unlock', 'Unlock: {{name}}', { name: stage.badgeOnHold.name })}
                                     </motion.div>
                                 )}
                             </div>
@@ -321,7 +339,7 @@ const ChoiceOverlay = ({ stage, balance, onChoice, t }) => {
                         onClick={() => onChoice('SELL')}
                         onMouseEnter={() => setHoveredChoice('SELL')}
                         onMouseLeave={() => setHoveredChoice(null)}
-                        className={`w-full p-4 rounded-xl border-2 transition-all text-left
+                        className={`w-full p-4 rounded-xl border-2 transition-all text-start
                             ${hoveredChoice === 'SELL'
                                 ? 'border-amber-500 bg-amber-50 shadow-lg scale-[1.02]'
                                 : 'border-slate-200 hover:border-amber-300'}`}
@@ -347,7 +365,7 @@ const ChoiceOverlay = ({ stage, balance, onChoice, t }) => {
                                         animate={{ opacity: 1 }}
                                     >
                                         <Heart className="w-3 h-3" />
-                                        It's okay to protect what you have
+                                        {t('investments.riskStory.protectHint', "It's okay to protect what you have")}
                                     </motion.div>
                                 )}
                             </div>
@@ -404,7 +422,7 @@ const RecoveryCelebration = ({ stage, badge, newBalance, onContinue, t }) => {
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.7 }}
                 >
-                    <div className="text-sm text-emerald-100 mb-1">Market Recovered!</div>
+                    <div className="text-sm text-emerald-100 mb-1">{t('investments.riskStory.marketRecovered', 'Market Recovered!')}</div>
                     <div className="text-3xl font-bold">${Math.round(newBalance).toLocaleString()}</div>
                     <div className="text-sm text-emerald-200 flex items-center justify-center gap-1 mt-1">
                         <TrendingUp className="w-4 h-4" />
@@ -475,7 +493,7 @@ const ResultsScreen = ({ choices, finalAllocation, initialBalance, onComplete, t
                 </h3>
 
                 <div className="space-y-3">
-                    {STORY_STAGES.map((stage, i) => (
+                    {STORY_STAGES.map((s) => localizeStage(s, t)).map((stage, i) => (
                         <div key={stage.id} className="flex items-center gap-3">
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold
                                 ${choices[i] === 'HOLD' ? 'bg-emerald-500' : 'bg-amber-500'}`}>
@@ -483,10 +501,10 @@ const ResultsScreen = ({ choices, finalAllocation, initialBalance, onComplete, t
                             </div>
                             <div className="flex-1">
                                 <span className="font-medium text-slate-700">{stage.name}</span>
-                                <span className="text-slate-500 text-sm ml-2">({stage.year})</span>
+                                <span className="text-slate-500 text-sm ms-2">({stage.year})</span>
                             </div>
                             <span className={`text-sm font-medium ${choices[i] === 'HOLD' ? 'text-emerald-600' : 'text-amber-600'}`}>
-                                {choices[i] === 'HOLD' ? 'Held Strong' : 'Protected'}
+                                {choices[i] === 'HOLD' ? t('investments.riskStory.heldStrong', 'Held Strong') : t('investments.riskStory.protected', 'Protected')}
                             </span>
                         </div>
                     ))}
@@ -563,7 +581,7 @@ export const RiskStoryMode = ({
     const [isSaving, setIsSaving] = useState(false);
 
     // Chart data points
-    const [chartData, setChartData] = useState([{ value: 100000, label: 'Start' }]);
+    const [chartData, setChartData] = useState([{ value: 100000, label: t('investments.riskStory.chartStart', 'Start') }]);
     const [chartIndex, setChartIndex] = useState(0);
 
     // Calculate portfolio drop based on allocation and volatility
@@ -583,7 +601,7 @@ export const RiskStoryMode = ({
 
         // Animate the first drop
         setTimeout(() => {
-            const stage = STORY_STAGES[0];
+            const stage = localizeStage(STORY_STAGES[0], t);
             const effectiveDrop = calculateDrop(stage.dropPercent);
             const newBalance = simulationBalance * (1 + effectiveDrop / 100);
 
@@ -597,7 +615,7 @@ export const RiskStoryMode = ({
 
     // Handle user choice
     const handleChoice = (choice) => {
-        const stage = STORY_STAGES[currentStage - 1];
+        const stage = localizeStage(STORY_STAGES[currentStage - 1], t);
         setChoices(prev => [...prev, choice]);
 
         if (choice === 'HOLD') {
@@ -612,7 +630,7 @@ export const RiskStoryMode = ({
 
             setTimeout(() => {
                 setSimulationBalance(finalRecoveredBalance);
-                setChartData(prev => [...prev, { value: finalRecoveredBalance, label: 'Recovery' }]);
+                setChartData(prev => [...prev, { value: finalRecoveredBalance, label: t('investments.riskStory.chartRecovery', 'Recovery') }]);
                 setChartIndex(prev => prev + 1);
             }, 500);
 
@@ -649,7 +667,7 @@ export const RiskStoryMode = ({
             setPhase('dropping');
 
             setTimeout(() => {
-                const stage = STORY_STAGES[nextStage - 1];
+                const stage = localizeStage(STORY_STAGES[nextStage - 1], t);
                 const effectiveDrop = calculateDrop(stage.dropPercent);
                 const newBalance = simulationBalance * (1 + effectiveDrop / 100);
 
@@ -708,7 +726,7 @@ export const RiskStoryMode = ({
     };
 
     // Current stage data
-    const currentStageData = currentStage > 0 && currentStage <= 3 ? STORY_STAGES[currentStage - 1] : null;
+    const currentStageData = currentStage > 0 && currentStage <= 3 ? localizeStage(STORY_STAGES[currentStage - 1], t) : null;
 
     return (
         <div className="space-y-6" dir={isRTL ? 'rtl' : 'ltr'}>
@@ -735,7 +753,7 @@ export const RiskStoryMode = ({
 
                     {/* Starting Balance */}
                     <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl p-6 max-w-sm mx-auto">
-                        <div className="text-sm text-purple-600 font-medium mb-1">Starting Balance</div>
+                        <div className="text-sm text-purple-600 font-medium mb-1">{t('investments.misc.startingBalance', 'Starting Balance')}</div>
                         <div className="text-4xl font-bold text-purple-700">$100,000</div>
                         <div className="mt-4">
                             <BucketBar allocation={allocation} balance={100000} />
@@ -782,7 +800,7 @@ export const RiskStoryMode = ({
 
                     {/* Balance Display */}
                     <div className="text-center">
-                        <div className="text-sm text-slate-500 mb-1">Your Portfolio</div>
+                        <div className="text-sm text-slate-500 mb-1">{t('investments.misc.yourPortfolio', 'Your Portfolio')}</div>
                         <AnimatedCounter
                             value={Math.round(simulationBalance)}
                             className={`text-4xl font-bold ${simulationBalance < 100000 ? 'text-red-600' : 'text-emerald-600'}`}

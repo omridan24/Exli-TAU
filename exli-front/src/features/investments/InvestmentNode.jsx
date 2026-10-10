@@ -110,7 +110,7 @@ const StockCard = ({ data, periodKey, onRemove, t }) => {
             {/* Remove button */}
             <button
                 onClick={(e) => { e.stopPropagation(); onRemove?.(data.symbol); }}
-                className="absolute top-2 right-2 w-6 h-6 rounded-full bg-slate-100 hover:bg-red-100 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                className="absolute top-2 end-2 w-6 h-6 rounded-full bg-slate-100 hover:bg-red-100 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
             >
                 <X className="w-3 h-3 text-slate-500 hover:text-red-500" />
             </button>
@@ -162,7 +162,7 @@ const StockCard = ({ data, periodKey, onRemove, t }) => {
 const SearchResults = ({ results, onSelect, isLoading, t }) => {
     if (isLoading) {
         return (
-            <div className="absolute top-full left-0 right-0 bg-white rounded-xl shadow-lg border border-slate-200 mt-2 p-4 z-50">
+            <div className="absolute top-full start-0 end-0 bg-white rounded-xl shadow-lg border border-slate-200 mt-2 p-4 z-50">
                 <div className="flex items-center gap-2 text-slate-500">
                     <RefreshCw className="w-4 h-4 animate-spin" />
                     {t('investments.searching', 'Searching...')}
@@ -178,16 +178,16 @@ const SearchResults = ({ results, onSelect, isLoading, t }) => {
     if (stockResults.length === 0) return null;
 
     return (
-        <div className="absolute top-full left-0 right-0 bg-white rounded-xl shadow-lg border border-slate-200 mt-2 max-h-80 overflow-y-auto z-50">
+        <div className="absolute top-full start-0 end-0 bg-white rounded-xl shadow-lg border border-slate-200 mt-2 max-h-80 overflow-y-auto z-50">
             {stockResults.map((item, idx) => (
                 <button
                     key={idx}
                     onClick={() => onSelect(item)}
-                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 border-b border-slate-100 last:border-0 text-left"
+                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 border-b border-slate-100 last:border-0 text-start"
                 >
                     <div>
                         <span className="font-bold text-slate-800">{item.symbol}</span>
-                        <span className="text-slate-500 ml-2 text-sm">{item.name}</span>
+                        <span className="text-slate-500 ms-2 text-sm">{item.name}</span>
                     </div>
                     <span className={`text-xs px-2 py-1 rounded-full ${item.type === 'etf' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
                         {item.type?.toUpperCase() || 'STOCK'}
@@ -787,16 +787,16 @@ export const InvestmentNode = ({ userId, onComplete }) => {
                     <div className="max-w-2xl mx-auto py-8 px-4">
                         {showRetakeConfirm ? (
                             <div className="bg-white rounded-xl p-6 border border-slate-200 text-center shadow-sm">
-                                <h3 className="text-lg font-bold text-slate-800 mb-2">Are you sure?</h3>
+                                <h3 className="text-lg font-bold text-slate-800 mb-2">{t('investments.retake.title', 'Are you sure?')}</h3>
                                 <p className="text-slate-600 mb-6">
-                                    Retaking the simulation will reset your strategy based on your new choices. Do you want to proceed?
+                                    {t('investments.retake.text', 'Retaking the simulation will reset your strategy based on your new choices. Do you want to proceed?')}
                                 </p>
                                 <div className="flex items-center justify-center gap-4">
                                     <button
                                         onClick={() => setShowRetakeConfirm(false)}
                                         className="px-6 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors font-medium"
                                     >
-                                        Cancel
+                                        {t('common.cancel', 'Cancel')}
                                     </button>
                                     <button
                                         onClick={() => {
@@ -805,7 +805,7 @@ export const InvestmentNode = ({ userId, onComplete }) => {
                                         }}
                                         className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
                                     >
-                                        Yes, Retake Simulator
+                                        {t('investments.retake.confirm', 'Yes, Retake Simulator')}
                                     </button>
                                 </div>
                             </div>
@@ -838,7 +838,7 @@ export const InvestmentNode = ({ userId, onComplete }) => {
                                     onClick={() => setIsRetakingSimulation(false)}
                                     className="w-full py-2 text-slate-500 hover:text-slate-700 text-sm"
                                 >
-                                    ← Cancel Simulation
+                                    {t('investments.retake.cancelSimulation', '← Cancel Simulation')}
                                 </button>
                             </div>
                         )}
@@ -930,7 +930,7 @@ export const InvestmentNode = ({ userId, onComplete }) => {
                                     className="text-purple-600 hover:text-purple-700 text-sm font-medium flex items-center gap-2 px-4 py-2 hover:bg-purple-50 rounded-lg transition-colors"
                                 >
                                     <History className="w-4 h-4" />
-                                    Retake Risk Simulator
+                                    {t('investments.retake.button', 'Retake Risk Simulator')}
                                 </button>
                             </div>
                         </div>

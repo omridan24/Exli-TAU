@@ -5,9 +5,16 @@ import { StatsOverview } from './components/StatsOverview';
 import { YearDashboard } from './components/YearDashboard';
 import { useFx } from '../../lib/fx/useFx';
 
-export const AnalyticsNode = ({ data, income, categories, userId }) => {
+// target (optional): a dashboard shortcut, { view: 'reports' | 'trends', category?: string }. It opens the
+// year that holds the data (the latest one, or the latest one with that category) on the right tab.
+export const AnalyticsNode = ({ data, income, categories, userId, target }) => {
     const { t } = useTranslation();
-    const [selectedYear, setSelectedYear] = useState(null);
+    const [selectedYear, setSelectedYear] = useState(() => {
+        if (!target) return null;
+        const matching = target.category ? data.filter(d => d.assignedCategory === target.category) : data;
+        const targetYears = matching.map(d => d.reportMonth?.split('-')[0]).filter(Boolean).sort();
+        return targetYears[targetYears.length - 1] || null;
+    });
     const { sum, defaultCurrency, dataVersion } = useFx();
 
     const years = useMemo(() => {
@@ -61,7 +68,7 @@ export const AnalyticsNode = ({ data, income, categories, userId }) => {
         return 'real';
     };
 
-    if (selectedYear) return <YearDashboard year={selectedYear} data={data} income={income} categories={categories} userId={userId} onBack={() => setSelectedYear(null)} />;
+    if (selectedYear) return <YearDashboard year={selectedYear} data={data} income={income} categories={categories} userId={userId} initialViewMode={target?.view === 'trends' ? 'category' : undefined} initialCategory={target?.category} onBack={() => setSelectedYear(null)} />;
 
     return (
         <div className="p-6 max-w-5xl mx-auto animate-fade-in">

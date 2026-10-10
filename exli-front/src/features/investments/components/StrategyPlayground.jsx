@@ -164,10 +164,10 @@ export const StrategyPlayground = ({
     // Calculate next milestone for encouragement
     const nextMilestone = useMemo(() => {
         if (savingsRate >= 50) return null;
-        if (savingsRate >= 30) return { target: 50, label: 'FIRE Mode 🔥', remaining: 50 - savingsRate };
-        if (savingsRate >= 10) return { target: 30, label: 'Cruising 🚴', remaining: 30 - savingsRate };
-        return { target: 10, label: 'Tortoise 🐢', remaining: 10 - savingsRate };
-    }, [savingsRate]);
+        if (savingsRate >= 30) return { target: 50, label: t('investments.strategy.milestones.fire', 'FIRE Mode 🔥'), remaining: 50 - savingsRate };
+        if (savingsRate >= 10) return { target: 30, label: t('investments.strategy.milestones.cruising', 'Cruising 🚴'), remaining: 30 - savingsRate };
+        return { target: 10, label: t('investments.strategy.milestones.tortoise', 'Tortoise 🐢'), remaining: 10 - savingsRate };
+    }, [savingsRate, t]);
 
     // Fixed max scale logic based on 15% return (highest) + 30 years + current active Income * 50% savings?
     // We need a stable scale so bars don't jump wildly when slider moves. But slider DOES move Invested bar.
@@ -240,7 +240,7 @@ export const StrategyPlayground = ({
 
                 <div className="flex items-center gap-2">
                     <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">
+                        <span className="absolute start-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">
                             {userCurrency === 'ILS' ? '₪' : '$'}
                         </span>
                         <input
@@ -251,7 +251,7 @@ export const StrategyPlayground = ({
                                 setManualIncome(Math.max(0, parseInt(e.target.value) || 0));
                             }}
                             placeholder={averageIncome || 0}
-                            className="w-32 pl-8 pr-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-800 focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition-all"
+                            className="w-32 ps-8 pe-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-800 focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition-all"
                         />
                     </div>
 
@@ -355,7 +355,7 @@ export const StrategyPlayground = ({
                                 <span className="text-sm text-slate-600">
                                     {t('investments.strategy.scenes.retireAge', 'Estimated retirement age:')}
                                 </span>
-                                <span className={`text-lg font-bold ${lifeScene.textColor} ml-2`}>
+                                <span className={`text-lg font-bold ${lifeScene.textColor} ms-2`}>
                                     {lifeScene.retireAge}
                                 </span>
                             </div>
@@ -450,24 +450,24 @@ export const StrategyPlayground = ({
 
                                 <div className="space-y-1 relative">
                                     {/* Invested Bar */}
-                                    <div className="h-8 bg-slate-100 rounded-r-lg overflow-hidden relative w-full">
+                                    <div className="h-8 bg-slate-100 rounded-e-lg overflow-hidden relative w-full">
                                         <div
-                                            className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 absolute left-0 top-0 transition-all duration-500 flex items-center justify-between px-3"
+                                            className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 absolute start-0 top-0 transition-all duration-500 flex items-center justify-between px-3"
                                             style={{ width: `${Math.max(investedPercent, 0.5)}%` }} // Ensure visible
                                         >
                                             <span className="text-white font-bold text-xs whitespace-nowrap">{t('investments.strategy.projection.investedLabel', '🚀 Invested')}</span>
                                         </div>
                                         {/* Value Label (outside if too small?) - keeping inside for now or right aligned */}
-                                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-600">
+                                        <span className="absolute end-2 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-600">
                                             {formatCurrency(proj.rocket)}
                                         </span>
                                     </div>
 
                                     {/* Cash Bar (Status Quo) */}
-                                    <div className="h-6 bg-slate-50 rounded-r-lg overflow-hidden relative w-full flex items-center">
+                                    <div className="h-6 bg-slate-50 rounded-e-lg overflow-hidden relative w-full flex items-center">
                                         {/* Bar */}
                                         <div
-                                            className={`h-full absolute left-0 top-0 transition-all duration-500 ${isCashNegative
+                                            className={`h-full absolute start-0 top-0 transition-all duration-500 ${isCashNegative
                                                 ? 'bg-red-400/80 pattern-diagonal-lines' // Negative
                                                 : 'bg-slate-300' // Positive
                                                 }`}

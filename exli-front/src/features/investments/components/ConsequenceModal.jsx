@@ -41,7 +41,7 @@ const ComparisonCard = ({ title, data, variant, t }) => {
                                     ? 'bg-amber-100 text-amber-700'
                                     : 'bg-emerald-100 text-emerald-700'
                             }`}>
-                            {data.riskLevel}
+                            {t(`investments.misc.level.${data.riskLevel}`, data.riskLevel)}
                         </span>
                     </div>
                 )}

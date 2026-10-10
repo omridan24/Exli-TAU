@@ -35,6 +35,14 @@ const HISTORICAL_CRASHES = [
     }
 ];
 
+// Display texts of a historical crash, translated (the crash data above stays language-neutral)
+const localizeCrash = (crash, t) => ({
+    ...crash,
+    label: t(`investments.riskStorm.crashes.${crash.key}.label`, crash.label),
+    description: t(`investments.riskStorm.crashes.${crash.key}.description`, crash.description),
+    recovery: t(`investments.riskStorm.crashes.${crash.key}.recovery`, crash.recovery)
+});
+
 // Bucket volatility multipliers (how much each bucket drops during crashes)
 const BUCKET_VOLATILITY = {
     short: 0.05,   // Cash/bonds barely move
@@ -86,7 +94,7 @@ const BucketImpact = ({ bucket, allocation, baseValue, crashPercent, t }) => {
                     </div>
                 </div>
             </div>
-            <div className="text-right">
+            <div className="text-end">
                 <div className="flex items-center gap-2">
                     <span className="text-slate-400 text-sm line-through">
                         ${bucketValue.toLocaleString()}
@@ -118,12 +126,12 @@ const EducationalOverlay = ({ messageKey, onDismiss, t }) => {
         },
         recovery: {
             title: t('investments.onboarding.stressTest.educationalOverlay.recovery', 'History shows recovery'),
-            description: 'Markets recovered from 2008 in about 18 months. The S&P 500 went on to 5x from the bottom. Patience pays.',
+            description: t('investments.riskStorm.overlay.recoveryDesc', 'Markets recovered from 2008 in about 18 months. The S&P 500 went on to 5x from the bottom. Patience pays.'),
             color: 'bg-amber-50 border-amber-200'
         },
         sellWarning: {
             title: t('investments.onboarding.stressTest.educationalOverlay.sellWarning', 'The danger zone'),
-            description: 'In 2008, many sold here and locked in permanent losses. Those who waited recovered fully—and then some.',
+            description: t('investments.riskStorm.overlay.sellWarningDesc', 'In 2008, many sold here and locked in permanent losses. Those who waited recovered fully—and then some.'),
             color: 'bg-red-50 border-red-200'
         }
     };
@@ -189,20 +197,20 @@ const SellModal = ({ portfolioLoss, onClose, onConfirmStay, t }) => {
                         </h4>
                         <div className="space-y-2 text-sm">
                             <div className="flex justify-between">
-                                <span className="text-slate-600">2008 Crisis (-50%)</span>
-                                <span className="text-emerald-600 font-medium">Recovered in 18 months</span>
+                                <span className="text-slate-600">{t('investments.riskStorm.history.crisis2008', '2008 Crisis (-50%)')}</span>
+                                <span className="text-emerald-600 font-medium">{t('investments.riskStorm.history.crisis2008Result', 'Recovered in 18 months')}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-slate-600">COVID Crash (-34%)</span>
-                                <span className="text-emerald-600 font-medium">Recovered in 5 months</span>
+                                <span className="text-slate-600">{t('investments.riskStorm.history.covid', 'COVID Crash (-34%)')}</span>
+                                <span className="text-emerald-600 font-medium">{t('investments.riskStorm.history.covidResult', 'Recovered in 5 months')}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-slate-600">2022 Inflation (-19%)</span>
-                                <span className="text-emerald-600 font-medium">Recovered in 14 months</span>
+                                <span className="text-slate-600">{t('investments.riskStorm.history.inflation2022', '2022 Inflation (-19%)')}</span>
+                                <span className="text-emerald-600 font-medium">{t('investments.riskStorm.history.inflation2022Result', 'Recovered in 14 months')}</span>
                             </div>
                         </div>
                         <p className="text-xs text-slate-500 mt-3 italic">
-                            * Those who sold at the bottom permanently lost money. Those who waited recovered fully.
+                            {t('investments.riskStorm.history.note', '* Those who sold at the bottom permanently lost money. Those who waited recovered fully.')}
                         </p>
                     </div>
                 )}
@@ -238,6 +246,7 @@ export const RiskStormSimulator = ({
     embedded = false
 }) => {
     const { t } = useTranslation();
+    const crashes = HISTORICAL_CRASHES.map(crash => localizeCrash(crash, t));
     const { isRTL } = useLanguage(userId);
 
     const [crashPercent, setCrashPercent] = useState(0);
@@ -339,7 +348,7 @@ export const RiskStormSimulator = ({
             {/* Portfolio Visualization */}
             <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-4">
                 <div className="text-sm text-slate-500 mb-3 uppercase tracking-wide font-medium">
-                    Your Portfolio
+                    {t('investments.riskStorm.yourPortfolio', 'Your Portfolio')}
                 </div>
 
                 <div className="space-y-2">
@@ -358,8 +367,8 @@ export const RiskStormSimulator = ({
                 {/* Total */}
                 <div className="mt-4 p-3 bg-white rounded-xl border-2 border-slate-200">
                     <div className="flex items-center justify-between">
-                        <span className="font-medium text-slate-700">Total Portfolio</span>
-                        <div className="text-right">
+                        <span className="font-medium text-slate-700">{t('investments.misc.totalPortfolio', 'Total Portfolio')}</span>
+                        <div className="text-end">
                             <div className={`text-xl font-bold ${crashPercent < 0 ? 'text-red-600' : 'text-slate-800'}`}>
                                 ${Math.round(portfolioImpact.totalNewValue).toLocaleString()}
                             </div>
@@ -388,7 +397,7 @@ export const RiskStormSimulator = ({
 
                 <div className="relative pt-8 pb-4">
                     {/* Event Markers ON the slider */}
-                    {HISTORICAL_CRASHES.map(crash => {
+                    {crashes.map(crash => {
                         // Position: -50 is left (0%), 0 is right (100%)
                         const position = ((crash.drop + 50) / 50) * 100;
                         const isActive = crashPercent === crash.drop;
@@ -425,15 +434,15 @@ export const RiskStormSimulator = ({
                     />
 
                     {/* End labels */}
-                    <div className="absolute -bottom-2 left-0 right-0 flex justify-between text-xs text-slate-400">
+                    <div className="absolute -bottom-2 start-0 end-0 flex justify-between text-xs text-slate-400">
                         <span>-50%</span>
                         <span>0%</span>
                     </div>
                 </div>
 
                 {/* Event Details - Show when an event is selected */}
-                {HISTORICAL_CRASHES.find(c => c.drop === crashPercent) && (() => {
-                    const event = HISTORICAL_CRASHES.find(c => c.drop === crashPercent);
+                {crashes.find(c => c.drop === crashPercent) && (() => {
+                    const event = crashes.find(c => c.drop === crashPercent);
                     return (
                         <div className="mt-4 p-4 bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl border border-slate-200 animate-in fade-in-50 duration-200">
                             <div className="flex items-start gap-3">

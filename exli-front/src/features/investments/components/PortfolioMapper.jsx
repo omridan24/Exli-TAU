@@ -64,21 +64,21 @@ export const PortfolioMapper = ({
             label: t('investments.buckets.long.name', 'Long Range'),
             emoji: '🚀',
             color: 'purple',
-            timeRange: '10+ years'
+            timeRange: t('investments.buckets.long.timeRange', '10+ years')
         },
         mid: {
             icon: Anchor,
             label: t('investments.buckets.mid.name', 'Mid Range'),
             emoji: '⚓',
             color: 'blue',
-            timeRange: '3-10 years'
+            timeRange: t('investments.buckets.mid.timeRange', '3-10 years')
         },
         short: {
             icon: Shield,
             label: t('investments.buckets.short.name', 'Short Term'),
             emoji: '🛡️',
             color: 'emerald',
-            timeRange: '0-3 years'
+            timeRange: t('investments.buckets.short.timeRange', '0-3 years')
         }
     };
 
@@ -352,11 +352,11 @@ export const PortfolioMapper = ({
                 setUploadComplete(true);
                 setShowReviewModal(true);
             } else {
-                alert(data.error || 'Failed to extract holdings');
+                alert(data.error || t('investments.portfolio.extractFailed', 'Failed to extract holdings'));
             }
         } catch (err) {
             console.error('Upload failed:', err);
-            alert('Upload failed. Please try again.');
+            alert(t('investments.portfolio.uploadFailed', 'Upload failed. Please try again.'));
             if (uploadIntervalRef.current) {
                 clearInterval(uploadIntervalRef.current);
             }
@@ -555,7 +555,7 @@ export const PortfolioMapper = ({
                 </div>
 
                 {/* Price display */}
-                <div className="mt-2 pl-[52px]">
+                <div className="mt-2 ps-[52px]">
                     <div className={`text-lg font-semibold ${isMissingPrice ? 'text-red-500' : 'text-slate-800'}`}>
                         {isMissingPrice
                             ? t('investments.portfolio.enterPrice', 'Enter price ↓')
@@ -622,7 +622,7 @@ export const PortfolioMapper = ({
                         <div>
                             <label className={`text-xs ${!editValues.currentPrice ? 'text-red-600 font-medium' : 'text-slate-600'}`}>
                                 {t('investments.portfolio.currentPrice', 'Current Price per Share')}
-                                {!editValues.currentPrice && <span className="ml-1">⚠️</span>}
+                                {!editValues.currentPrice && <span className="ms-1">⚠️</span>}
                             </label>
                             <input
                                 type="number"
@@ -724,19 +724,19 @@ export const PortfolioMapper = ({
             {/* Search Bar (separate from watched symbols) */}
             <div className="relative">
                 <div className="relative">
-                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+                    <Search className="absolute start-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
                     <input
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder={t('investments.portfolio.searchPlaceholder', 'Search stocks or ETFs to add...')}
-                        className="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition-all"
+                        className="w-full ps-12 pe-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition-all"
                     />
                 </div>
 
                 {/* Search results dropdown */}
                 {(isSearching || searchResults.length > 0) && (
-                    <div className="absolute top-full left-0 right-0 bg-white rounded-xl shadow-lg border border-slate-200 mt-2 max-h-60 overflow-y-auto z-50">
+                    <div className="absolute top-full start-0 end-0 bg-white rounded-xl shadow-lg border border-slate-200 mt-2 max-h-60 overflow-y-auto z-50">
                         {isSearching ? (
                             <div className="flex items-center gap-2 p-4 text-slate-500">
                                 <RefreshCw className="w-4 h-4 animate-spin" />
@@ -747,11 +747,11 @@ export const PortfolioMapper = ({
                                 <button
                                     key={idx}
                                     onClick={() => handleSearchResultClick(item)}
-                                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 border-b border-slate-100 last:border-0 text-left"
+                                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 border-b border-slate-100 last:border-0 text-start"
                                 >
                                     <div>
                                         <span className="font-bold text-slate-800">{item.symbol}</span>
-                                        <span className="text-slate-500 ml-2 text-sm">{item.name}</span>
+                                        <span className="text-slate-500 ms-2 text-sm">{item.name}</span>
                                     </div>
                                     <Plus className="w-4 h-4 text-purple-600" />
                                 </button>
@@ -812,7 +812,7 @@ export const PortfolioMapper = ({
 
             {/* Upload Complete Notification Banner */}
             {uploadComplete && uploadCompletedData && !showReviewModal && (
-                <div className="fixed top-4 right-4 z-50 animate-bounce-slow">
+                <div className="fixed top-4 end-4 z-50 animate-bounce-slow">
                     <button
                         onClick={() => {
                             setExtractedHoldings(uploadCompletedData);
@@ -826,7 +826,7 @@ export const PortfolioMapper = ({
                         <div className="bg-white/20 rounded-full p-1">
                             <Check className="w-5 h-5" />
                         </div>
-                        <div className="text-left">
+                        <div className="text-start">
                             <div className="font-semibold">{t('investments.portfolio.analysisComplete', 'Analysis Complete!')}</div>
                             <div className="text-sm text-emerald-100">{t('investments.portfolio.clickToReview', 'Click to review {{count}} holdings', { count: uploadCompletedData.length })}</div>
                         </div>
@@ -908,7 +908,7 @@ export const PortfolioMapper = ({
                                         <span className="text-lg font-bold text-slate-800">
                                             {formatCurrency(stats.total, userCurrency)}
                                         </span>
-                                        <span className={`ml-2 text-sm font-medium ${Math.abs(stats.diff) <= 5 ? 'text-emerald-600' :
+                                        <span className={`ms-2 text-sm font-medium ${Math.abs(stats.diff) <= 5 ? 'text-emerald-600' :
                                             stats.diff > 0 ? 'text-amber-600' : 'text-blue-600'
                                             }`}>
                                             ({stats.percentage}%)
@@ -958,7 +958,7 @@ export const PortfolioMapper = ({
             {bucketStats.grandTotal > 0 && (
                 <div className="bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl p-4 text-center">
                     <span className="text-slate-600">{t('investments.portfolio.totalPortfolio', 'Total Portfolio')}:</span>
-                    <span className="text-2xl font-bold text-slate-800 ml-2">
+                    <span className="text-2xl font-bold text-slate-800 ms-2">
                         {formatCurrency(bucketStats.grandTotal, userCurrency)}
                     </span>
                 </div>
@@ -1074,14 +1074,14 @@ export const PortfolioMapper = ({
                                                     value={holding.symbol || ''}
                                                     onChange={(e) => updateExtractedHolding(idx, { symbol: e.target.value })}
                                                     className="font-bold text-slate-800 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-purple-500 outline-none w-24"
-                                                    placeholder="Symbol"
+                                                    placeholder={t('investments.misc.symbol', 'Symbol')}
                                                 />
                                                 <input
                                                     type="text"
                                                     value={holding.name || ''}
                                                     onChange={(e) => updateExtractedHolding(idx, { name: e.target.value })}
-                                                    className="text-sm text-slate-500 ml-2 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-purple-500 outline-none w-48"
-                                                    placeholder="Name"
+                                                    className="text-sm text-slate-500 ms-2 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-purple-500 outline-none w-48"
+                                                    placeholder={t('investments.misc.name', 'Name')}
                                                 />
                                                 {holding.localSecurityId && (holding.unverified || !holding.symbol) && (
                                                     <div className="text-xs text-slate-400 mt-0.5">
@@ -1096,10 +1096,10 @@ export const PortfolioMapper = ({
                                                 onChange={(e) => updateExtractedHolding(idx, { assetType: e.target.value })}
                                                 className="text-xs bg-slate-100 px-2 py-1 rounded border-0"
                                             >
-                                                <option value="stock">STOCK</option>
-                                                <option value="etf">ETF</option>
-                                                <option value="crypto">CRYPTO</option>
-                                                <option value="bond">BOND</option>
+                                                <option value="stock">{t('investments.misc.assetType.stock', 'STOCK')}</option>
+                                                <option value="etf">{t('investments.misc.assetType.etf', 'ETF')}</option>
+                                                <option value="crypto">{t('investments.misc.assetType.crypto', 'CRYPTO')}</option>
+                                                <option value="bond">{t('investments.misc.assetType.bond', 'BOND')}</option>
                                             </select>
                                             {holding.newToDatabase && (
                                                 <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
@@ -1133,10 +1133,10 @@ export const PortfolioMapper = ({
                                                             needsReview: false,
                                                             candidates: null
                                                         })}
-                                                        className="px-3 py-1.5 bg-white border border-amber-300 rounded-lg text-sm hover:bg-amber-100 hover:border-amber-400 transition-colors text-left"
+                                                        className="px-3 py-1.5 bg-white border border-amber-300 rounded-lg text-sm hover:bg-amber-100 hover:border-amber-400 transition-colors text-start"
                                                     >
                                                         <span className="font-bold text-slate-800">{c.symbol}</span>
-                                                        <span className="text-slate-500 ml-1.5">{c.name}</span>
+                                                        <span className="text-slate-500 ms-1.5">{c.name}</span>
                                                     </button>
                                                 ))}
                                                 <button
@@ -1154,7 +1154,7 @@ export const PortfolioMapper = ({
                                         <div>
                                             <label className={`text-xs ${!holding.quantity ? 'text-red-500 font-medium' : 'text-slate-500'}`}>
                                                 {t('investments.portfolio.quantity', 'Quantity')}
-                                                {!holding.quantity && <span className="ml-1">⚠️</span>}
+                                                {!holding.quantity && <span className="ms-1">⚠️</span>}
                                             </label>
                                             <input
                                                 type="number"
@@ -1171,7 +1171,7 @@ export const PortfolioMapper = ({
                                         <div>
                                             <label className={`text-xs ${!holding.pricePerShare && !holding.currentPrice ? 'text-red-500 font-medium' : 'text-slate-500'}`}>
                                                 {t('investments.portfolio.pricePerShare', 'Price/Share')}
-                                                {!holding.pricePerShare && !holding.currentPrice && <span className="ml-1">⚠️</span>}
+                                                {!holding.pricePerShare && !holding.currentPrice && <span className="ms-1">⚠️</span>}
                                             </label>
                                             <input
                                                 type="number"
@@ -1194,7 +1194,7 @@ export const PortfolioMapper = ({
                                                 value={holding.costBasis || ''}
                                                 onChange={(e) => updateExtractedHolding(idx, { costBasis: parseFloat(e.target.value) || null })}
                                                 className="w-full px-2 py-1.5 border border-slate-200 rounded focus:border-purple-500 focus:ring-1 focus:ring-purple-100"
-                                                placeholder={t('common.optional', 'Optional')}
+                                                placeholder={t('common.optionalCap', 'Optional')}
                                             />
                                         </div>
                                         <div>
@@ -1272,7 +1272,7 @@ export const PortfolioMapper = ({
                                                 </span>
                                             ) : (
                                                 pendingStock.currentPrice > 0
-                                                    ? `${formatCurrency(pendingStock.currentPrice, pendingStock.currency || 'USD')} per share`
+                                                    ? t('investments.portfolio.perShare', '{{price}} per share', { price: formatCurrency(pendingStock.currentPrice, pendingStock.currency || 'USD') })
                                                     : t('investments.portfolio.priceNotAvailable', 'Price not available')
                                             )}
                                         </p>
