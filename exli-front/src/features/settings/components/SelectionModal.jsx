@@ -33,9 +33,13 @@ export const SelectionModal = ({ isOpen, title, data = [], onClose, onSelect, se
     const filtered = data.filter(o => {
         const name = o.name || o;
         const displayName = getDisplayName(o);
-        const originalMatch = String(name).toLowerCase().includes(searchTerm.toLowerCase());
-        const displayMatch = String(displayName).toLowerCase().includes(searchTerm.toLowerCase());
-        return originalMatch || displayMatch;
+        const term = searchTerm.trim().toLowerCase();
+        if (!term) return true;
+        const originalMatch = String(name).toLowerCase().includes(term);
+        const displayMatch = String(displayName).toLowerCase().includes(term);
+        const hebrewMatch = o.nameHe ? String(o.nameHe).toLowerCase().includes(term) : false;
+        const codeMatch = o.code ? String(o.code).toLowerCase() === term : false;
+        return originalMatch || displayMatch || hebrewMatch || codeMatch;
     });
 
     return (
@@ -77,7 +81,13 @@ export const SelectionModal = ({ isOpen, title, data = [], onClose, onSelect, se
                                                 className={`p-4 rounded-xl text-start font-bold border transition-all flex items-center justify-between group ${selectedValue === name ? 'bg-emerald-50 border-emerald-500 text-emerald-700' : 'bg-white border-slate-200 hover:border-slate-300'}`}
                                             >
                                                 <div className="flex items-center gap-3">
-                                                    {opt.flag && opt.flag}
+                                                    {opt.flag && (
+                                                        typeof opt.flag === 'string' && (opt.flag.startsWith('http') || opt.flag.startsWith('/')) ? (
+                                                            <img src={opt.flag} alt="" className="w-6 h-4 object-cover rounded-sm shadow-xs" loading="lazy" />
+                                                        ) : (
+                                                            opt.flag
+                                                        )
+                                                    )}
                                                     <span className="truncate">{displayName}</span>
                                                 </div>
                                                 {selectedValue === name && <Check className="w-5 h-5" />}

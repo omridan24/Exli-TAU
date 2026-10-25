@@ -3,6 +3,7 @@ import { Save, Globe, Languages } from 'lucide-react';
 import { doc, getDoc, setDoc, collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db, logUserAction } from '../../config/firebase';
 import { OCCUPATIONS_LIST, STATUS_LIST } from '../../config/constants';
+import { COUNTRIES_LIST, getCountryFlagUrl } from '../../config/countries';
 import { Button } from '../../components/UI';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '../../hooks/useLanguage';
@@ -16,6 +17,21 @@ import { ProfileTab } from './components/ProfileTab';
 import { CategoriesTab } from './components/CategoriesTab';
 import { HistoryTab } from './components/HistoryTab';
 import { CurrencyTab } from './components/CurrencyTab';
+
+const defaultCountryOptions = COUNTRIES_LIST.map(c => ({
+  name: c.name,
+  code: c.code,
+  nameHe: c.nameHe,
+  flag: (
+    <img
+      src={getCountryFlagUrl(c.code)}
+      alt=""
+      className="w-6 h-4 object-cover rounded-sm shadow-xs"
+      loading="lazy"
+      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+    />
+  )
+}));
 
 export const SettingsNode = ({ userId, onUpdateProfile, categories, onUpdateCategories }) => {
   const { t } = useTranslation();
@@ -41,7 +57,7 @@ export const SettingsNode = ({ userId, onUpdateProfile, categories, onUpdateCate
   const [catModal, setCatModal] = useState(null);
 
   // API Data Lists
-  const [countries, setCountries] = useState([]);
+  const [countries, setCountries] = useState(defaultCountryOptions);
   const [cities, setCities] = useState([]);
   const [universities, setUniversities] = useState([]);
   const [isApiLoading, setIsApiLoading] = useState(false);
@@ -68,18 +84,6 @@ export const SettingsNode = ({ userId, onUpdateProfile, categories, onUpdateCate
       const q = query(collection(db, 'users', userId, 'history'), orderBy('timestamp', 'desc'), limit(15));
       const hSnap = await getDocs(q);
       setHistory(hSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-
-      // Fetch Countries
-      fetch('https://restcountries.com/v3.1/all?fields=name,cca2,flags')
-        .then(res => res.json())
-        .then(data => {
-          const formatted = data.map(c => ({
-            name: c.name.common,
-            code: c.cca2,
-            flag: c.flags.svg ? <img src={c.flags.svg} className="w-6 h-4 object-cover" /> : null
-          })).sort((a, b) => a.name.localeCompare(b.name));
-          setCountries(formatted);
-        });
     };
     init();
   }, [userId]);
@@ -89,13 +93,9 @@ export const SettingsNode = ({ userId, onUpdateProfile, categories, onUpdateCate
     setModalType('city');
     setIsApiLoading(true);
     try {
-      const response = await fetch("https://countriesnow.space/api/v0.1/countries/cities", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ country: countryName })
-      });
+      const response = await fetch(`https://countriesnow.space/api/v0.1/countries/cities/q?country=${encodeURIComponent(countryName)}`);
       const data = await response.json();
-      setCities(!data.error ? data.data : ['No cities found', 'Other']);
+      setCities(!data.error && Array.isArray(data.data) ? data.data : ['No cities found', 'Other']);
     } catch (err) { setCities(['Error fetching', 'Other']); } finally { setIsApiLoading(false); }
   };
 
@@ -106,9 +106,11 @@ export const SettingsNode = ({ userId, onUpdateProfile, categories, onUpdateCate
     fetch("https://raw.githubusercontent.com/Hipo/university-domains-list/master/world_universities_and_domains.json")
       .then(res => res.json())
       .then(data => {
-        const filtered = data.filter(u => u.country.toLowerCase() === country.toLowerCase()).map(u => u.name).sort();
+        const filtered = Array.isArray(data) ? data.filter(u => u.country?.toLowerCase() === country.toLowerCase()).map(u => u.name).sort() : [];
         setUniversities(filtered.length ? filtered : ['Other']);
-      }).finally(() => setIsApiLoading(false));
+      })
+      .catch(() => setUniversities(['Other']))
+      .finally(() => setIsApiLoading(false));
   };
 
   const handleSaveProfile = async (newProfile) => {
