@@ -80,6 +80,9 @@ export const groupsApi = {
   applyDefaultSplit: (groupId) =>
     authedFetch(`/groups/${groupId}/expenses/apply-default-split`, { method: 'POST' }),
 
+  getIncomeFixes: (groupId) => authedFetch(`/groups/${groupId}/expenses/income-fixes`),
+  applyIncomeFixes: (groupId) => authedFetch(`/groups/${groupId}/expenses/income-fixes`, { method: 'POST' }),
+
   getMergePreview: (groupId, currency) =>
     authedFetch(`/groups/${groupId}/merge-preview?currency=${encodeURIComponent(currency)}`),
   consolidateCurrency: (groupId, currency) =>

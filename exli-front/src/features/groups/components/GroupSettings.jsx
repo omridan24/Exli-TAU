@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { X, Camera, Loader2, Shield, UserMinus } from 'lucide-react';
@@ -28,6 +28,10 @@ export const GroupSettings = ({ group, userId, expenseCount = 0, expenseMonths =
   const [confirmingApply, setConfirmingApply] = useState(false); // after saving a changed default: convert existing expenses?
   const [applying, setApplying] = useState(false);
   const [applyResult, setApplyResult] = useState(null);
+  const [incomeFixes, setIncomeFixes] = useState([]); // equal-split fallbacks whose income has since been uploaded
+  const [reviewingFixes, setReviewingFixes] = useState(false);
+  const [applyingFixes, setApplyingFixes] = useState(false);
+  const [fixesDone, setFixesDone] = useState(null); // count re-split, after approving
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -38,6 +42,10 @@ export const GroupSettings = ({ group, userId, expenseCount = 0, expenseMonths =
   const [mergeCurrency, setMergeCurrency] = useState(initialCurrencySettings.mergeCurrency || 'ILS');
 
   const activeMembers = Object.entries(group.members || {}).filter(([, m]) => m.status === 'active');
+
+  useEffect(() => {
+    groupsApi.getIncomeFixes(group.id).then((res) => setIncomeFixes(res.fixes || [])).catch(() => {});
+  }, [group.id]);
 
   const handleImageChange = (e) => {
     const file = e.target.files?.[0];
@@ -114,6 +122,21 @@ export const GroupSettings = ({ group, userId, expenseCount = 0, expenseMonths =
     }
   };
 
+  const handleApplyFixes = async () => {
+    setApplyingFixes(true);
+    setError('');
+    try {
+      const res = await groupsApi.applyIncomeFixes(group.id);
+      setFixesDone(res.converted);
+      setIncomeFixes([]);
+      setReviewingFixes(false);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setApplyingFixes(false);
+    }
+  };
+
   // A group already on one shared currency can still hold expenses/payments recorded in another one.
   const openLeftoverPreview = async () => {
     setPreviewing(true);
@@ -183,6 +206,58 @@ export const GroupSettings = ({ group, userId, expenseCount = 0, expenseMonths =
 
         <div className="p-6 space-y-5 overflow-y-auto">
           {error && <p className="text-xs text-rose-500 font-medium">{error}</p>}
+
+          {fixesDone != null && (
+            <p className="text-sm text-emerald-700 font-medium bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+              {t('groups.settings.incomeFix.done', { count: fixesDone })}
+            </p>
+          )}
+
+          {incomeFixes.length > 0 && !reviewingFixes && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center justify-between gap-3">
+              <p className="text-xs text-slate-700 font-medium">{t('groups.settings.incomeFix.banner', { count: incomeFixes.length })}</p>
+              <button type="button" onClick={() => setReviewingFixes(true)}
+                className="shrink-0 px-3 py-2 rounded-lg bg-slate-900 text-white text-xs font-bold">
+                {t('groups.settings.incomeFix.review')}
+              </button>
+            </div>
+          )}
+
+          {reviewingFixes && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
+              <p className="text-sm font-bold text-slate-800">{t('groups.settings.incomeFix.title')}</p>
+              <p className="text-xs text-slate-500">{t('groups.settings.incomeFix.explain')}</p>
+              <div className="max-h-60 overflow-y-auto space-y-2">
+                {incomeFixes.map((f) => (
+                  <div key={f.expenseId} className="bg-white rounded-lg p-3 text-xs text-slate-600 space-y-0.5">
+                    <p className="flex justify-between gap-3 font-bold text-slate-800">
+                      <span className="truncate">{f.date} {f.description}</span>
+                      <span className="whitespace-nowrap">{formatMinorAmount(f.amountMinor, f.currency)}</span>
+                    </p>
+                    {Object.keys(f.newShares).map((uid) => (
+                      <p key={uid} className="flex justify-between gap-3">
+                        <span>{group.members?.[uid]?.displayName || uid}</span>
+                        <span className="whitespace-nowrap">
+                          {formatMinorAmount(f.oldShares[uid] || 0, f.currency)} {'→'}{' '}
+                          <span className="font-bold text-slate-800">{formatMinorAmount(f.newShares[uid], f.currency)}</span>
+                        </span>
+                      </p>
+                    ))}
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setReviewingFixes(false)} disabled={applyingFixes}
+                  className="flex-1 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-600 font-bold text-sm">
+                  {t('groups.create.cancel')}
+                </button>
+                <button type="button" onClick={handleApplyFixes} disabled={applyingFixes}
+                  className="flex-1 py-2.5 rounded-xl bg-slate-900 text-white font-bold text-sm flex items-center justify-center gap-2">
+                  {applyingFixes && <Loader2 className="w-4 h-4 animate-spin" />} {t('groups.settings.incomeFix.approve')}
+                </button>
+              </div>
+            </div>
+          )}
 
           {mergePlan && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">

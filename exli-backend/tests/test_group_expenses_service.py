@@ -858,6 +858,63 @@ class TestApplyDefaultSplitToExisting:
         assert db.collection("users").document(OWNER).collection("expenses").document(pid).get().to_dict()["amount"] == 70.0
 
 
+class TestIncomeFixes:
+    """Income uploaded AFTER expenses fell back to an equal split (incomeFallback)."""
+
+    def _group_with_fallback_expense(self, db, date="2026-10-10"):
+        gid = seed_group(db, splitRules=[equal_rule(), income_rule()], defaultSplitRuleId="income", defaultSplitConfigured=True)
+        eid = svc.create_expense(db, OWNER, gid, **basic_kwargs(date_str=date, split_input=None))
+        assert expense_dict(db, gid, eid)["split"]["params"]["incomeFallback"] is True
+        return gid, eid
+
+    def test_nothing_to_fix_while_income_is_still_missing(self, db):
+        gid, _ = self._group_with_fallback_expense(db)
+        seed_income(db, OWNER, "2026-10", 16000)  # member's income still missing
+        assert svc.get_income_fixes(db, OWNER, gid) == {"fixes": []}
+        assert svc.apply_income_fixes(db, OWNER, gid) == {"converted": 0}
+
+    def test_preview_lists_fixable_expense_without_writing(self, db):
+        gid, eid = self._group_with_fallback_expense(db)
+        seed_income(db, OWNER, "2026-10", 16000); seed_income(db, MEMBER, "2026-10", 4000)
+
+        fix, = svc.get_income_fixes(db, OWNER, gid)["fixes"]
+
+        assert fix["expenseId"] == eid
+        assert fix["oldShares"] == {OWNER: 5000, MEMBER: 5000}
+        assert fix["newShares"] == {OWNER: 8000, MEMBER: 2000}
+        assert expense_dict(db, gid, eid)["shares"] == {OWNER: 5000, MEMBER: 5000}
+
+    def test_apply_resplits_by_income_and_fixes_balances(self, db):
+        gid, eid = self._group_with_fallback_expense(db)
+        seed_income(db, OWNER, "2026-10", 16000); seed_income(db, MEMBER, "2026-10", 4000)
+
+        assert svc.apply_income_fixes(db, OWNER, gid) == {"converted": 1}
+
+        expense = expense_dict(db, gid, eid)
+        assert expense["shares"] == {OWNER: 8000, MEMBER: 2000}
+        assert expense["split"]["kind"] == "income_ratio"
+        assert "incomeFallback" not in expense["split"]["params"]
+        assert group_dict(db, gid)["balances"] == {OWNER: 2000, MEMBER: -2000}
+        assert svc.get_income_fixes(db, OWNER, gid) == {"fixes": []}  # already fixed
+
+    def test_only_months_with_complete_income_are_fixed(self, db):
+        gid, sept = self._group_with_fallback_expense(db, "2026-09-10")
+        octo = svc.create_expense(db, OWNER, gid, **basic_kwargs(date_str="2026-10-10", split_input=None))
+        seed_income(db, OWNER, "2026-10", 16000); seed_income(db, MEMBER, "2026-10", 4000)
+
+        svc.apply_income_fixes(db, OWNER, gid)
+
+        assert expense_dict(db, gid, octo)["shares"] == {OWNER: 8000, MEMBER: 2000}
+        assert expense_dict(db, gid, sept)["shares"] == {OWNER: 5000, MEMBER: 5000}
+
+    def test_requires_admin(self, db):
+        gid, _ = self._group_with_fallback_expense(db)
+        with pytest.raises(groups_svc.ForbiddenError):
+            svc.get_income_fixes(db, MEMBER, gid)
+        with pytest.raises(groups_svc.ForbiddenError):
+            svc.apply_income_fixes(db, MEMBER, gid)
+
+
 class TestRemovePersonalExpenseFromGroup:
     def test_restores_original_amount_and_clears_group_ref(self, db):
         gid = seed_group(db)

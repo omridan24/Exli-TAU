@@ -682,6 +682,96 @@ def transfer_personal_expenses_batch(db, uid, group_id, personal_expense_ids, sp
     return {"results": results}
 
 
+def _commit_resplit(db, uid, group, group_ref, planned):
+    """Writes planned re-splits [(doc, expense_dict, new_split, new_shares)] in chunks,
+    correcting group balances by the per-member share delta in the same batch."""
+    keep_original = get_currency_settings(group)["mode"] == "keep_original"
+    for start in range(0, len(planned), CONVERT_CHUNK_SIZE):
+        chunk = planned[start:start + CONVERT_CHUNK_SIZE]
+        batch = db.batch()
+        chunk_deltas = {}  # balance field path -> delta; per-currency ledgers in keep_original groups
+        for doc, e, new_split, new_shares in chunk:
+            delta = _combine_deltas(
+                _negate(_balance_deltas(e["paidBy"], e["amountMinor"], e.get("shares") or {})),
+                _balance_deltas(e["paidBy"], e["amountMinor"], new_shares),
+            )
+            prefix = f"balancesByCurrency.{e.get('currency')}." if keep_original else "balances."
+            chunk_deltas = _combine_deltas(chunk_deltas, {f"{prefix}{m_uid}": d for m_uid, d in delta.items()})
+            batch.update(doc.reference, {
+                "split": new_split, "shares": new_shares,
+                "updatedAt": firestore.SERVER_TIMESTAMP, "updatedBy": uid,
+            })
+            if e.get("source") == "personal_transfer" and e.get("sourcePersonalExpenseId") and e.get("createdBy"):
+                personal_ref = db.collection("users").document(e["createdBy"]).collection("expenses").document(
+                    e["sourcePersonalExpenseId"])
+                personal_snap = personal_ref.get()
+                if personal_snap.exists and (personal_snap.to_dict() or {}).get("groupRef"):
+                    batch.update(personal_ref, {"amount": new_shares.get(e["paidBy"], 0) / 100})
+
+        group_update = {path: firestore.Increment(d) for path, d in chunk_deltas.items() if d}
+        group_update["updatedAt"] = firestore.SERVER_TIMESTAMP
+        batch.update(group_ref, group_update)
+        batch.commit()
+
+
+def _income_fix_plan(db, group, group_ref):
+    """Expenses that fell back to an equal split because a member's income for the expense's
+    month wasn't uploaded yet (split.params.incomeFallback) and whose month is now complete.
+    Returns [(doc, expense_dict, new_split, new_shares)]; still-incomplete months are left alone."""
+    planned = []
+    for doc in group_ref.collection("expenses").stream():
+        e = doc.to_dict() or {}
+        split = e.get("split") or {}
+        if e.get("deleted") or not (split.get("params") or {}).get("incomeFallback") or not split.get("splitRuleId"):
+            continue
+        try:
+            participants = list(e.get("participants") or [])
+            split_rule_id, kind, params, resolved = _resolve_split(
+                db, group, _parse_date(e.get("date")), {"splitRuleId": split["splitRuleId"]}, participants,
+                reference_currency=e.get("currency") or group.get("currency") or "ILS",
+            )
+            new_shares = compute_shares(e["amountMinor"], kind, participants, e["paidBy"], params)
+        except (GroupServiceError, SplitError):
+            continue  # income still missing for that month (or the rule is gone) - not fixable yet
+        new_split = {"splitRuleId": split_rule_id, "kind": kind, "params": params, "resolvedRatios": resolved}
+        planned.append((doc, e, new_split, new_shares))
+    return planned
+
+
+def get_income_fixes(db, uid, group_id):
+    """Admin preview for the 'income was uploaded later' notification: which expenses would be
+    re-split by income, with each member's share before and after."""
+    snap = get_group_or_404(db, group_id)
+    group = snap.to_dict()
+    ensure_permission(group, uid, "group.update")
+
+    fixes = [
+        {
+            "expenseId": doc.id, "description": e.get("description"), "date": e.get("date"),
+            "amountMinor": e["amountMinor"], "currency": e.get("currency"),
+            "oldShares": e.get("shares") or {}, "newShares": new_shares,
+            "ratios": new_split["resolvedRatios"],
+        }
+        for doc, e, new_split, new_shares in _income_fix_plan(db, group, snap.reference)
+    ]
+    fixes.sort(key=lambda f: (f["date"] or "", f["expenseId"]))
+    return {"fixes": fixes}
+
+
+def apply_income_fixes(db, uid, group_id):
+    """Admin approval of get_income_fixes: re-splits those expenses by income and corrects balances."""
+    snap = get_group_or_404(db, group_id)
+    group = snap.to_dict()
+    ensure_permission(group, uid, "group.update")
+
+    planned = _income_fix_plan(db, group, snap.reference)
+    _commit_resplit(db, uid, group, snap.reference, planned)
+    log_activity(db, group_id, "EXPENSES_RESPLIT", uid, metadata={
+        "converted": len(planned), "unchanged": 0, "skipped": 0, "reason": "income_uploaded",
+    })
+    return {"converted": len(planned)}
+
+
 def apply_default_split_to_existing(db, uid, group_id):
     """
     Admin bulk operation: re-split EVERY existing (non-deleted) expense with the group's
@@ -727,31 +817,7 @@ def apply_default_split_to_existing(db, uid, group_id):
             continue
         planned.append((doc, e, new_split, new_shares))
 
-    for start in range(0, len(planned), CONVERT_CHUNK_SIZE):
-        chunk = planned[start:start + CONVERT_CHUNK_SIZE]
-        batch = db.batch()
-        chunk_deltas = {}
-        for doc, e, new_split, new_shares in chunk:
-            delta = _combine_deltas(
-                _negate(_balance_deltas(e["paidBy"], e["amountMinor"], e.get("shares") or {})),
-                _balance_deltas(e["paidBy"], e["amountMinor"], new_shares),
-            )
-            chunk_deltas = _combine_deltas(chunk_deltas, delta)
-            batch.update(doc.reference, {
-                "split": new_split, "shares": new_shares,
-                "updatedAt": firestore.SERVER_TIMESTAMP, "updatedBy": uid,
-            })
-            if e.get("source") == "personal_transfer" and e.get("sourcePersonalExpenseId") and e.get("createdBy"):
-                personal_ref = db.collection("users").document(e["createdBy"]).collection("expenses").document(
-                    e["sourcePersonalExpenseId"])
-                personal_snap = personal_ref.get()
-                if personal_snap.exists and (personal_snap.to_dict() or {}).get("groupRef"):
-                    batch.update(personal_ref, {"amount": new_shares.get(e["paidBy"], 0) / 100})
-
-        group_update = {f"balances.{m_uid}": firestore.Increment(d) for m_uid, d in chunk_deltas.items() if d}
-        group_update["updatedAt"] = firestore.SERVER_TIMESTAMP
-        batch.update(group_ref, group_update)
-        batch.commit()
+    _commit_resplit(db, uid, group, group_ref, planned)
 
     log_activity(db, group_id, "EXPENSES_RESPLIT", uid, metadata={
         "converted": len(planned), "unchanged": unchanged, "skipped": len(skipped),

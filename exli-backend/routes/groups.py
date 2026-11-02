@@ -318,6 +318,26 @@ def apply_default_split(group_id):
     return _handled(run)
 
 
+@groups_bp.route("/groups/<group_id>/expenses/income-fixes", methods=["GET"])
+@require_auth
+@require_whitelisted
+def income_fixes_preview(group_id):
+    def run():
+        return jsonify(expenses_svc.get_income_fixes(_db(), g.uid, group_id))
+
+    return _handled(run)
+
+
+@groups_bp.route("/groups/<group_id>/expenses/income-fixes", methods=["POST"])
+@require_auth
+@require_whitelisted
+def income_fixes_apply(group_id):
+    def run():
+        return jsonify(expenses_svc.apply_income_fixes(_db(), g.uid, group_id))
+
+    return _handled(run)
+
+
 @groups_bp.route("/groups/<group_id>/expenses/from-personal", methods=["POST"])
 @require_auth
 @require_whitelisted

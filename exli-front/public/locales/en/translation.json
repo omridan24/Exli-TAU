@@ -1898,6 +1898,14 @@
                 "confirm": "Convert and continue",
                 "leftover": "{{count}} expense(s) or payment(s) are still recorded in another currency than {{currency}}.",
                 "review": "Review and convert"
+            },
+            "incomeFix": {
+                "banner": "Income was uploaded for {{count}} expense(s) that were split equally.",
+                "review": "Review",
+                "title": "Re-split by income",
+                "explain": "These expenses were split equally because someone's income wasn't uploaded yet. It is now, so they can be split by income. Balances are updated and it is recorded in the group history. Nothing changes until you approve.",
+                "approve": "Approve and apply",
+                "done": "{{count}} expense(s) re-split by income."
             }
         },
         "transfer": {
